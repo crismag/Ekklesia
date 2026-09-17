@@ -79,7 +79,7 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>My profile - Church Portal</title>
+    <title>My profile - Ekklesia</title>
     <style>
         * { box-sizing: border-box; }
         /* A display rule on a class beats the [hidden] attribute, and this
@@ -579,7 +579,7 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
 
     <?php endif; ?>
 </main>
-<?= portal_footer('Church Portal', 'Your profile and sign-in') ?>
+<?= portal_footer('Ekklesia', 'Your profile and sign-in') ?>
 </div>
 
 <?php if ($actor !== null): ?>

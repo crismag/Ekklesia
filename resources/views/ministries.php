@@ -20,7 +20,7 @@ $subtitle = $minSettings['subtitle'] ?? 'Who is assigned across ministries — g
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Ministry Schedule Board · Church Portal</title>
+    <title>Ministry Schedule Board · Ekklesia</title>
     <style>
         :root{--ink:#17211b;--muted:#66756d;--line:#d9e4dd;--paper:#fff;--deep:#123b31;--teal:#117b6d;--soft:#eef4f0;--bg:#f7faf8;--gold:#c48725;--gradient-top:#0c2f28;--gradient-mid:#123b31}
         *{box-sizing:border-box}
@@ -207,7 +207,7 @@ $subtitle = $minSettings['subtitle'] ?? 'Who is assigned across ministries — g
     </div>
 
     </main>
-<?= portal_footer('Church Portal', 'Ministry schedule board') ?>
+<?= portal_footer('Ekklesia', 'Ministry schedule board') ?>
 </div>
 <script>
 (function () {

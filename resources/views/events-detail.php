@@ -43,7 +43,7 @@ if ($whenLabel === '') {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title><?= $event !== null ? $eventTitle . ' — ' : '' ?>Events — Church Portal</title>
+    <title><?= $event !== null ? $eventTitle . ' — ' : '' ?>Events — Ekklesia</title>
     <style>
                 *{box-sizing:border-box}
         body{margin:0;min-height:100vh;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0,var(--gradient-mid,#123b31) 320px,var(--bg) 321px)}
@@ -818,7 +818,7 @@ if ($whenLabel === '') {
 
     </main>
 <footer class="portal-footer">
-        <span>Church Portal</span>
+        <span>Ekklesia</span>
         <span>Event #<?= $eventId ?></span>
     </footer>
 </div><!-- /shell -->

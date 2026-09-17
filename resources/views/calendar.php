@@ -33,7 +33,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Calendar - Church Portal</title>
+    <title>Calendar - Ekklesia</title>
     <style>
         /* Topbar / drawer / search styles are injected by _portal-shell.php
            via portal_header(). Page-specific layout follows below. */
@@ -473,7 +473,7 @@ require_once __DIR__ . '/_portal-shell.php';
         </section>
 
     </main>
-<footer class="portal-footer"><span>Church Portal</span><span>Calendar views and filters</span></footer>
+<footer class="portal-footer"><span>Ekklesia</span><span>Calendar views and filters</span></footer>
 </div>
 <script>
 const shell = document.querySelector('.shell');

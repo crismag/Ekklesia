@@ -372,7 +372,7 @@ if (!function_exists('admin_render_page')) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title><?= $title ?> · Admin · Church Portal</title>
+    <title><?= $title ?> · Admin · Ekklesia</title>
     <?= admin_shell_styles() ?>
 </head>
 <body>

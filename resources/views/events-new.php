@@ -49,7 +49,7 @@ $returnTo = str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//')
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>New event · Church Portal</title>
+<title>New event · Ekklesia</title>
 <?= portal_theme_style_block() ?>
 <style>
     body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}

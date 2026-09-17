@@ -32,7 +32,7 @@ final class LoginChoiceRequired extends RuntimeException
         public readonly array $choices,
     ) {
         parent::__construct($kind === 'claim'
-            ? 'Choose your Church Portal account.'
+            ? 'Choose your Ekklesia account.'
             : 'More than one account matches. Choose yours.');
     }
 }

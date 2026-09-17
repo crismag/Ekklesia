@@ -18,7 +18,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>People Portal - Church Portal</title>
+    <title>People Portal - Ekklesia</title>
     <style>
                 *{box-sizing:border-box}
         body{margin:0;min-height:100vh;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
@@ -261,7 +261,7 @@ require_once __DIR__ . '/_portal-shell.php';
 
     <section id="peopleDirectory"><div class="panel empty">Loading people...</div></section>
     </main>
-<?= portal_footer('Church Portal', 'People portal') ?>
+<?= portal_footer('Ekklesia', 'People portal') ?>
 </div>
 <script>
 (function(){

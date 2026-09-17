@@ -50,7 +50,7 @@ if (!function_exists('printable_page')) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title><?= $title ?> · Printables · Church Portal</title>
+    <title><?= $title ?> · Printables · Ekklesia</title>
     <?= function_exists('portal_theme_style_block') ? portal_theme_style_block() : '' ?>
     <style>
         :root{--ink:var(--ink,#17211b);--muted:var(--muted,#627169);--line:var(--line,#d9e4dd);--paper:#fff;--deep:var(--deep,#123b31);--teal:var(--teal,#117b6d);--soft:var(--soft,#eef4f0);--bg:var(--bg,#f7faf8);--gradient-top:var(--gradient-top,#0c2f28);--gradient-mid:var(--deep,#123b31)}

@@ -12,7 +12,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Church Portal - Availability</title>
+    <title>Ekklesia - Availability</title>
     <style>
         .av-h1{margin:6px 0 10px;font-size:clamp(22px,3.2vw,28px);line-height:1.2;color:#f8fffb}
                 * { box-sizing: border-box; }
@@ -126,7 +126,7 @@ require_once __DIR__ . '/_portal-shell.php';
     <?php endif; ?>
 
     </main>
-<?= portal_footer('Church Portal', 'Campus-aware serving windows') ?>
+<?= portal_footer('Ekklesia', 'Campus-aware serving windows') ?>
 </div>
 
 <?php if ($actor !== null && ($actor['personId'] ?? null) !== null): ?>

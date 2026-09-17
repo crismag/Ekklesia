@@ -16,7 +16,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Church Portal - Sign in</title>
+    <title>Ekklesia - Sign in</title>
     <style>
                 * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background:var(--bg); }
@@ -83,7 +83,7 @@ require_once __DIR__ . '/_portal-shell.php';
     <section class="hero">
         <div class="hero-copy">
             <div class="hero-chip"><span class="pulse-dot"></span>Welcome back</div>
-            <h1>Sign in to Church Portal.</h1>
+            <h1>Sign in to Ekklesia.</h1>
             <p class="lead">Open the ministry browser, people directory, calendar, and schedule tools once you're authenticated.</p>
         </div>
         <form class="panel panel-inner" method="post" action="<?= $loginUrl ?>" id="loginForm">
@@ -100,7 +100,7 @@ require_once __DIR__ . '/_portal-shell.php';
         </form>
 
         <form class="panel panel-inner" id="choiceForm" hidden>
-            <h2 id="choiceTitle">Choose your Church Portal account</h2>
+            <h2 id="choiceTitle">Choose your Ekklesia account</h2>
             <p class="muted" id="choiceLead"></p>
             <div class="err" id="choiceError" role="alert" hidden></div>
             <fieldset class="choice-list" id="choiceList"></fieldset>
@@ -110,7 +110,7 @@ require_once __DIR__ . '/_portal-shell.php';
     </section>
 
     </main>
-<?= portal_footer('Church Portal', 'Sign-in gateway') ?>
+<?= portal_footer('Ekklesia', 'Sign-in gateway') ?>
 </div>
 <script>
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
@@ -148,7 +148,7 @@ function showChoice(data, loginForm) {
     const list = document.getElementById('choiceList');
     const single = data.choices.length === 1;
     const claim = data.kind === 'claim';
-    document.getElementById('choiceTitle').textContent = claim && single ? 'Is this you?' : 'Choose your Church Portal account';
+    document.getElementById('choiceTitle').textContent = claim && single ? 'Is this you?' : 'Choose your Ekklesia account';
     document.getElementById('choiceLead').textContent = claim
         ? (single
             ? 'This email or phone is on the record below. Confirm it is you to create your login.'

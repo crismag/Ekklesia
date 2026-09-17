@@ -316,7 +316,7 @@ require_once __DIR__ . '/_portal-shell.php';
     <?php endif; ?>
 
     </main>
-<?= portal_footer('Church Portal', 'Roster schedules') ?>
+<?= portal_footer('Ekklesia', 'Roster schedules') ?>
 </div>
 
 <script>

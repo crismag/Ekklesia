@@ -8,7 +8,7 @@ $base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>IoT — Church Portal</title>
+  <title>IoT — Ekklesia</title>
   <style>body{font:14px/1.5 Inter,system-ui,Arial;color:var(--ink,#17211b);margin:0;padding:20px} .card{background:#fff;border:1px solid #e6efe8;padding:16px;border-radius:8px;max-width:980px}</style>
 </head>
 <body>

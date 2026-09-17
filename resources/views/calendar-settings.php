@@ -19,7 +19,7 @@ $campusesJson = htmlspecialchars(json_encode($campuses, JSON_THROW_ON_ERROR), EN
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Calendar Settings - Church Portal</title>
+    <title>Calendar Settings - Ekklesia</title>
     <style>
                 *{box-sizing:border-box}
         body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0,var(--gradient-mid,#123b31) 250px,var(--bg) 251px)}
@@ -93,7 +93,7 @@ $campusesJson = htmlspecialchars(json_encode($campuses, JSON_THROW_ON_ERROR), EN
 
     <header class="page-titlebar">
         <div class="brand">
-            <a href="<?= $base ?>/">Church Portal</a>
+            <a href="<?= $base ?>/">Ekklesia</a>
             <h1>Calendar Settings</h1>
             <div class="sub">Shape what the calendar shows, and define local custom calendars for the dashboard view.</div>
         </div>
@@ -204,7 +204,7 @@ $campusesJson = htmlspecialchars(json_encode($campuses, JSON_THROW_ON_ERROR), EN
     </section>
 
     </main>
-<footer class="portal-footer"><span>Church Portal</span><span>Calendar settings</span></footer>
+<footer class="portal-footer"><span>Ekklesia</span><span>Calendar settings</span></footer>
 </div>
 <script>
 const shell = document.querySelector('.shell');

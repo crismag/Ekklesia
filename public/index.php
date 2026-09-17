@@ -61,7 +61,7 @@ if (\App\Core\Maintenance::isActive()) {
     $safeReason = htmlspecialchars($reason, ENT_QUOTES, 'UTF-8');
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        . '<title>Back shortly — Church Portal</title>'
+        . '<title>Back shortly — Ekklesia</title>'
         . '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;'
         . 'font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;'
         . 'color:#1b3228;background:#f4f8f6;padding:24px}'

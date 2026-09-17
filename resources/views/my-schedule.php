@@ -14,7 +14,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>My Schedule - Church Portal</title>
+    <title>My Schedule - Ekklesia</title>
     <style>
         .ms-h1{margin:6px 0 4px;font-size:clamp(22px,3.2vw,28px);line-height:1.2;color:#f8fffb}
                 * { box-sizing: border-box; }
@@ -166,7 +166,7 @@ require_once __DIR__ . '/_portal-shell.php';
     <?php endif; ?>
 
     </main>
-<footer class="portal-footer"><span>Church Portal</span><span>Personal schedule view</span></footer>
+<footer class="portal-footer"><span>Ekklesia</span><span>Personal schedule view</span></footer>
 </div>
 
 <?php if ($actor !== null && ($actor['personId'] ?? null) !== null): ?>

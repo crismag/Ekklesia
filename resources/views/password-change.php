@@ -18,7 +18,7 @@ $displayName = htmlspecialchars((string) ($actor['displayName'] ?? 'Friend'), EN
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Set a new password — Church Portal</title>
+    <title>Set a new password — Ekklesia</title>
     <style>
         /* Self-contained theme tokens so this auth-flow page always renders
            correctly even when the DB-backed theme service is unavailable.

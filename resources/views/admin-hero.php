@@ -22,7 +22,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Hero Settings - Church Portal</title>
+    <title>Hero Settings - Ekklesia</title>
     <style>
                 *{box-sizing:border-box}
         body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0,var(--gradient-mid,#123b31) 250px,var(--bg) 251px)}
@@ -186,7 +186,7 @@ require_once __DIR__ . '/_portal-shell.php';
         </aside>
     </div>
 
-    <?= portal_footer('Church Portal', 'Hero settings') ?>
+    <?= portal_footer('Ekklesia', 'Hero settings') ?>
 </div>
 <script>
 (function(){

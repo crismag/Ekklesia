@@ -130,7 +130,7 @@ final class ChromeSettingsService
                 'primaryNav'    => $cleanNav !== [] ? $cleanNav : $this->defaults()['header']['primaryNav'],
             ],
             'footer' => [
-                'leftText'  => mb_substr(trim((string) ($footerIn['leftText']  ?? 'Church Portal')), 0, 80),
+                'leftText'  => mb_substr(trim((string) ($footerIn['leftText']  ?? 'Ekklesia')), 0, 80),
                 'rightText' => mb_substr(trim((string) ($footerIn['rightText'] ?? '')), 0, 120),
                 'minimal'   => $this->coerceBool($footerIn['minimal'] ?? true),
             ],
@@ -164,7 +164,7 @@ final class ChromeSettingsService
                 ],
             ],
             'footer' => [
-                'leftText'  => 'Church Portal',
+                'leftText'  => 'Ekklesia',
                 'rightText' => 'Campus-aware ministry operations',
                 'minimal'   => true,
             ],

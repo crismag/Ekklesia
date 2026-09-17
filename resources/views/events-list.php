@@ -12,7 +12,7 @@ $campuses = is_array($campusSelector['campuses'] ?? null) ? $campusSelector['cam
 require_once __DIR__ . '/_portal-shell.php';
 ?>
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Events - Church Portal</title><style>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Events - Ekklesia</title><style>
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
@@ -290,7 +290,7 @@ body{margin:0;min-height:100vh;font:14px/1.5 Inter,ui-sans-serif,system-ui,-appl
         ? pc_button(['label' => 'Sign in', 'href' => $base . '/login', 'variant' => 'primary'])
         : '',
 ]) ?><?php endif; ?>
-</section></main><footer class="portal-footer"><span>Church Portal</span><span>Campus-aware event planning</span></footer></div><script>
+</section></main><footer class="portal-footer"><span>Ekklesia</span><span>Campus-aware event planning</span></footer></div><script>
 
 // Event creation lives on /events/new — a real form. This used to be a
 // prompt() posting a bare title to an endpoint that could not succeed.

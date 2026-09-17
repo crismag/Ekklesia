@@ -749,7 +749,7 @@ require_once __DIR__ . '/_portal-shell.php';
     </div><!-- /wrap -->
 
     </main>
-<?= portal_footer('Church Portal', 'Schedule editor') ?>
+<?= portal_footer('Ekklesia', 'Schedule editor') ?>
 </div><!-- /shell -->
 
 <script>

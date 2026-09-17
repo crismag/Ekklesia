@@ -87,7 +87,7 @@ $countCampus = $overview['countCampusId'] ?? null;
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title><?= $e($pageTitle) ?> · Ministries · Church Portal</title>
+    <title><?= $e($pageTitle) ?> · Ministries · Ekklesia</title>
     <style>
         body{margin:0;min-height:100vh;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
         .mw-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -475,7 +475,7 @@ $countCampus = $overview['countCampusId'] ?? null;
 <?php endif; ?>
     </main>
 
-    <?= portal_footer('Church Portal', 'Ministries') ?>
+    <?= portal_footer('Ekklesia', 'Ministries') ?>
 </div>
 <?php if ($overview !== null && $actor !== null && $tabAllowed): ?>
 <script>

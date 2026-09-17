@@ -32,8 +32,8 @@
         ]
     },
     "footer": {
-        "leftText": "Church Portal",
-        "rightText": "Campus-aware ministry operations",
+        "leftText": "Ekklesia",
+        "rightText": "Church records and operations portal",
         "minimal": true
     }
 }

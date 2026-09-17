@@ -16,7 +16,7 @@ require_once __DIR__ . '/_portal-shell.php';
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Person - Church Portal</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Person - Ekklesia</title>
 <style>
         .pd-h1{margin:6px 0 12px;font-size:clamp(22px,3.2vw,28px);line-height:1.2;color:#f8fffb}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0,var(--gradient-mid,#123b31) 245px,var(--bg) 246px)}.panel{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 14px 34px rgba(28,48,39,.08);overflow:hidden}.profile-hero{display:grid;grid-template-columns:210px minmax(0,1fr);gap:20px;padding:20px;background:linear-gradient(180deg,#fff 0,#fbfdfc 100%);border-bottom:1px solid var(--line)}.photo-card{display:grid;gap:10px;justify-items:center}.photo-frame{width:180px;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--soft);border:1px solid var(--line);display:grid;place-items:center;color:var(--deep);font-size:42px;font-weight:900}.photo-frame img{width:100%;height:100%;object-fit:cover;display:block}.photo-frame.missing img{display:none}.profile-name{margin:0;font-size:20px;font-weight:700;line-height:1.2;color:var(--ink)}
@@ -90,7 +90,7 @@ require_once __DIR__ . '/_portal-shell.php';
 </section>
 <?php endif; ?>
 </main>
-<?= portal_footer('Church Portal', 'Person profile') ?>
+<?= portal_footer('Ekklesia', 'Person profile') ?>
 </div>
 <script>
 (function(){

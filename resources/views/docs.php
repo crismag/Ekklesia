@@ -207,7 +207,7 @@ foreach ($DOCS_SECTIONS as $s) {
 }
 
 $pageTitle = $activeSection ? $activeSection['title'] . ' — Docs' : 'User Guide — Docs';
-$pageSub   = $activeSection ? 'Church Portal documentation' : 'Detailed tutorials and reference for ministry leaders';
+$pageSub   = $activeSection ? 'Ekklesia documentation' : 'Detailed tutorials and reference for ministry leaders';
 
 $contentHtml = '';
 if ($activeSection) {

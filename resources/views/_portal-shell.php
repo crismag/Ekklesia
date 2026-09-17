@@ -238,7 +238,7 @@ if (!function_exists('portal_chrome')) {
         } catch (\Throwable) {
             return [
                 'header' => ['brandTitle' => 'Ekklesia', 'brandSubtitle' => '', 'primaryNav' => []],
-                'footer' => ['leftText' => 'Church Portal', 'rightText' => '', 'minimal' => true],
+                'footer' => ['leftText' => 'Ekklesia', 'rightText' => '', 'minimal' => true],
             ];
         }
     }
@@ -1850,7 +1850,7 @@ if (!function_exists('portal_footer')) {
     function portal_footer(string $left = '', string $right = ''): string
     {
         $chrome = portal_chrome();
-        $cfgLeft  = (string) ($chrome['footer']['leftText']  ?? 'Church Portal');
+        $cfgLeft  = (string) ($chrome['footer']['leftText']  ?? 'Ekklesia');
         $cfgRight = (string) ($chrome['footer']['rightText'] ?? '');
         $minimal  = (bool)   ($chrome['footer']['minimal']   ?? true);
         $finalLeft  = $left  !== '' ? $left  : $cfgLeft;
