@@ -78,7 +78,7 @@ enum PortalPermission: string
     case ViewLeaderEvents = 'view_leader_events';
 
     /**
-     * Build an ActorContext-friendly list of permissions from a portal_user_role row.
+     * Build an ActorContext-friendly list of permissions from an account_roles row.
      * Encodes the role-to-permission mapping in one place.
      *
      * @return list<self>
