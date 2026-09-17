@@ -25,12 +25,10 @@ require_once __DIR__ . '/_portal-shell.php';
         a{color:inherit}
         .button,button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 13px;border-radius:8px;background:var(--deep);color:#fff;font:inherit;font-weight:900;text-decoration:none;border:0;cursor:pointer}
         .button.secondary{background:#fff;color:var(--deep);border:1px solid var(--line)}
-        .hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:16px;margin-bottom:18px;color:#f8fffb}
-        .hero-copy{padding:16px 0 4px}
-        .hero-kicker{display:inline-flex;align-items:center;gap:8px;margin-bottom:10px;padding:6px 10px;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:rgba(255,255,255,.1);font-size:12px;font-weight:900}
-        .pulse-dot{width:7px;height:7px;border-radius:50%;background:#8ef0c6;box-shadow:0 0 0 6px rgba(142,240,198,.12)}
-        .lead{margin:10px 0 0;color:rgba(248,255,251,.82);font-size:16px;max-width:760px}
-        .panel{background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 14px 34px rgba(28,48,39,.08);overflow:hidden}
+        /* People & Records: the directory sits on the kit (ek-page, tabs, page
+           header, cards). The table, cards and filters below are the working
+           directory; only their surfaces follow the kit's tokens. */
+        .panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-lg,12px);box-shadow:0 1px 2px rgba(16,32,24,.04),0 8px 24px rgba(16,32,24,.05);overflow:hidden}
         .summary{padding:14px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-self:end}
         .metric{border-radius:8px;padding:14px;color:#fff;min-height:86px;display:grid;align-content:space-between}
         .metric strong{font-size:28px;line-height:1}
@@ -39,20 +37,18 @@ require_once __DIR__ . '/_portal-shell.php';
         /* Was a fixed 8-column grid that could not fit its own content: the Refresh
            button overflowed the viewport by 21px at 1440 and 101px at 1280
            (audit H3). auto-fit lets the row wrap instead of overflowing. */
-        .toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:18px 0;align-items:end}
+        .toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:0;align-items:end}
+        .filters-wrap{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-lg,12px);padding:var(--sp-4,16px) var(--sp-5,20px)}
         .toolbar>*{min-width:0}
         .toolbar select,.toolbar input{width:100%}
-        label{display:block;margin-bottom:4px;color:var(--muted);font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.05em}
-        select,input{width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;background:#fff;color:var(--ink)}
+        label{display:block;margin-bottom:6px;color:var(--ink);font-size:13px;font-weight:650}
+        select,input{width:100%;min-height:40px;border:1px solid var(--line);border-radius:var(--radius,8px);padding:8px 12px;font:inherit;background:var(--paper);color:var(--ink)}
+        select:focus,input:focus{outline:none;border-color:var(--teal);box-shadow:var(--focus-shadow,0 0 0 3px rgba(17,123,109,.3))}
         .toolbar button{align-self:end}
-        .context-note{margin:-6px 0 14px;color:var(--muted);font-size:12px}
+        .context-note{margin:0;color:var(--muted);font-size:13px}
         /* The dark band was a fixed 250px gradient on <body>, so the intro paragraph
            was clipped mid-line where the band ended (audit C4 seam class). The band
            now belongs to .hero and always matches its real height. */
-        .hero{position:relative;isolation:isolate}
-        .hero::before{content:"";position:absolute;top:-18px;bottom:0;left:calc(-1 * var(--portal-gutter,1.5rem));right:calc(-1 * var(--portal-gutter,1.5rem));
-          width:auto;background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0,var(--gradient-mid,#123b31) 100%);z-index:-1}
-        .people-h1{margin:6px 0 4px;font-size:clamp(22px,3.2vw,28px);line-height:1.2;color:#f8fffb}
         .colvis-wrap{display:grid;gap:6px}
         /* The label wraps rather than running off the page. Held to one line it was
            202px wide in a track that could be narrower, and since .toolbar>* allows
@@ -74,10 +70,11 @@ require_once __DIR__ . '/_portal-shell.php';
         .directory-table th.col-member,
         .directory-table th.col-birthday,
         .directory-table th.col-status{width:1%;white-space:nowrap}
-        .directory-table{width:100%;table-layout:auto;border-collapse:collapse;background:#fff}
-        .directory-table th,.directory-table td{text-align:left;padding:5px 10px;border-bottom:1px solid var(--line,#edf2ef);vertical-align:middle;line-height:1.4}
-        .directory-table th{background:#fbfdfc;color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:900;letter-spacing:.04em;white-space:nowrap}
-        .sort-button{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:900;text-transform:uppercase;letter-spacing:.04em;cursor:pointer}
+        .directory-table{width:100%;table-layout:auto;border-collapse:collapse;background:var(--paper)}
+        .directory-table th,.directory-table td{text-align:left;padding:6px 12px;border-bottom:1px solid var(--line,#edf2ef);vertical-align:middle;line-height:1.4}
+        .directory-table th{background:var(--soft,#eef4f0);color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
+        .sort-button{display:inline-flex;align-items:center;gap:5px;min-height:28px;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:700;cursor:pointer}
+        .sort-button:focus-visible,.person-name:focus-visible,.pager button:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
         .sort-button::after{content:"↕";font-size:12px;color:#9aa9a1}
         .sort-button.active::after{content:"↑";color:var(--teal)}
         .sort-button.active.desc::after{content:"↓"}
@@ -86,7 +83,7 @@ require_once __DIR__ . '/_portal-shell.php';
         .name-inline{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}
         .person-sub{color:var(--muted);font-size:12px;white-space:nowrap}
         .table-wrap{overflow:auto}
-        .pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border-top:1px solid var(--line);background:#fbfdfc;flex-wrap:wrap}
+        .pager{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid var(--line);background:var(--paper);flex-wrap:wrap}
         .pager-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
         .pager button{min-height:32px;padding:6px 10px}
         .pager button:disabled{opacity:.45;cursor:not-allowed}
@@ -94,7 +91,7 @@ require_once __DIR__ . '/_portal-shell.php';
         .page-size select{width:auto;min-width:78px;padding:6px 8px}
         .nowrap{white-space:nowrap}
         .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-        .person-card{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 24px rgba(27,50,40,.07);padding:14px;display:grid;gap:10px;min-height:220px}
+        .person-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-lg,12px);box-shadow:0 1px 2px rgba(16,32,24,.04),0 8px 24px rgba(16,32,24,.05);padding:14px;display:grid;gap:10px;min-height:220px}
         .person-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
         .avatar{width:28px;height:28px;border-radius:6px;background:var(--soft);color:var(--deep);display:grid;place-items:center;font-size:11px;font-weight:700;flex:0 0 auto}
         .name-block{min-width:0;flex:1}
@@ -102,20 +99,20 @@ require_once __DIR__ . '/_portal-shell.php';
         .muted{color:var(--muted)}
         .small{font-size:12px}
         .tags{display:flex;gap:6px;flex-wrap:wrap}
-        .tag{display:inline-flex;border-radius:999px;padding:3px 8px;background:var(--soft);color:var(--deep);font-size:12px;font-weight:900}
+        .tag{display:inline-flex;border-radius:999px;padding:2px 8px;background:var(--soft);color:var(--deep);font-size:12px;font-weight:650}
         .tag.public{background:#e8eef6;color:#254d74}
         .tag.inactive{background:#f8e8e8;color:#8a2a2a}
         /* The overflow chip on cards. Outlined rather than filled so it reads
            as a count of what is not shown, not as another ministry. */
         .tag.more{background:transparent;color:var(--deep);border:1px dashed var(--line, currentColor);font-weight:700}
         .info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-        .info{padding:9px;border-radius:8px;background:#fbfdfc;border:1px solid #edf2ef}
+        .info{padding:9px;border-radius:8px;background:var(--soft,#fbfdfc);border:1px solid var(--line,#edf2ef)}
         .info strong{display:block;font-size:18px;line-height:1}
         .actions-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
         .text-link{color:var(--teal);font-weight:900;text-decoration:none}
         .empty{padding:22px;color:var(--muted)}
         @media(max-width:1120px){.toolbar{grid-template-columns:repeat(3,1fr)}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:760px){.hero,.summary,.toolbar,.cards{grid-template-columns:1fr}}
+        @media(max-width:760px){.summary,.toolbar,.cards{grid-template-columns:1fr}}
 
         /* Below 1024px a 7-column directory is not a table any more. Each row
            becomes a card with "Label: value" pairs, driven by the data-label
@@ -129,7 +126,7 @@ require_once __DIR__ . '/_portal-shell.php';
         .display-note{margin:4px 0 0;font-size:11.5px;line-height:1.4;color:var(--muted,#5c6b63);max-width:24ch}
         .display-note[hidden]{display:none}
         @media(max-width:1023px){
-          .filters-wrap{margin:14px 0}
+          .filters-wrap{padding:var(--sp-3,12px)}
           .filters-summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:0 14px;
             background:var(--soft,#eef4f0);border:1px solid var(--line,#d9e4dd);
             border-radius:var(--radius,8px);font-size:14px;font-weight:700;color:var(--ink,#17211b);cursor:pointer}
@@ -156,7 +153,7 @@ require_once __DIR__ . '/_portal-shell.php';
           .name-cell{min-width:0}
           .person-name{min-height:44px;display:inline-flex;align-items:center}
         }
-        @media print{body{background:#fff}.shell{width:100%;padding:0}.topbar,.portal-titleblock,.hero-copy,.toolbar,.context-note,.portal-footer{display:none!important}.panel,.person-card{box-shadow:none}.cards{grid-template-columns:repeat(2,1fr)}.person-card{break-inside:avoid}}
+        @media print{body{background:#fff}.shell{width:100%;padding:0}.topbar,.portal-titleblock,.ek-tabs,.ek-page-header,.filters-wrap,.context-note,.portal-footer{display:none!important}.panel,.person-card{box-shadow:none}.cards{grid-template-columns:repeat(2,1fr)}.person-card{break-inside:avoid}}
     </style>
 </head>
 <body>
@@ -181,14 +178,15 @@ require_once __DIR__ . '/_portal-shell.php';
         $base . '/login'
     ) ?>
 
-    <section class="hero">
-        <div class="hero-copy">
-            <div class="hero-kicker"><span class="pulse-dot"></span><span>Directory</span></div>
-            <h1 class="people-h1">People</h1>
-            <p class="lead">Look up who is on this campus — by ministry, family, birthday month, or search. Public viewers see first name plus last initial; contact and address stay privileged. Adding or editing a record is Administration → <strong>Member records</strong>, not this page.</p>
-        </div>
-    </section>
-<main id="portal-main" tabindex="-1">
+<main id="portal-main" class="ek-page" tabindex="-1">
+    <?= ek_workspace_tabs($basePath, 'people', 'directory', $actor) ?>
+    <?= ek_page_header(
+        'Directory',
+        'Look up who is on this campus — by ministry, family, birthday month, or search. Visitors who are not signed in see a first name and last initial; contact details and addresses stay private.'
+    ) ?>
+    <?php if ($actor !== null && !empty($actor['isPortalWideAdmin'])): ?>
+    <p class="context-note">Adding or editing a person happens in <a class="text-link" href="<?= $base ?>/admin/people">Member records</a>, not this page.</p>
+    <?php endif; ?>
 
     <details class="filters-wrap" id="peopleFilters" open><summary class="filters-summary">Filters &amp; search</summary>
     <section class="toolbar" aria-label="People filters">
