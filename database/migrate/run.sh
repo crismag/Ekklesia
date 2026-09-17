@@ -5,7 +5,7 @@
 #
 # Drops and recreates members_db (never the legacy databases). The mysql
 # client authenticates through MYSQL (default "mysql"), e.g.
-#   MYSQL="sudo -n mysql" database/migrate/run.sh
+#   MYSQL="sudo -n mysql" PHP="sudo -n php" database/migrate/run.sh
 #   MYSQL="mysql --defaults-extra-file=/path/to/admin.cnf" database/migrate/run.sh
 # RELATED_FAMILIES points at the portal's related-families.json (default: this checkout's).
 set -euo pipefail
@@ -16,6 +16,8 @@ CRM="${2:-u471078694_churchcrm_v0}"
 PORTAL="${3:-u471078694_christlike_mdb}"
 RELATED_FAMILIES="${RELATED_FAMILIES:-$here/../config/related-families.json}"
 MYSQL="${MYSQL:-mysql}"
+# PHP steps connect with LEGACY_DSN/LEGACY_USER/LEGACY_PASSWORD (default: root over the local socket).
+PHP="${PHP:-php}"
 
 for name in "$MEMBERS" "$CRM" "$PORTAL"; do
   [[ "$name" =~ ^[A-Za-z0-9_]+$ ]] || { echo "Invalid database name: $name" >&2; exit 1; }
@@ -31,6 +33,9 @@ sed -e "s/{{MEMBERS}}/$MEMBERS/g" -e "s/{{CRM}}/$CRM/g" -e "s/{{PORTAL}}/$PORTAL
   "$here/migrate/members_from_legacy.sql" | $MYSQL
 
 php "$here/migrate/household_links_from_json.php" "$RELATED_FAMILIES" | $MYSQL "$MEMBERS"
+
+echo "Carrying ChurchCRM user rights into logins"
+$PHP "$here/migrate/access_from_legacy_users.php" "$MEMBERS" "$CRM"
 
 $MYSQL "$MEMBERS" < "$here/members/002_sheet_views.sql"
 

@@ -29,8 +29,8 @@ SELECT area, legacy, migrated, IF(legacy = migrated, 'ok', 'CHECK') AS result FR
   UNION ALL SELECT 'rosters', (SELECT COUNT(*) FROM {{PORTAL}}.schedule_roster), (SELECT COUNT(*) FROM {{MEMBERS}}.rosters)
   UNION ALL SELECT 'roster slots', (SELECT COUNT(*) FROM {{PORTAL}}.schedule_roster_slot), (SELECT COUNT(*) FROM {{MEMBERS}}.roster_slots)
   UNION ALL SELECT 'roster assignments', (SELECT COUNT(*) FROM {{PORTAL}}.schedule_roster_assignment), (SELECT COUNT(*) FROM {{MEMBERS}}.roster_assignments)
-  UNION ALL SELECT 'accounts', (SELECT COUNT(*) FROM {{PORTAL}}.portal_users), (SELECT COUNT(*) FROM {{MEMBERS}}.user_accounts)
-  UNION ALL SELECT 'account roles', (SELECT COUNT(*) FROM {{PORTAL}}.portal_user_roles), (SELECT COUNT(*) FROM {{MEMBERS}}.account_roles)
+  UNION ALL SELECT 'accounts from the portal', (SELECT COUNT(*) FROM {{PORTAL}}.portal_users), (SELECT COUNT(*) FROM {{MEMBERS}}.user_accounts a WHERE EXISTS (SELECT 1 FROM {{PORTAL}}.portal_users u WHERE u.portal_user_id = a.id))
+  UNION ALL SELECT 'account roles from the portal', (SELECT COUNT(*) FROM {{PORTAL}}.portal_user_roles), (SELECT COUNT(*) FROM {{PORTAL}}.portal_user_roles r WHERE EXISTS (SELECT 1 FROM {{MEMBERS}}.account_roles n WHERE n.account_id = r.portal_user_id AND CAST(n.role AS CHAR) = CONVERT(r.role USING utf8mb4) COLLATE utf8mb4_unicode_ci AND n.campus_id <=> r.scope_campus_id AND n.ministry_id <=> r.scope_ministry_id))
   UNION ALL SELECT 'saved calendar views', (SELECT COUNT(*) FROM {{PORTAL}}.calendar_saved_view), (SELECT COUNT(*) FROM {{MEMBERS}}.calendar_views)
   UNION ALL SELECT 'unavailability', (SELECT COUNT(*) FROM {{PORTAL}}.portal_unavailability), (SELECT COUNT(*) FROM {{MEMBERS}}.unavailability)
   UNION ALL SELECT 'import batches', (SELECT COUNT(*) FROM {{CRM}}.member_import_batch), (SELECT COUNT(*) FROM {{MEMBERS}}.member_import_batches)
@@ -47,6 +47,10 @@ UNION ALL SELECT 'Accounts without a person', id, 1, email FROM {{MEMBERS}}.user
 UNION ALL SELECT 'People without a campus', id, 1, CONCAT(first_name, ' ', last_name) FROM {{MEMBERS}}.people WHERE campus_id IS NULL
 UNION ALL SELECT 'Email used by several people', NULL, COUNT(*), GROUP_CONCAT(id) FROM {{MEMBERS}}.people WHERE email IS NOT NULL GROUP BY email HAVING COUNT(*) > 1
 UNION ALL SELECT 'Inactive ministries', id, 1, name FROM {{MEMBERS}}.ministries WHERE is_active = 0
+UNION ALL SELECT CONCAT('Access from ChurchCRM user: ', r.role), a.person_id, 1, CONCAT(a.email, IF(a.must_change_password = 1 AND NOT EXISTS (SELECT 1 FROM {{PORTAL}}.portal_users u WHERE u.portal_user_id = a.id), ' (new login, default password)', ''))
+  FROM {{MEMBERS}}.account_roles r JOIN {{MEMBERS}}.user_accounts a ON a.id = r.account_id
+  WHERE r.role IN ('admin', 'scheduler')
+    AND NOT EXISTS (SELECT 1 FROM {{PORTAL}}.portal_user_roles o WHERE o.portal_user_id = r.account_id AND CONVERT(o.role USING utf8mb4) COLLATE utf8mb4_unicode_ci = CAST(r.role AS CHAR))
 UNION ALL SELECT 'Sheet person matching nobody by name', c.people_id, 1, CONCAT(c.first_name, ' ', c.last_name)
   FROM {{PORTAL}}.christlikeness_people_tbl c
   WHERE NOT EXISTS (SELECT 1 FROM {{MEMBERS}}.people p WHERE LOWER(TRIM(p.first_name)) = LOWER(TRIM(c.first_name)) AND LOWER(TRIM(p.last_name)) = LOWER(TRIM(c.last_name)))

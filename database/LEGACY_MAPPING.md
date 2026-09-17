@@ -131,6 +131,7 @@ Membership roles in code and in the browser are the strings `member` and
 | Legacy | New |
 | --- | --- |
 | `portal_users` | `user_accounts` |
+| ChurchCRM `user_usr.usr_Admin` / `usr_ManageGroups` | `account_roles` admin / scheduler (campus) on the person's login, created if missing (`migrate/access_from_legacy_users.php`) |
 | `portal_user_id` | `id` (as a reference elsewhere: `account_id`) |
 | `churchcrm_person_id` + `portal_user_person_links` | `person_id` (one person per login; several logins may share a person) |
 | `email`, `password_hash`, `display_name`, `is_active`, `must_change_password`, `last_login_at` | same names |

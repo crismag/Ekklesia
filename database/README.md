@@ -25,6 +25,7 @@ never changed.
 | `visitors/001_schema.sql` | Visitors database: 4 tables |
 | `migrate/members_from_legacy.sql` | Copies the legacy records into the member database |
 | `migrate/run.sh` | Recreates the member database, copies records, runs the verification |
+| `migrate/access_from_legacy_users.php` | Gives ChurchCRM administrators and group managers their Ekklesia roles (creating a first login where needed) |
 | `migrate/household_links_from_json.php` | Turns the related-families file into `household_links` rows |
 | `migrate/visitors_from_legacy.php` | Builds the visitors SQLite file from the legacy sign-up tables |
 | `LEGACY_MAPPING.md` | Every legacy table and column and its new name, and the conventions code follows |
@@ -34,7 +35,7 @@ never changed.
 
 ```sh
 # Member database: drops and recreates christlikeness_members only.
-MYSQL="sudo -n mysql" database/migrate/run.sh \
+MYSQL="sudo -n mysql" PHP="sudo -n php" database/migrate/run.sh \
   christlikeness_members u471078694_churchcrm_v0 u471078694_christlike_mdb
 
 # Visitors database (reads the legacy DB and member_types from the new one).
@@ -127,6 +128,12 @@ Tables are grouped in the schema file the way they are here.
   `event_occurrences` are the dated instances, and `original_starts_at` keeps
   an instance's identity when it is moved. `source_app` + `external_id` let
   Oikonomia publish its schedules into the same calendar without id clashes.
+- **ChurchCRM rights carry over.** The portal gave a ChurchCRM user their roles
+  when they first signed in (`usr_Admin` → admin, `usr_ManageGroups` →
+  scheduler for their campus). Ekklesia reads roles only from `account_roles`,
+  so the migration writes those rights onto the person's login, or creates the
+  login their first sign-in would have (default password, must change it).
+  People can hold several roles: an admin can also lead a ministry.
 - **Several logins may belong to one person** (`user_accounts.person_id` is not
   unique): the legacy data has role-test accounts for the same person.
 - **Change notes become the audit log.** All 74 legacy notes were automatic
