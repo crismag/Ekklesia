@@ -269,6 +269,31 @@ final readonly class MinistryController
     }
 
     /**
+     * POST /api/ministry/{id}/members/{personId}/positions  { positions: ["Usher", …] }
+     * Replace a member's positions in the ministry.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    public function setMemberPositions(array $request): array
+    {
+        $actor = $this->requestContext->fromArray($request);
+        $ministryId = (int) ($request['id'] ?? 0);
+        $personId = (int) ($request['personId'] ?? 0);
+        $positions = $request['positions'] ?? [];
+        if (!is_array($positions)) {
+            throw new ValidationFailed('Positions must be a list of names.');
+        }
+
+        $saved = $this->ministryService->setMemberPositions($actor, $ministryId, $personId, array_values($positions));
+        if (!$saved) {
+            throw new ValidationFailed('That person is not a member of this ministry.');
+        }
+
+        return ['success' => true];
+    }
+
+    /**
      * POST /api/ministry/{id}/leaders/{personId} — make a member a leader.
      *
      * @param array<string, mixed> $request

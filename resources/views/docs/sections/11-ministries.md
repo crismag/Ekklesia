@@ -22,57 +22,85 @@ without changing existing memberships on renamed groups.
 
 ## Where ministries live
 
-Three doors, none of them named the same thing:
+Everything about ministries is in the **Ministries** workspace:
 
-- **Ministries** (top bar) — the chooser. Open a team to see its members, serving grid, and posted lists.
-- **Members & leaders** (Administration) — create a team and who is on it, with *group roles* (Member, Teacher, Leader).
-- **Ministry list** (Administration) — which ministry pages appear on the public site. It does not create teams.
+- **Ministries** — the directory. Every ministry with its campus, how many
+  members it has, whether it schedules people and its next serving date. Your
+  own ministries come first. Leaders' names show on the ministries you may see
+  the people of.
+- **Each ministry** (`/ministries/{id}`) has four tabs:
+  - **Overview** — leaders, positions and serving roles at a glance, the dates
+    it serves next, and the way into the schedule editor and printables.
+  - **Members & leaders** — who is on the team, who leads it, and each
+    member's positions. This replaces the old Administration page of the same
+    name; its old addresses open this tab.
+  - **Serving roles** — the roles the schedule editor fills on each date.
+  - **Schedule** — who serves on each date in the next eight weeks. Changes are
+    made in the schedule editor.
+- **Manage ministries** (administrators) — create, rename, move, deactivate or
+  delete ministries, and the **Ministry list** settings: what the church
+  website may list publicly.
 
-> **Tip:** A ministry's **schedule assignments** (who serves on which date) are separate from its **group roles** (a person's standing on the team). The first is the serving grid (or Calendar's day panel); the second is Members & leaders.
+Members & leaders and Serving roles are shown to the ministry's leaders and
+schedulers; changing them needs a leader or administrator account for that
+ministry.
+
+> **Tip:** A ministry's **schedule assignments** (who serves on which date) are separate from its **membership** (who is on the team, and who leads it). The first is the serving grid (or Calendar's day panel); the second is the ministry's Members & leaders tab.
 
 ## Viewing ministries
 
-Open **Ministries** from the top bar. Each ministry card shows its name, campus,
-and current leaders. Selecting a ministry opens its dashboard with the members,
-leaders, and recent schedule activity for that team.
+Open **Ministries** from the sidebar. Choose a campus above the list to see that
+campus's ministries and the ones serving every campus, with member counts for
+that campus; **All campuses** shows everything. Type in **Find a ministry** to
+narrow the list.
 
-- Use the **campus selector** in the top bar to focus on one campus. Choosing **All campuses** shows every ministry across locations.
-- A ministry page at `/ministry/{name}` (for example `/ministry/ushers`) is a friendly shortcut to the same dashboard.
+A ministry page at `/ministry/{name}` (for example `/ministry/victuals`) is a
+friendly shortcut to the same ministry.
 
 ## Creating and editing a ministry
 
 Ministries are created and configured by a portal-wide admin.
 
-1. Open Administration → **Members & leaders**.
-2. Add the ministry with its **name** and **campus**.
-3. Save. The ministry can receive members, leaders, and schedules. Turn on public visibility separately under **Ministry list**.
+1. Open Ministries → **Manage ministries**.
+2. Under **Add a ministry**, enter its **name** and choose a **campus** (or All
+   campuses), then **Create ministry**. You are taken to its Members & leaders
+   tab to add people.
+3. **Edit** renames a ministry or moves it to another campus. **Deactivate**
+   hides it from the directory and the schedule editor and keeps its history;
+   **Delete** removes it with its memberships and serving roles.
 
-Campuses come from the **Campuses** admin page (under *Church setup*), so make
-sure the campus exists first.
+Whether it appears on the church website is set separately under **Ministry
+list** (the *Public listing* section of the same page).
+
+Campuses come from the **Campuses** admin page, so make sure the campus exists
+first.
 
 > **Best Practice:** Keep ministry names short and recognizable — they appear on schedules, the calendar, and the public directory.
 
-## Members, leaders, and roles
+## Members, leaders, and positions
 
-On **Members & leaders** you manage who is on each team and their group role:
+On a ministry's **Members & leaders** tab you manage who is on the team:
 
-- **Member** — the default standing for anyone on the team.
-- **Teacher** / **Leader** — tags that mark elevated standing. **Leaders** are surfaced on the ministry page and can be granted scheduling access.
+- **Add someone** — type a name, choose **Member** or **Leader**, and add them.
+- **Make leader / Make member** — change someone's standing on the team.
+  **Leaders** are shown on the ministry's overview.
+- **Positions** — what someone does in the ministry (Usher, Emcee), separated
+  by commas.
+- **Remove** — take someone off the team. Past schedules are not changed.
 
-Leaders are filtered by campus, so a leader assigned to the Scarborough campus
-is listed only under that campus's view.
+When a campus is chosen in the header, the tab shows that campus's members, with
+a link to show everyone.
 
-See **Roles, Leaders & Members** for the full walkthrough of assigning roles and
-granting a leader scheduling access.
+See **Roles, Leaders & Members** for granting a leader scheduling access.
 
 ## Ministries and scheduling
 
-Once a ministry has members, its **Serving grid** button lets a leader fill
+Once a ministry has members and serving roles, **Open schedule editor** lets a leader fill
 the roles on upcoming activity dates. Assignments made there show up on:
 
 - each person's **My Schedule**,
 - the **Calendar** (as assignment items),
-- and the ministry dashboard.
+- and the ministry's **Schedule** tab.
 
 ## Campus filtering
 

@@ -883,6 +883,292 @@ final readonly class MinistryService
         return $this->ministryRepository->removeMinistryLeader($ministryId, $personId);
     }
 
+    /**
+     * Replace a member's positions ("Usher", "Emcee") in a ministry.
+     *
+     * Positions are part of managing the ministry's membership, so the rule is
+     * the membership editor's, narrowed to ministry-role managers: ManageSchedules
+     * and ManageMinistryRoles inside the ministry's scope. False when the person
+     * is not a member of the ministry.
+     *
+     * @param list<mixed> $positions
+     */
+    public function setMemberPositions(ActorContext $context, int $ministryId, int $personId, array $positions): bool
+    {
+        if ($ministryId <= 0 || $personId <= 0) {
+            throw new ValidationFailed('Ministry id and person id are required.');
+        }
+        if (!$context->hasPermission(PortalPermission::ManageMinistryRoles)
+            || !$context->hasPermission(PortalPermission::ManageSchedules)
+        ) {
+            throw new PermissionDenied('Actor lacks permission to manage ministry members.');
+        }
+        if (!$context->canAccessMinistry($ministryId)) {
+            throw new PermissionDenied('Actor is outside the requested ministry scope.');
+        }
+        if (count($positions) > 20) {
+            throw new ValidationFailed('A member can hold at most 20 positions.');
+        }
+        $clean = [];
+        foreach ($positions as $position) {
+            if (!is_string($position)) {
+                throw new ValidationFailed('Positions are names.');
+            }
+            $name = trim($position);
+            if (mb_strlen($name) > 60) {
+                throw new ValidationFailed('A position name must be 60 characters or fewer.');
+            }
+            if ($name !== '') {
+                $clean[] = $name;
+            }
+        }
+
+        return $this->ministryRepository->setMemberPositions($personId, $ministryId, $clean);
+    }
+
+    // ---------------------------------------------------------------------
+    // Ministries workspace (directory and per-ministry pages)
+    // ---------------------------------------------------------------------
+
+    /**
+     * What this actor may see and do in one ministry's workspace.
+     *
+     * Every flag restates a rule the service or the API already enforces; the
+     * workspace only uses them to decide what to offer. Management is offered
+     * to holders of ManageMinistryRoles (leaders, admins) — the people the
+     * workspace map has always offered member management to — although the
+     * membership endpoints themselves accept ManageSchedules alone.
+     *
+     * @return array{canViewPeople:bool,canManageMembers:bool,canManageRoles:bool,canEditSchedule:bool,canPrintSchedule:bool,canManageMinistries:bool}
+     */
+    public function workspaceAccess(ActorContext $context, int $ministryId): array
+    {
+        $inScope = $ministryId > 0 && $context->canAccessMinistry($ministryId);
+        $manages = $inScope
+            && $context->hasPermission(PortalPermission::ManageSchedules)
+            && $context->hasPermission(PortalPermission::ManageMinistryRoles);
+
+        return [
+            'canViewPeople'       => $inScope && ($context->hasPermission(PortalPermission::ViewMinistrySchedule)
+                || $context->hasPermission(PortalPermission::ManageSchedules)),
+            'canManageMembers'    => $manages,
+            'canManageRoles'      => $manages,
+            'canEditSchedule'     => $inScope && $context->hasPermission(PortalPermission::ManageSchedules),
+            'canPrintSchedule'    => $context->isPortalWideAdmin
+                || $context->hasPermission(PortalPermission::ViewMinistrySchedule)
+                || $context->hasPermission(PortalPermission::ManageSchedules),
+            'canManageMinistries' => $context->isPortalWideAdmin,
+        ];
+    }
+
+    /**
+     * The ministries directory for a signed-in actor.
+     *
+     * Everyone signed in sees each active ministry's name, campus, how many
+     * people belong to it, whether it schedules people, and its next serving
+     * date. Leader names are member data and appear only where the actor may
+     * already read that ministry's people (getMinistryLeaders' rule); otherwise
+     * 'leaders' is null. Inactive ministries are listed for administrators only.
+     *
+     * With a campus, ministries of that campus and church-wide ones are listed,
+     * and counts are that campus's people.
+     *
+     * @return list<array{ministryId:int,name:string,campusId:?int,active:bool,memberCount:int,servingRoleCount:int,schedules:bool,upcomingCount:int,nextDate:?DateTimeImmutable,nextTitle:string,isMine:bool,leadsIt:bool,leaders:?list<string>}>
+     */
+    public function listDirectory(ActorContext $context, ?int $campusId, DateTimeImmutable $today): array
+    {
+        if ($campusId !== null && !$context->canAccessCampus($campusId)) {
+            throw new PermissionDenied("Actor is outside the requested campus scope (campus $campusId).");
+        }
+
+        $from = $today->setTime(0, 0);
+        $until = $from->modify('+60 days');
+        $upcoming = [];
+        foreach ($this->ministryRepository->fetchDashboard([], $from, $from, $until) as $row) {
+            $upcoming[(int) $row['ministry_id']] = $row;
+        }
+
+        $leaders = [];
+        foreach ($this->ministryRepository->listLeadersByMinistry($campusId) as $row) {
+            $leaders[(int) $row['ministry_id']][] = (string) $row['display_name'];
+        }
+
+        [$mine, $led] = $this->membershipsOf($context);
+
+        $out = [];
+        foreach ($this->ministryRepository->listMinistriesAdmin($campusId) as $m) {
+            $id = (int) $m['ministry_id'];
+            $active = (bool) ($m['active'] ?? true);
+            if (!$active && !$context->isPortalWideAdmin) {
+                continue;
+            }
+            $occurrences = $upcoming[$id]['upcoming_occurrences'] ?? [];
+            $occurrences = is_array($occurrences) ? array_values($occurrences) : [];
+            $first = $occurrences[0] ?? null;
+            $access = $this->workspaceAccess($context, $id);
+            $out[] = [
+                'ministryId'       => $id,
+                'name'             => (string) $m['name'],
+                'campusId'         => $m['campus_id'] === null ? null : (int) $m['campus_id'],
+                'active'           => $active,
+                'memberCount'      => (int) ($m['member_count'] ?? 0),
+                'servingRoleCount' => (int) ($m['role_count'] ?? 0),
+                'schedules'        => (int) ($m['role_count'] ?? 0) > 0,
+                'upcomingCount'    => count($occurrences),
+                'nextDate'         => $first !== null && ($first['starts_on'] ?? null) instanceof DateTimeImmutable ? $first['starts_on'] : null,
+                'nextTitle'        => $first !== null ? (string) ($first['event_title'] ?? '') : '',
+                'isMine'           => isset($mine[$id]) || (!$context->isPortalWideAdmin && in_array($id, $context->ministryScopeIds, true)),
+                'leadsIt'          => isset($led[$id]),
+                'leaders'          => $access['canViewPeople'] ? ($leaders[$id] ?? []) : null,
+            ];
+        }
+
+        usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+
+        return $out;
+    }
+
+    /**
+     * One ministry's Overview: identity, counts, and what the actor may read of
+     * its people, roles and upcoming serving dates. Null when there is no such
+     * ministry, or it is inactive and the actor is not an administrator.
+     *
+     * @return ?array<string,mixed>
+     */
+    public function getWorkspaceOverview(ActorContext $context, int $ministryId, ?int $campusId, DateTimeImmutable $today): ?array
+    {
+        if ($ministryId <= 0) {
+            return null;
+        }
+        if ($campusId !== null && !$context->canAccessCampus($campusId)) {
+            throw new PermissionDenied("Actor is outside the requested campus scope (campus $campusId).");
+        }
+
+        $row = null;
+        foreach ($this->ministryRepository->listMinistriesAdmin($campusId) as $m) {
+            if ((int) $m['ministry_id'] === $ministryId) {
+                $row = $m;
+                break;
+            }
+        }
+        if ($row === null && $campusId !== null) {
+            // Another campus's ministry, opened while a campus is selected:
+            // still the same ministry, counted across the church.
+            foreach ($this->ministryRepository->listMinistriesAdmin(null) as $m) {
+                if ((int) $m['ministry_id'] === $ministryId) {
+                    $row = $m;
+                    $campusId = null;
+                    break;
+                }
+            }
+        }
+        if ($row === null || (!($row['active'] ?? true) && !$context->isPortalWideAdmin)) {
+            return null;
+        }
+
+        $access = $this->workspaceAccess($context, $ministryId);
+        $from = $today->setTime(0, 0);
+        $cards = $this->ministryRepository->fetchDashboard([$ministryId], $from, $from, $from->modify('+60 days'));
+        $upcoming = [];
+        foreach (($cards[0]['upcoming_occurrences'] ?? []) as $o) {
+            $upcoming[] = [
+                'title'           => (string) ($o['event_title'] ?? ''),
+                'startsOn'        => $o['starts_on'],
+                'assignmentCount' => (int) ($o['assignment_count'] ?? 0),
+            ];
+        }
+
+        $leaders = null;
+        $positions = null;
+        $roles = null;
+        if ($access['canViewPeople']) {
+            $leaders = [];
+            $positions = [];
+            foreach ($this->ministryRepository->listMinistryMembers($ministryId, $campusId) as $member) {
+                if (!empty($member['is_leader'])) {
+                    $leaders[] = ['personId' => (int) $member['person_id'], 'name' => (string) $member['display_name']];
+                }
+                foreach ($member['positions'] ?? [] as $p) {
+                    $positions[(string) $p] = ($positions[(string) $p] ?? 0) + 1;
+                }
+            }
+            ksort($positions, SORT_NATURAL | SORT_FLAG_CASE);
+            $roles = array_map(static fn (array $r): array => [
+                'id'            => (int) $r['id'],
+                'name'          => (string) $r['name'],
+                'active'        => (bool) ($r['is_active'] ?? true),
+                'assignedCount' => (int) ($r['assigned_count'] ?? 0),
+            ], $this->ministryRepository->fetchMinistryRoles($ministryId));
+        }
+
+        [$mine, $led] = $this->membershipsOf($context);
+
+        return [
+            'ministryId'       => $ministryId,
+            'name'             => (string) $row['name'],
+            'campusId'         => $row['campus_id'] === null ? null : (int) $row['campus_id'],
+            'countCampusId'    => $campusId,
+            'active'           => (bool) ($row['active'] ?? true),
+            'memberCount'      => (int) ($row['member_count'] ?? 0),
+            'leaderCount'      => (int) ($row['leader_count'] ?? 0),
+            'servingRoleCount' => (int) ($row['role_count'] ?? 0),
+            'upcoming'         => $upcoming,
+            'leaders'          => $leaders,
+            'positions'        => $positions,
+            'roles'            => $roles,
+            'isMine'           => isset($mine[$ministryId]),
+            'leadsIt'          => isset($led[$ministryId]),
+            'access'           => $access,
+        ];
+    }
+
+    /**
+     * The ministry an old name-based address meant: "victuals",
+     * "gift-and-arrows" and "Gift and Arrows" all name the same one. Letters and
+     * digits only, case-insensitive. Null when none or more than one match.
+     * Resolving a name grants nothing; the page it leads to decides access.
+     */
+    public function findMinistryIdBySlug(string $slug): ?int
+    {
+        $norm = static fn (string $s): string => preg_replace('/[^a-z0-9]+/', '', strtolower($s)) ?? '';
+        $want = $norm($slug);
+        if ($want === '') {
+            return null;
+        }
+        $found = [];
+        foreach ($this->ministryRepository->listMinistriesAdmin(null) as $m) {
+            if ($norm((string) $m['name']) === $want) {
+                $found[] = (int) $m['ministry_id'];
+            }
+        }
+
+        return count($found) === 1 ? $found[0] : null;
+    }
+
+    /**
+     * The ministries the actor's own person record belongs to, and leads.
+     *
+     * @return array{0:array<int,true>,1:array<int,true>}
+     */
+    private function membershipsOf(ActorContext $context): array
+    {
+        $mine = [];
+        $led = [];
+        if ($context->personId === null || $context->personId <= 0) {
+            return [$mine, $led];
+        }
+        foreach ($this->ministryRepository->listMinistryIdsForPeople([$context->personId])[$context->personId] ?? [] as $id) {
+            $mine[(int) $id] = true;
+        }
+        foreach ($this->ministryRepository->listLeadersByMinistry(null) as $row) {
+            if ((int) $row['person_id'] === $context->personId) {
+                $led[(int) $row['ministry_id']] = true;
+            }
+        }
+
+        return [$mine, $led];
+    }
+
     private function assertCanManageMembers(ActorContext $context, int $ministryId, int $personId): void
     {
         if ($ministryId <= 0 || $personId <= 0) {

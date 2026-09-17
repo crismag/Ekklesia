@@ -1,9 +1,126 @@
 <?php
+
+declare(strict_types=1);
+
+/**
+ * /admin/ministries — Manage ministries (Ministries workspace, administrators).
+ *
+ * Create a ministry, rename it or move it to a campus, deactivate or activate
+ * it, delete it; and the public-listing settings the church website reads.
+ * Writes go to the existing /api/admin/ministries* endpoints, which refuse
+ * anyone but a portal-wide administrator. Who is in a ministry is managed on
+ * the ministry's own Members & leaders tab, not here.
+ *
+ * Rendered once: this page used to call admin_render_page() twice and so drew
+ * two complete pages, the second a leftover tile board.
+ *
+ * @var array<string,mixed> $req
+ * @var string $basePath
+ * @var ?array<string,mixed> $actor
+ * @var array<string,mixed> $campusSelector
+ */
+
 require_once __DIR__ . '/_admin-shell.php';
 $base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
 $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
 
 $h = static fn (mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+
+if (!$isAdmin) {
+    echo admin_render_page([
+        'basePath' => $basePath, 'activeId' => 'ministries',
+        'pageTitle' => 'Manage ministries', 'pageSubtitle' => '',
+        'sectionTitle' => 'Manage ministries',
+        'sectionDescription' => 'Creating, renaming and retiring ministries is for administrators.',
+        'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => false,
+    ], static fn (): string => '<article class="ek-card"><div class="ek-empty">'
+        . '<strong>Managing ministries is for administrators</strong>'
+        . '<p>Leaders look after their ministry\'s members and serving roles from the ministry itself.</p>'
+        . '<a class="ek-btn ek-btn-primary" href="' . $base . '/ministries">Go to Ministries</a>'
+        . '</div></article>');
+    return;
+}
+
+$campuses = is_array($campusSelector['campuses'] ?? null) ? $campusSelector['campuses'] : [];
+$campusNames = [];
+foreach ($campuses as $c) {
+    $campusNames[(int) ($c['id'] ?? 0)] = (string) ($c['name'] ?? '');
+}
+
+// Every ministry, active or not, counted across all campuses.
+$rows = [];
+$loadError = false;
+try {
+    $context = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
+    $rows = \App\Providers\PortalServiceProvider::makeMinistryService()->listMinistriesAdmin($context, null);
+} catch (\Throwable) {
+    $loadError = true;
+}
+usort($rows, static fn (array $a, array $b): int => ((int) !$a['active'] <=> (int) !$b['active']) ?: strcasecmp((string) $a['name'], (string) $b['name']));
+$activeCount = count(array_filter($rows, static fn (array $r): bool => (bool) $r['active']));
+
+$campusOptions = static function (?int $selected) use ($campuses, $h): string {
+    $out = '<option value="">All campuses</option>';
+    foreach ($campuses as $c) {
+        $id = (int) ($c['id'] ?? 0);
+        if ($id > 0) {
+            $out .= '<option value="' . $id . '"' . ($selected === $id ? ' selected' : '') . '>' . $h($c['name'] ?? '') . '</option>';
+        }
+    }
+    return $out;
+};
+
+$tableRows = '';
+foreach ($rows as $m) {
+    $id = (int) $m['ministry_id'];
+    $campusId = $m['campus_id'] === null ? null : (int) $m['campus_id'];
+    $campusLabel = $campusId === null ? 'All campuses' : ($campusNames[$campusId] ?? 'Campus #' . $campusId);
+    $active = (bool) $m['active'];
+    $tableRows .= '<tr id="ministry-' . $id . '" data-id="' . $id . '" data-name="' . $h($m['name']) . '" data-active="' . ($active ? '1' : '0') . '"'
+        . ' data-members="' . (int) $m['member_count'] . '" data-roles="' . (int) $m['role_count'] . '" data-search="' . $h(strtolower((string) $m['name'])) . '">'
+        . '<td><a href="' . $base . '/ministries/' . $id . '"><strong>' . $h($m['name']) . '</strong></a>'
+        . '<form class="mm-edit" hidden data-edit-form>'
+        . '<div class="ek-field"><label for="mmName' . $id . '">Name</label><input class="ek-input" id="mmName' . $id . '" type="text" maxlength="50" required value="' . $h($m['name']) . '"></div>'
+        . '<div class="ek-field"><label for="mmCampus' . $id . '">Campus</label><select class="ek-select" id="mmCampus' . $id . '">' . $campusOptions($campusId) . '</select></div>'
+        . '<button class="ek-btn ek-btn-primary" type="submit">Save</button>'
+        . '<button class="ek-btn ek-btn-quiet" type="button" data-cancel>Cancel</button>'
+        . '</form></td>'
+        . '<td><span class="mm-lbl">Campus: </span>' . $h($campusLabel) . '</td>'
+        . '<td class="is-num"><span class="mm-lbl">Members: </span>' . (int) $m['member_count'] . '</td>'
+        . '<td class="is-num"><span class="mm-lbl">Leaders: </span>' . (int) $m['leader_count'] . '</td>'
+        . '<td class="is-num"><span class="mm-lbl">Serving roles: </span>' . (int) $m['role_count'] . '</td>'
+        . '<td>' . ($active ? '<span class="ek-badge is-ok">Active</span>' : '<span class="ek-badge is-warn">Inactive</span>') . '</td>'
+        . '<td class="mm-do">'
+        . '<button class="ek-btn" type="button" data-act="edit" aria-label="Rename or move ' . $h($m['name']) . '">Edit</button>'
+        . '<button class="ek-btn" type="button" data-act="toggle" aria-label="' . ($active ? 'Deactivate ' : 'Activate ') . $h($m['name']) . '">' . ($active ? 'Deactivate' : 'Activate') . '</button>'
+        . '<button class="ek-btn ek-btn-danger" type="button" data-act="delete" aria-label="Delete ' . $h($m['name']) . '">Delete</button>'
+        . '</td></tr>';
+}
+
+$manageHtml = '<div id="mmFlash" role="status" aria-live="polite"></div>'
+    . '<article class="ek-card" aria-labelledby="mmAddHead">'
+    . '<div class="ek-card-head"><div><h2 id="mmAddHead">Add a ministry</h2><p>Then open it to add members, leaders and serving roles.</p></div></div>'
+    . '<div class="ek-card-body"><form class="mm-add" id="mmAddForm" novalidate>'
+    . '<div class="ek-field"><label for="mmNewName">Ministry name</label><input class="ek-input" id="mmNewName" type="text" maxlength="50" required autocomplete="off"><span class="ek-hint">Up to 50 characters.</span></div>'
+    . '<div class="ek-field"><label for="mmNewCampus">Campus</label><select class="ek-select" id="mmNewCampus">' . $campusOptions(null) . '</select><span class="ek-hint">Leave as All campuses for a church-wide ministry.</span></div>'
+    . '<button class="ek-btn ek-btn-primary" type="submit">Create ministry</button>'
+    . '</form></div></article>'
+
+    . '<article class="ek-card" aria-labelledby="mmListHead">'
+    . '<div class="ek-card-head"><div><h2 id="mmListHead">Ministries <span class="mm-sub">(' . $activeCount . ' active of ' . count($rows) . ')</span></h2>'
+    . '<p>Deactivating hides a ministry from the directory and the schedule editor and keeps its history. Deleting removes it with its memberships and serving roles.</p></div>'
+    . ($rows !== [] ? '<div class="ek-field mm-filter"><label class="sr-only" for="mmFilter">Filter ministries</label><input class="ek-input" id="mmFilter" type="search" placeholder="Filter by name…" autocomplete="off"></div>' : '')
+    . '</div>'
+    . ($loadError
+        ? '<div class="ek-card-body"><div class="ek-alert is-error"><div><strong>The ministry list could not be loaded.</strong> Reload the page to try again.</div></div></div>'
+        : ($rows === []
+            ? '<div class="ek-empty"><strong>No ministries yet</strong><p>Create the first one above.</p></div>'
+            : '<div class="ek-table-wrap"><table class="ek-table mm-table" id="mmTable"><thead><tr>'
+              . '<th scope="col">Ministry</th><th scope="col">Campus</th><th scope="col" class="is-num">Members</th><th scope="col" class="is-num">Leaders</th>'
+              . '<th scope="col" class="is-num">Serving roles</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th>'
+              . '</tr></thead><tbody>' . $tableRows . '</tbody></table></div>'
+              . '<div id="mmNoMatch" hidden><div class="ek-empty"><strong>No ministry by that name</strong><p>Clear the filter to see them all.</p></div></div>'))
+    . '</article>';
 
 // The list an administrator picks from. Without it this page can only ask for
 // identifiers, which is what it used to do.
@@ -26,9 +143,9 @@ foreach ($allMinistries as $m) {
         . '<span>' . $h($name) . '</span></label>';
 }
 
-$content = '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>What the public can see</h2>'
-    . '<p>Choose which ministry pages appear on the public site, and hide any ministry that should not be listed.</p></div></div>'
+$visibilityHtml = '<article class="admin-card" id="public-listing">'
+    . '<div class="admin-card-head"><div><h2>Public listing</h2>'
+    . '<p>What the church website may show of ministries, and which ministries it should leave out. Nothing here changes the portal.</p></div></div>'
     . '<div class="admin-card-body">'
 
     . '<fieldset class="mv-fieldset"><legend>Public ministry pages</legend>'
@@ -72,18 +189,127 @@ $content = '<article class="admin-card">'
 
     . '<div class="mv-actions">'
     . '<button id="admin_save_ministries" class="button primary">Save settings</button> '
-    . '<button id="admin_preview_ministries" class="button">Preview public board</button>'
+    . '<button id="admin_preview_ministries" class="button">Preview schedule board</button>'
     . '</div>'
     . '</div></article>';
 
-echo admin_render_page([
-    'basePath' => $basePath, 'activeId' => 'ministries',
-    'pageTitle' => 'Ministry list · Admin', 'pageSubtitle' => 'Public visibility',
-    'sectionTitle' => 'Ministry list',
-    'sectionDescription' => 'Choose which ministry pages appear on the public site. Create a team, and who is on it, under Members & leaders.',
-    'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
-], static fn(): string => $content);
+ob_start();
 ?>
+<style>
+  .mm-sub{color:var(--muted);font-size:13px;font-weight:500}
+  .mm-add{display:grid;gap:var(--sp-3,12px);grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto;align-items:start}
+  .mm-add .ek-btn{margin-top:26px}
+  .mm-filter{max-width:260px}
+  .mm-table td.mm-do{white-space:nowrap;text-align:right}
+  .mm-table .ek-btn{min-height:32px;padding:4px 10px;font-size:13px}
+  .mm-table a{text-decoration:none}
+  .mm-lbl{display:none}
+  .mm-edit{display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-top:8px}
+  .mm-edit .ek-field{flex:1 1 160px}
+  #public-listing{margin-top:0}
+  [hidden]{display:none!important}
+  @media (max-width:720px){
+    .mm-add{grid-template-columns:1fr}.mm-add .ek-btn{margin-top:0}
+    .mm-table thead{display:none}
+    .mm-table tr{display:grid;gap:4px;padding:10px 12px;border-bottom:1px solid var(--line,#d9e4dd)}
+    .mm-table td{padding:0;border:0;text-align:left!important}
+    .mm-table .mm-lbl{display:inline;color:var(--muted)}
+    .mm-table td.mm-do{white-space:normal}
+  }
+</style>
+<script>
+(function () {
+  'use strict';
+  var BASE = <?= json_encode($basePath) ?> || '';
+  var flash = document.getElementById('mmFlash');
+  function say(message, isError) {
+    flash.innerHTML = '';
+    var box = document.createElement('div'); box.className = 'ek-alert ' + (isError ? 'is-error' : 'is-ok');
+    var text = document.createElement('div');
+    if (isError) { var s = document.createElement('strong'); s.textContent = 'Not saved. '; text.appendChild(s); }
+    text.appendChild(document.createTextNode(message)); box.appendChild(text); flash.appendChild(box);
+    flash.scrollIntoView({ block: 'nearest' });
+  }
+  try { var kept = sessionStorage.getItem('mm-flash'); if (kept) { sessionStorage.removeItem('mm-flash'); say(kept, false); } } catch (e) {}
+  function done(message) { try { sessionStorage.setItem('mm-flash', message); } catch (e) {} location.reload(); }
+  function api(method, path, body) {
+    return fetch(BASE + path, { method: method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) {
+      if (!r.ok || d.success === false) throw new Error(d.error || 'The server refused the change (' + r.status + ').'); return d; }); });
+  }
+  function busy(b, on) { if (b) { b.disabled = on; b.setAttribute('aria-busy', on ? 'true' : 'false'); } }
+
+  var add = document.getElementById('mmAddForm');
+  add.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var input = document.getElementById('mmNewName'); var name = input.value.trim();
+    if (!name) { input.setAttribute('aria-invalid', 'true'); say('Give the ministry a name.', true); input.focus(); return; }
+    var btn = add.querySelector('button[type=submit]'); busy(btn, true);
+    api('POST', '/api/admin/ministries', { name: name, campus_id: document.getElementById('mmNewCampus').value })
+      .then(function (d) {
+        var id = d.ministry && (d.ministry.ministry_id || d.ministry.id);
+        if (id) { try { sessionStorage.setItem('mw-flash', 'Created ' + name + '. Add its members and serving roles here.'); } catch (e) {} location.href = BASE + '/ministries/' + id + '/members'; }
+        else { done('Created ' + name + '.'); }
+      })
+      .catch(function (err) { busy(btn, false); say(err.message, true); });
+  });
+
+  var filter = document.getElementById('mmFilter');
+  var table = document.getElementById('mmTable');
+  if (filter && table) {
+    var rows = [].slice.call(table.querySelectorAll('tbody tr')); var none = document.getElementById('mmNoMatch');
+    filter.addEventListener('input', function () {
+      var q = filter.value.trim().toLowerCase(), shown = 0;
+      rows.forEach(function (tr) { var hit = !q || tr.getAttribute('data-search').indexOf(q) !== -1; tr.hidden = !hit; if (hit) shown++; });
+      none.hidden = shown !== 0;
+    });
+  }
+  if (table) {
+    table.addEventListener('click', function (ev) {
+      var cancel = ev.target.closest('[data-cancel]');
+      if (cancel) { var f = cancel.closest('form'); f.hidden = true; f.closest('tr').querySelector('[data-act="edit"]').focus(); return; }
+      var btn = ev.target.closest('button[data-act]'); if (!btn) return;
+      var tr = btn.closest('tr'); var id = tr.getAttribute('data-id'); var name = tr.getAttribute('data-name');
+      var act = btn.getAttribute('data-act');
+      if (act === 'edit') { var form = tr.querySelector('[data-edit-form]'); form.hidden = !form.hidden; if (!form.hidden) form.querySelector('input').focus(); return; }
+      if (act === 'toggle') {
+        var on = tr.getAttribute('data-active') !== '1'; busy(btn, true);
+        api('POST', '/api/admin/ministries/' + id + '/active', { active: on })
+          .then(function () { done(name + (on ? ' is active again.' : ' is now inactive.')); })
+          .catch(function (err) { busy(btn, false); say(err.message, true); });
+        return;
+      }
+      if (act === 'delete') {
+        var members = parseInt(tr.getAttribute('data-members'), 10) || 0, roles = parseInt(tr.getAttribute('data-roles'), 10) || 0;
+        var msg = 'Permanently delete ' + name + '?\n\n' + (members || roles
+          ? 'Its ' + members + (members === 1 ? ' membership' : ' memberships') + ' and ' + roles + (roles === 1 ? ' serving role' : ' serving roles') + ' are deleted with it. To keep its history, deactivate it instead.'
+          : 'It has no members or serving roles.') + '\n\nThis cannot be undone.';
+        if (!window.confirm(msg)) return;
+        busy(btn, true);
+        api('DELETE', '/api/admin/ministries/' + id)
+          .then(function () { done('Deleted ' + name + '.'); })
+          .catch(function (err) { busy(btn, false); say(err.message, true); });
+      }
+    });
+    table.addEventListener('submit', function (ev) {
+      var form = ev.target.closest('[data-edit-form]'); if (!form) return;
+      ev.preventDefault();
+      var tr = form.closest('tr'); var input = form.querySelector('input'); var name = input.value.trim();
+      if (!name) { input.setAttribute('aria-invalid', 'true'); say('A ministry needs a name.', true); input.focus(); return; }
+      var btn = form.querySelector('button[type=submit]'); busy(btn, true);
+      api('PUT', '/api/admin/ministries/' + tr.getAttribute('data-id'), { name: name, campus_id: form.querySelector('select').value })
+        .then(function () { done('Saved ' + name + '.'); })
+        .catch(function (err) { busy(btn, false); say(err.message, true); });
+    });
+    if (location.hash && /^#ministry-\d+$/.test(location.hash)) {
+      var target = document.getElementById(location.hash.slice(1));
+      if (target) { var b = target.querySelector('[data-act="edit"]'); if (b) { b.click(); } }
+    }
+  }
+})();
+</script>
 <style>
   .mv-fieldset{border:1px solid var(--line,#d9e4dd);border-radius:8px;padding:14px 16px;margin:0 0 16px}
   .mv-fieldset>legend{padding:0 6px;font-size:13px;font-weight:800;color:var(--ink)}
@@ -235,32 +461,19 @@ echo admin_render_page([
             noticeEl.textContent = 'Saved server-side.';
         }catch(e){ noticeEl.textContent = 'Save failed.'; }
     });
-    previewBtn?.addEventListener('click', ()=>{ window.open(new URL(apiPath('/ministries'), location.origin).toString(), '_blank'); });
+    previewBtn?.addEventListener('click', ()=>{ window.open(new URL(apiPath('/schedule-board'), location.origin).toString(), '_blank'); });
     // loadSaved() writes the stored identifiers into the hidden field; tick the
     // boxes to match once it has, rather than watching the field for changes.
     loadSaved().then(syncFromHidden).catch(syncFromHidden);
 })();
 </script>
 <?php
-require_once __DIR__ . '/_admin-shell.php';
-$base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
-$isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-
-$content = '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>Roles &amp; members</h2><p>Configure roles per ministry and manage who serves on each.</p></div>' . admin_section_status_badge('Beta') . '</div>'
-    . '<div class="admin-card-body">'
-    . '<div class="tile-grid">'
-    . '<a class="tile" href="' . $base . '/ministries"><h3>Ministries</h3><p>Open a ministry workspace — members, serving grid, posted lists.</p><span class="tile-cta">Open &rsaquo;</span></a>'
-    . '<a class="tile" href="' . $base . '/people"><h3>People</h3><p>Look up members. Adding a record is Member records, not this directory.</p><span class="tile-cta">Open &rsaquo;</span></a>'
-    . '<a class="tile" href="' . $base . '/schedules"><h3>Serving grid</h3><p>Fill roles on an activity\'s dates.</p><span class="tile-cta">Open &rsaquo;</span></a>'
-    . '</div></div></article>'
-
-    . '';
+$pageAssets = (string) ob_get_clean();
 
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'ministries',
-    'pageTitle' => 'Ministry list · Admin', 'pageSubtitle' => 'Public visibility.',
-    'sectionTitle' => 'Ministry list',
-    'sectionDescription' => 'Public ministry visibility. Create teams and assign members under Members & leaders.',
+    'pageTitle' => 'Manage ministries', 'pageSubtitle' => '',
+    'sectionTitle' => 'Manage ministries',
+    'sectionDescription' => 'Create, rename, move, deactivate or delete ministries, and choose what the church website lists. Members and serving roles are managed inside each ministry.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
-], static fn (): string => $content);
+], static fn (): string => $manageHtml . $visibilityHtml . $pageAssets);

@@ -67,10 +67,10 @@ final class Workspaces
             [
                 'id' => 'ministries', 'label' => 'Ministries', 'icon' => 'ministry',
                 'pages' => [
-                    ['id' => 'ministries', 'label' => 'Ministries', 'href' => '/ministries', 'icon' => 'ministry', 'need' => 'signed-in', 'match' => ['/ministries', '/ministries/*', '/ministry/*']],
-                    // The membership editor, kept whole until each ministry gets
-                    // its own Members & leaders tab.
-                    ['id' => 'members', 'label' => 'Manage members & leaders', 'href' => '/ministries/members-and-leaders', 'icon' => 'people', 'need' => 'perm:manage_ministry_roles', 'match' => ['/ministries/members-and-leaders', '/ministries/members-and-leaders/*', '/admin/groups-and-ministries', '/admin/groups-and-ministries/*']],
+                    // The directory, and each ministry's own workspace below it
+                    // (tabs: self::ministryTabs()). Members & leaders is a tab of
+                    // each ministry; the old editor addresses redirect there.
+                    ['id' => 'ministries', 'label' => 'Ministries', 'href' => '/ministries', 'icon' => 'ministry', 'need' => 'signed-in', 'match' => ['/ministries', '/ministries/*', '/ministry/*', '/admin/groups-and-ministries', '/admin/groups-and-ministries/*']],
                     ['id' => 'manage', 'label' => 'Manage ministries', 'href' => '/admin/ministries', 'icon' => 'settings', 'need' => 'admin', 'match' => ['/admin/ministries']],
                 ],
             ],
@@ -158,12 +158,32 @@ final class Workspaces
             'families'      => ['people', 'households', null],
             'import'        => ['people', 'import', null],
             'options'       => ['people', 'settings', null],
-            'groups'        => ['ministries', 'members', null],
             'ministries'    => ['ministries', 'manage', null],
             'calendar'      => ['events', 'calendar-settings', null],
             'events'        => ['events', 'events', null],
             'event-types'   => ['events', 'categories', null],
             'outreach'      => ['visitors', 'outreach', null],
+        ];
+    }
+
+    /**
+     * The tabs of one ministry's workspace (/ministries/{id}…).
+     *
+     * A ministry is a record, not a page of the map, so its tabs live here
+     * rather than in all(). 'suffix' follows the ministry's path; 'requires'
+     * names a MinistryService::workspaceAccess() flag the actor must hold to be
+     * offered the tab (null: anyone who may open the ministry). As with the
+     * map, hiding a tab is a courtesy; the service decides.
+     *
+     * @return list<array{id:string,label:string,suffix:string,requires:?string}>
+     */
+    public static function ministryTabs(): array
+    {
+        return [
+            ['id' => 'overview', 'label' => 'Overview',          'suffix' => '',          'requires' => null],
+            ['id' => 'members',  'label' => 'Members & leaders', 'suffix' => '/members',  'requires' => 'canViewPeople'],
+            ['id' => 'roles',    'label' => 'Serving roles',     'suffix' => '/roles',    'requires' => 'canViewPeople'],
+            ['id' => 'schedule', 'label' => 'Schedule',          'suffix' => '/schedule', 'requires' => null],
         ];
     }
 

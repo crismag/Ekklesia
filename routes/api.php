@@ -325,6 +325,11 @@ return [
         PortalServiceProvider::makeRequestContext(),
     ))->setMemberRole($req),
 
+    'POST /api/ministry/{id}/members/{personId}/positions' => fn (array $req) => (new MinistryController(
+        PortalServiceProvider::makeMinistryService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->setMemberPositions($req),
+
     'DELETE /api/ministry/{id}/members/{personId}' => fn (array $req) => (new MinistryController(
         PortalServiceProvider::makeMinistryService(),
         PortalServiceProvider::makeRequestContext(),

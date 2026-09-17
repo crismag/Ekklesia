@@ -62,7 +62,7 @@ if (!function_exists('admin_sections')) {
             ]],
 
             ['group' => 'Ministries', 'icon' => 'ministry', 'need' => 'perm:manage_ministry_roles', 'children' => [
-                ['id' => 'groups',     'label' => 'Members & leaders', 'href' => $basePath . '/ministries/members-and-leaders', 'icon' => 'people',   'need' => 'perm:manage_ministry_roles'],
+                ['id' => 'groups',     'label' => 'Members & leaders', 'href' => $basePath . '/ministries', 'icon' => 'people',   'need' => 'perm:manage_ministry_roles'],
                 ['id' => 'ministries', 'label' => 'Ministry list',     'href' => $basePath . '/admin/ministries',            'icon' => 'ministry', 'need' => 'admin'],
             ]],
 
