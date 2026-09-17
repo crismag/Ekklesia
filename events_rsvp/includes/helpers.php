@@ -223,9 +223,8 @@ if (!function_exists('rv_config')) {
         $first = $has('first name'); $last = $has('last name');
         $birth = $has('birth month/year');
         $strong = $has('email') || $has('mobile') || $birth;
+        // Exact needs the person's own name: households share email and phone.
         if ($first && $last && $strong) { return 'exact'; }
-        if (($has('email') || $has('mobile')) && $last) { return 'exact'; }
-        if ($last && $birth) { return 'exact'; }
         if (count($why) >= 2 || $has('email') || $has('mobile')) { return 'possible'; }
         return 'none';
     }

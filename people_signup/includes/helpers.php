@@ -239,8 +239,8 @@ if (!function_exists('sg_config')) {
 
     /**
      * Classify a set of matched components into 'exact' | 'possible' | 'none'.
-     * Exact = full name plus at least one strong identifier, OR a direct
-     * email/phone hit alongside a matching last name. Anything with two or more
+     * Exact = full name plus at least one strong identifier (email, phone or
+     * birth month/year). Anything with two or more
      * signals (or a lone strong identifier) is a 'possible' for admin review.
      *
      * @param list<string> $why
@@ -253,9 +253,11 @@ if (!function_exists('sg_config')) {
         $birth  = $has('birth month/year');
         $strong = $has('email') || $has('mobile') || $birth;
 
+        // Exact needs the person's own name. A household shares email and phone
+        // (children under a guardian, older members using a relative's), and a
+        // shared surname with a shared contact is a family member, not the same
+        // person; those are possibles for an admin to decide.
         if ($first && $last && $strong) { return 'exact'; }        // name + one more
-        if (($has('email') || $has('mobile')) && $last) { return 'exact'; } // contact + last
-        if ($last && $birth) { return 'exact'; }                   // last + exact birthdate (nickname-safe)
         if (count($why) >= 2 || $has('email') || $has('mobile')) { return 'possible'; }
         return 'none';
     }

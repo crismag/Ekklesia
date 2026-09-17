@@ -1492,6 +1492,48 @@ assert_true(count($plan['create']) === 2, 'unmatched file rows create');
 assert_true(count($plan['remove']) === 1, 'campus leftover is removed from campus');
 assert_true((int) $plan['remove'][0]['person_id'] === 11, 'old campus member scheduled for unlink');
 
+// A household shares one email (a guardian's address used for the children, an
+// older member using a relative's). Identity is the name: each row keeps its own
+// person, nobody is duplicated, and nobody is dropped from the campus.
+$row = static fn (string $last, string $first, string $email): array => [
+    'name_raw' => $last . ', ' . $first, 'last_name' => $last, 'first_name' => $first, 'email' => $email,
+];
+$family = [
+    ['id' => 20, 'first_name' => 'Maria', 'last_name' => 'Santos', 'email' => 'santos.family@example.com', 'campus_id' => 3],
+    ['id' => 21, 'first_name' => 'Lito', 'last_name' => 'Santos', 'email' => 'santos.family@example.com', 'campus_id' => 3],
+    ['id' => 22, 'first_name' => 'Aurea', 'last_name' => 'De Guzman', 'email' => 'shared@example.com', 'campus_id' => null],
+    ['id' => 23, 'first_name' => 'Nena', 'last_name' => 'Reyes', 'email' => 'shared@example.com', 'campus_id' => 3],
+];
+$plan = $planner->plan([
+    $row('Santos', 'Lito', 'santos.family@example.com'),
+    $row('Santos', 'Maria', 'santos.family@example.com'),
+    $row('De Guzman', 'Aurea', 'shared@example.com'),
+    $row('Reyes', 'Nena', 'shared@example.com'),
+], $family, 3);
+$matched = [];
+foreach ($plan['update'] as $u) {
+    $matched[$u['row']['first_name']] = (int) $u['person_id'];
+}
+assert_true($matched === ['Lito' => 21, 'Maria' => 20, 'Aurea' => 22, 'Nena' => 23], 'shared email: every row keeps its own person');
+assert_true($plan['create'] === [], 'shared email: no duplicate person is created');
+assert_true($plan['remove'] === [], 'shared email: nobody is dropped from the campus');
+
+// Two people with the same name are told apart by email.
+$plan = $planner->plan([$row('Cruz', 'Ana', 'ana.younger@example.com')], [
+    ['id' => 30, 'first_name' => 'Ana', 'last_name' => 'Cruz', 'email' => 'ana.elder@example.com', 'campus_id' => 3],
+    ['id' => 31, 'first_name' => 'Ana', 'last_name' => 'Cruz', 'email' => 'ana.younger@example.com', 'campus_id' => 3],
+], 3);
+assert_true((int) $plan['update'][0]['person_id'] === 31, 'same name: the email picks the right person');
+
+// A changed name still matches when the email belongs to exactly one person…
+$plan = $planner->plan([$row('Bautista', 'Joy', 'joy@example.com')], [
+    ['id' => 40, 'first_name' => 'Joy', 'last_name' => 'Castillo', 'email' => 'joy@example.com', 'campus_id' => 3],
+], 3);
+assert_true(count($plan['update']) === 1 && (int) $plan['update'][0]['person_id'] === 40, 'renamed person matches by a unique email');
+// …but never through an address several people share.
+$plan = $planner->plan([$row('Bautista', 'Joy', 'shared@example.com')], $family, 3);
+assert_true(count($plan['update']) === 0 && count($plan['create']) === 1, 'a shared email never decides who a new name is');
+
 echo "Member sheet merger (Hub latest + North York extras)\n";
 $merger = new \App\Services\MemberSheetMerger($parser);
 $hubRows = [
