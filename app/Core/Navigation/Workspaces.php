@@ -97,11 +97,9 @@ final class Workspaces
             [
                 'id' => 'visitors', 'label' => 'Visitors & RSVPs', 'icon' => 'profile',
                 'pages' => [
-                    ['id' => 'visitors', 'label' => 'Visitors', 'href' => '/visitors', 'icon' => 'people', 'need' => 'admin', 'match' => ['/visitors'], 'available' => false],
-                    ['id' => 'rsvps', 'label' => 'RSVPs', 'href' => '/visitors/rsvps', 'icon' => 'events', 'need' => 'admin', 'match' => ['/visitors/rsvps'], 'available' => false],
-                    ['id' => 'access', 'label' => 'Access codes', 'href' => '/visitors/access', 'icon' => 'admin', 'need' => 'admin', 'match' => ['/visitors/access'], 'available' => false],
-                    // Until Visitors & RSVPs is built, the existing launcher is the way in.
-                    ['id' => 'outreach', 'label' => 'Sign-ups & RSVP', 'href' => '/admin/outreach', 'icon' => 'people', 'need' => 'admin', 'match' => ['/admin/outreach']],
+                    ['id' => 'visitors', 'label' => 'Visitors', 'href' => '/visitors', 'icon' => 'people', 'need' => 'admin', 'match' => ['/visitors', '/visitors/*']],
+                    ['id' => 'rsvps', 'label' => 'RSVPs', 'href' => '/visitors/rsvps', 'icon' => 'events', 'need' => 'admin', 'match' => ['/visitors/rsvps']],
+                    ['id' => 'access', 'label' => 'Access codes', 'href' => '/visitors/access', 'icon' => 'admin', 'need' => 'admin', 'match' => ['/visitors/access']],
                     // The standalone guest app. RSVP has no page of its own without
                     // an event, so it is reached from each event rather than here.
                     ['id' => 'signup', 'label' => 'Guest sign-up', 'href' => '/people_signup/', 'icon' => 'profile', 'need' => null, 'match' => [], 'external' => true],
@@ -163,7 +161,9 @@ final class Workspaces
             'calendar'      => ['events', 'calendar-settings', null],
             'events'        => ['events', 'events', null],
             'event-types'   => ['events', 'categories', null],
-            'outreach'      => ['visitors', 'outreach', null],
+            'visitors'      => ['visitors', 'visitors', null],
+            'rsvps'         => ['visitors', 'rsvps', null],
+            'access'        => ['visitors', 'access', null],
         ];
     }
 

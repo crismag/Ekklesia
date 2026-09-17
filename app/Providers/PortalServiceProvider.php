@@ -194,6 +194,36 @@ final class PortalServiceProvider
         return new \App\Services\PersonAdminService(MembersConnection::get());
     }
 
+    /**
+     * Visitors & RSVPs. Two databases: visitors (SQLite) and members (MySQL);
+     * promoted people are created through PersonAdminService on the same
+     * member connection, so the promotion's member writes share a transaction.
+     * The access-code prefixes come from the standalone modules' own config,
+     * which the greeters' pages read too.
+     */
+    public static function makeVisitorService(): \App\Services\VisitorService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+        $root = dirname(__DIR__, 2);
+        $prefix = static function (string $relative) use ($root): string {
+            $file = $root . '/' . $relative;
+            $config = is_readable($file) ? json_decode((string) file_get_contents($file), true) : null;
+
+            return (string) ($config['admin_access']['prefix'] ?? 'ChristLikeness');
+        };
+        $members = MembersConnection::get();
+
+        return new \App\Services\VisitorService(
+            new \App\Repositories\DefaultVisitorRepository(new \App\Adapters\Sql\SqlVisitorAdapter(\App\Core\Database\VisitorsConnection::get())),
+            new \App\Repositories\DefaultVisitorMemberRepository(new \App\Adapters\Sql\SqlVisitorMemberAdapter($members)),
+            new \App\Services\Visitors\PersonEditorVisitorPersonCreator(new \App\Services\PersonAdminService($members)),
+            [
+                'signup' => $prefix('people_signup/config/signup.config.json'),
+                'rsvp' => $prefix('events_rsvp/config/rsvp.config.json'),
+            ],
+        );
+    }
+
     public static function makeMaintenanceBackupService(): \App\Services\MaintenanceBackupService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');

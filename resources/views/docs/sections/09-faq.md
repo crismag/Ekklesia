@@ -93,13 +93,16 @@ administrators. Tell your ministry leader when you're unavailable.
 ## Guest sign-ups & RSVP
 
 **How do people sign up or RSVP?**
-Share the public sign-up link, or an event RSVP link. Staff review submissions
-under **Sign-ups & RSVP**, where confident matches to existing members are
-flagged so you don't create duplicates.
+Share the public sign-up link, or an event RSVP link (both are listed under
+**Visitors & RSVPs → Access codes**, in *Public links*). Administrators review
+submissions under **Visitors & RSVPs → Visitors**: each registration shows
+members it may already be, so you can link it to that person instead of
+creating a duplicate. A shared family email or phone alone is only a possible
+match.
 
 **What's the admin code for those modules?**
 They use a rotating **ChristLikeness + WORD** access code (default one week),
-managed from each module's *Access code* page.
+managed under **Visitors & RSVPs → Access codes**.
 
 ## Still stuck?
 
