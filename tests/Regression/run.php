@@ -1412,7 +1412,7 @@ assert_true($first['email'] === 'vincedricabalahon@gmail.com', 'email normalized
 assert_true($first['member_type'] === 'Radical', 'member type Radical');
 assert_true(($first['birthday']['iso'] ?? '') === '2005-04-26', 'Excel serial birthday converted');
 assert_true($first['city'] === 'North York', 'address city parsed');
-assert_true($first['zip'] === 'M2M 0B1', 'postal code collapsed');
+assert_true($first['postal_code'] === 'M2M 0B1', 'postal code collapsed');
 $zach = $parsed['rows'][1];
 assert_true(($zach['birthday']['iso'] ?? '') === '2019-01-19', 'misspelled January birthday parsed');
 assert_true($zach['member_type'] === 'Gifts & Arrows', 'G&A member type normalized');
@@ -1499,14 +1499,14 @@ $hubRows = [
         'name_raw' => 'Abalahon, Vince Cedric', 'last_name' => 'Abalahon', 'first_name' => 'Vince Cedric',
         'middle_name' => '', 'preferred_name' => 'Cedric', 'email' => 'vincedricabalahon@gmail.com',
         'phone' => '', 'address_raw' => '602-5740 Yonge St, North York, ON M2M 0B1',
-        'address1' => '602-5740 Yonge St', 'city' => 'North York', 'state' => 'Ontario', 'zip' => 'M2M 0B1',
+        'address_line1' => '602-5740 Yonge St', 'city' => 'North York', 'region' => 'Ontario', 'postal_code' => 'M2M 0B1',
         'country' => 'CA', 'birthday' => ['year' => 2005, 'month' => 4, 'day' => 26, 'iso' => '2005-04-26'],
         'member_since' => ['iso' => '2023-12-01'], 'member_type' => 'Radical', 'ministry' => '', 'confirmed' => '0',
     ],
     [
         'name_raw' => 'Castelvi, Jermaine Jhay', 'last_name' => 'Castelvi', 'first_name' => 'Jermaine Jhay',
         'middle_name' => '', 'preferred_name' => '', 'email' => '',
-        'phone' => '', 'address_raw' => '', 'address1' => '', 'city' => '', 'state' => 'Ontario', 'zip' => '',
+        'phone' => '', 'address_raw' => '', 'address_line1' => '', 'city' => '', 'region' => 'Ontario', 'postal_code' => '',
         'country' => 'CA', 'birthday' => ['year' => null, 'month' => null, 'day' => null, 'iso' => null],
         'member_since' => ['iso' => null], 'member_type' => 'Trailblazer', 'ministry' => '', 'confirmed' => '0',
     ],
@@ -1516,22 +1516,22 @@ $nyRows = [
         'name_raw' => 'Abalahon, Vince Cedric', 'last_name' => 'Abalahon', 'first_name' => 'Vince Cedric',
         'middle_name' => '', 'preferred_name' => '', 'email' => 'vincedricabalahon@gmail.com',
         'phone' => '437-604-2979', 'address_raw' => '5740 Yonge St, North York, ON M2M 0B1',
-        'address1' => '5740 Yonge St', 'city' => 'North York', 'state' => 'Ontario', 'zip' => 'M2M 0B1',
+        'address_line1' => '5740 Yonge St', 'city' => 'North York', 'region' => 'Ontario', 'postal_code' => 'M2M 0B1',
         'country' => 'CA', 'birthday' => ['year' => 2005, 'month' => 4, 'day' => 26, 'iso' => '2005-04-26'],
         'member_since' => ['iso' => '2023-12-01'], 'member_type' => 'Radical', 'ministry' => 'Facilities, Victuals', 'confirmed' => '',
     ],
     [
         'name_raw' => 'Castelvi, Jermaine', 'last_name' => 'Castelvi', 'first_name' => 'Jermaine',
         'middle_name' => '', 'preferred_name' => '', 'email' => '',
-        'phone' => '416-555-0199', 'address_raw' => '1 King St', 'address1' => '1 King St', 'city' => 'Toronto',
-        'state' => 'Ontario', 'zip' => '', 'country' => 'CA',
+        'phone' => '416-555-0199', 'address_raw' => '1 King St', 'address_line1' => '1 King St', 'city' => 'Toronto',
+        'region' => 'Ontario', 'postal_code' => '', 'country' => 'CA',
         'birthday' => ['year' => 1990, 'month' => 1, 'day' => 2, 'iso' => '1990-01-02'],
         'member_since' => ['iso' => null], 'member_type' => 'Trailblazer', 'ministry' => 'Psalmist', 'confirmed' => '',
     ],
     [
         'name_raw' => 'Onlyny, Pat', 'last_name' => 'Onlyny', 'first_name' => 'Pat',
         'middle_name' => '', 'preferred_name' => '', 'email' => 'pat@example.com',
-        'phone' => '', 'address_raw' => '', 'address1' => '', 'city' => '', 'state' => 'Ontario', 'zip' => '',
+        'phone' => '', 'address_raw' => '', 'address_line1' => '', 'city' => '', 'region' => 'Ontario', 'postal_code' => '',
         'country' => 'CA', 'birthday' => ['year' => null, 'month' => null, 'day' => null, 'iso' => null],
         'member_since' => ['iso' => null], 'member_type' => 'Radical', 'ministry' => '', 'confirmed' => '',
     ],
@@ -1541,7 +1541,7 @@ assert_true(count($merged) === 3, 'merged list keeps Hub people plus NY-only');
 $aba = $merged[0];
 assert_true($aba['preferred_name'] === 'Cedric', 'Hub preferred name is kept');
 assert_true($aba['phone'] === '437-604-2979', 'blank Hub phone is filled from North York');
-assert_true($aba['address1'] === '602-5740 Yonge St', 'Hub address wins over North York');
+assert_true($aba['address_line1'] === '602-5740 Yonge St', 'Hub address wins over North York');
 assert_true($aba['ministry'] === 'Facilities, Victuals', 'blank Hub ministry is filled from North York');
 assert_true($aba['source'] === 'merged', 'filled extras mark the row as merged');
 assert_true($aba['status'] === 'ready', 'Hub members start ready');
@@ -1556,22 +1556,22 @@ $deduper = new \App\Services\MemberImportDeduper($parser);
 $duped = $deduper->dedupe([
     [
         'last_name' => 'Arceo', 'first_name' => 'Gabriel', 'name_raw' => 'Arceo, Gabriel',
-        'email' => '', 'phone' => '', 'address_raw' => '801 Bathurst', 'address1' => '801 Bathurst',
+        'email' => '', 'phone' => '', 'address_raw' => '801 Bathurst', 'address_line1' => '801 Bathurst',
         'member_type' => '', 'confirmed' => '', 'source' => 'hub', 'birth_month' => null, 'notes' => '',
     ],
     [
         'last_name' => 'Arceo', 'first_name' => 'Gabriel', 'name_raw' => 'Arceo, Gabriel',
-        'email' => '', 'phone' => '', 'address_raw' => '', 'address1' => '',
+        'email' => '', 'phone' => '', 'address_raw' => '', 'address_line1' => '',
         'member_type' => '', 'confirmed' => '', 'source' => 'hub', 'birth_month' => null, 'notes' => '',
     ],
     [
         'last_name' => 'Castelvi', 'first_name' => 'Nathaniel', 'name_raw' => 'Castelvi, Nathaniel',
-        'email' => '', 'phone' => '', 'address_raw' => '131 Firgrove Crescent', 'address1' => '131 Firgrove',
+        'email' => '', 'phone' => '', 'address_raw' => '131 Firgrove Crescent', 'address_line1' => '131 Firgrove',
         'member_type' => 'Gifts & Arrows', 'confirmed' => '', 'source' => 'hub', 'birth_month' => null, 'notes' => '',
     ],
     [
         'last_name' => 'Castelvi', 'first_name' => 'Nathaniel', 'name_raw' => 'Castelvi, Nathaniel',
-        'email' => '', 'phone' => '', 'address_raw' => '', 'address1' => '',
+        'email' => '', 'phone' => '', 'address_raw' => '', 'address_line1' => '',
         'member_type' => '', 'confirmed' => '', 'source' => 'hub', 'birth_month' => null, 'notes' => '',
     ],
 ]);
@@ -1607,7 +1607,7 @@ echo "Member import payload overlay\n";
 $keepPhone = \App\Services\MemberImportPayload::forSave(
     [
         'last_name' => 'Abalahon', 'first_name' => 'Vince Cedric', 'middle_name' => '',
-        'email' => '', 'phone' => '', 'address1' => '', 'city' => '', 'state' => '', 'zip' => '',
+        'email' => '', 'phone' => '', 'address_line1' => '', 'city' => '', 'region' => '', 'postal_code' => '',
         'country' => '', 'member_type' => '',
         'birthday' => ['month' => null, 'day' => null, 'year' => null],
         'member_since' => ['iso' => null],
@@ -1617,16 +1617,16 @@ $keepPhone = \App\Services\MemberImportPayload::forSave(
     ['radical' => 2],
     10,
     [
-        'per_ID' => 10, 'per_FirstName' => 'Vince', 'per_LastName' => 'Abalahon',
-        'per_Email' => 'keep@example.com', 'per_CellPhone' => '416-555-0100',
-        'per_Address1' => '1 King', 'per_City' => 'Toronto',
+        'id' => 10, 'first_name' => 'Vince', 'last_name' => 'Abalahon',
+        'email' => 'keep@example.com', 'mobile_phone' => '416-555-0100',
+        'address_line1' => '1 King', 'city' => 'Toronto',
     ]
 );
-assert_true($keepPhone['per_Email'] === 'keep@example.com', 'blank Hub email does not wipe CRM email');
-assert_true($keepPhone['per_CellPhone'] === '416-555-0100', 'blank Hub phone does not wipe CRM phone');
-assert_true($keepPhone['per_Address1'] === '1 King', 'blank Hub address does not wipe CRM address');
-assert_true($keepPhone['per_FirstName'] === 'Vince Cedric', 'Hub official first name still updates');
-assert_true($keepPhone['primary_campus_id'] === 3, 'apply always sets the target campus');
+assert_true($keepPhone['email'] === 'keep@example.com', 'blank Hub email does not wipe the stored email');
+assert_true($keepPhone['mobile_phone'] === '416-555-0100', 'blank Hub phone does not wipe the stored phone');
+assert_true($keepPhone['address_line1'] === '1 King', 'blank Hub address does not wipe the stored address');
+assert_true($keepPhone['first_name'] === 'Vince Cedric', 'Hub official first name still updates');
+assert_true($keepPhone['campus_id'] === 3, 'apply always sets the target campus');
 
 $cli = $root . '/tools/member-import.php';
 $json = shell_exec('php ' . escapeshellarg($cli) . ' --source=' . escapeshellarg($mergedXlsx) . ' --primary=' . escapeshellarg(\App\Services\MemberWorkbookParser::DEFAULT_SHEET) . ' --dump-json');
@@ -1670,12 +1670,12 @@ $xlsxBytes = (new \App\Services\MemberRosterXlsxWriter())->build([
             'last_name' => 'Doe',
             'first_name' => 'Jane',
             'email' => 'jane@example.com',
-            'cell' => '416-555-0100',
-            'address1' => '1 King St',
+            'mobile_phone' => '416-555-0100',
+            'address_line1' => '1 King St',
             'city' => 'Toronto',
-            'bm' => 3,
-            'bd' => 15,
-            'by2' => 1990,
+            'birth_month' => 3,
+            'birth_day' => 15,
+            'birth_year' => 1990,
             'member_type' => 'Member',
         ]],
     ],

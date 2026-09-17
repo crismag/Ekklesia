@@ -201,7 +201,7 @@ foreach ($confident as $m) {
         $delta['memberType']++;
         $diffs[] = 'memberType';
     }
-    if (norm($x['address1'] ?? ($x['address_raw'] ?? '')) !== '') {
+    if (norm($x['address_line1'] ?? ($x['address_raw'] ?? '')) !== '') {
         $delta['address']++;
         $diffs[] = 'address';
     }

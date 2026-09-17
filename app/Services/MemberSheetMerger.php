@@ -15,7 +15,7 @@ final class MemberSheetMerger
 {
     /** Fields copied from NY only when Hub is empty. */
     private const FILL_FIELDS = [
-        'email', 'phone', 'address_raw', 'address1', 'city', 'state', 'zip',
+        'email', 'phone', 'address_raw', 'address_line1', 'city', 'region', 'postal_code',
         'country', 'member_type', 'ministry', 'middle_name',
     ];
 
@@ -131,7 +131,7 @@ final class MemberSheetMerger
         $b = is_array($parsed['birthday'] ?? null) ? $parsed['birthday'] : [];
         $s = is_array($parsed['member_since'] ?? null) ? $parsed['member_since'] : [];
         $filled = [];
-        foreach (['last_name', 'first_name', 'middle_name', 'preferred_name', 'email', 'phone', 'address_raw', 'address1', 'city', 'member_type', 'ministry'] as $f) {
+        foreach (['last_name', 'first_name', 'middle_name', 'preferred_name', 'email', 'phone', 'address_raw', 'address_line1', 'city', 'member_type', 'ministry'] as $f) {
             if (!$this->isEmpty($parsed[$f] ?? '')) {
                 $filled[$f] = $source;
             }
@@ -150,10 +150,10 @@ final class MemberSheetMerger
             'email' => (string) ($parsed['email'] ?? ''),
             'phone' => (string) ($parsed['phone'] ?? ''),
             'address_raw' => (string) ($parsed['address_raw'] ?? ''),
-            'address1' => (string) ($parsed['address1'] ?? ''),
+            'address_line1' => (string) ($parsed['address_line1'] ?? ''),
             'city' => (string) ($parsed['city'] ?? ''),
-            'state' => (string) ($parsed['state'] ?? 'Ontario'),
-            'zip' => (string) ($parsed['zip'] ?? ''),
+            'region' => (string) ($parsed['region'] ?? 'Ontario'),
+            'postal_code' => (string) ($parsed['postal_code'] ?? ''),
             'country' => (string) ($parsed['country'] ?? 'CA'),
             'birth_year' => $b['year'] ?? null,
             'birth_month' => $b['month'] ?? null,

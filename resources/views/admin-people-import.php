@@ -157,6 +157,16 @@ ob_start();
                     </option>
                   <?php endforeach; ?>
                 </select>
+                <?php // Positions the name carried, beside the ministry it maps to. ?>
+                <?php if (!empty($row['positions'])):
+                    $positionOf = '';
+                    foreach (($ministryChoices ?? []) as $choice) {
+                        if ((int) $choice['id'] === (int) ($decided ?? $row['resolvedId'] ?? 0)) {
+                            $positionOf = (string) $choice['name'];
+                        }
+                    } ?>
+                  <span class="mi-note"><?= $h(trim($positionOf . ' (' . implode(', ', $row['positions']) . ')')) ?></span>
+                <?php endif; ?>
               </td>
             </tr>
           <?php endforeach; ?>

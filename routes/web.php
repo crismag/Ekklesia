@@ -1447,7 +1447,7 @@ $webRoutes = [
             } else {
                 throw new \InvalidArgumentException('Upload an Excel workbook (.xlsx) or paste a Google Sheets link.');
             }
-            $actorId = (int) ($actor['personId'] ?? $actor['actorId'] ?? 0);
+            $actorId = (int) ($actor['actorId'] ?? 0);
             $result = $imp->ingest($tmp, $campusId, $actorId, $hubSheet, $nySheet, (string) ($_FILES['workbook']['name'] ?? 'Google Sheet'));
             $batchId = (int) ($result['batch']['id'] ?? 0);
             $dupes = $result['batch']['duplicate_report'] ?? [];
@@ -1541,7 +1541,7 @@ $webRoutes = [
         }
         $batchId = (int) ($req['batch_id'] ?? 0);
         $imp = \App\Providers\PortalServiceProvider::makeMemberCampusImportService();
-        $actorId = (int) ($actor['personId'] ?? $actor['actorId'] ?? 0);
+        $actorId = (int) ($actor['actorId'] ?? 0);
         try {
             $result = $imp->applyBatch($batchId, $actorId);
             $_SESSION['people_flash'] = sprintf(
@@ -2695,15 +2695,24 @@ $webRoutes['POST /admin/maintenance/export-xlsx'] = function (array $req) use ($
     }
     try {
         $people = \App\Providers\PortalServiceProvider::makePersonAdminService();
+        $import = \App\Providers\PortalServiceProvider::makeMemberCampusImportService();
         $campusId = (int) ($req['campus_id'] ?? 0);
         $sheets = [];
         foreach ($people->campuses() as $c) {
             if ($campusId > 0 && (int) $c['id'] !== $campusId) {
                 continue;
             }
+            // The Ministry column in the form the import reads back:
+            // "Guest Services (Usher, Emcee), Psalmists".
+            $cells = $import->ministryCellsForCampus((int) $c['id']);
+            $rows = $people->exportCampus((int) $c['id']);
+            foreach ($rows as &$row) {
+                $row['ministry'] = $cells[(int) $row['id']] ?? '';
+            }
+            unset($row);
             $sheets[] = [
                 'campus' => (string) $c['name'],
-                'rows' => $people->exportCampus((int) $c['id']),
+                'rows' => $rows,
             ];
         }
         if ($sheets === []) {

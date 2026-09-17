@@ -232,7 +232,7 @@ final class PortalServiceProvider
         return new \App\Services\MemberCampusImportService(
             $db,
             new \App\Repositories\DefaultMemberImportRepository(
-                new \App\Adapters\ChurchCRM\ChurchCrmMemberImportAdapter($db)
+                new \App\Adapters\Sql\SqlMemberImportAdapter($db)
             ),
             new \App\Services\PersonAdminService($db),
             new \App\Services\MemberWorkbookParser(),

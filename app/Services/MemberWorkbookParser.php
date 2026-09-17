@@ -333,10 +333,12 @@ final class MemberWorkbookParser
             'preferred_name' => $preferred,
             'birthday' => $birthday,
             'address_raw' => $cell('address'),
-            'address1' => $address['address1'],
+            // The address parser keeps its own field names; a member row uses
+            // the member database's.
+            'address_line1' => $address['address1'],
             'city' => $address['city'],
-            'state' => $address['state'],
-            'zip' => $address['zip'],
+            'region' => $address['state'],
+            'postal_code' => $address['zip'],
             'country' => $address['country'],
             'phone' => $this->normalizePhone($cell('phone')),
             'email' => $email,

@@ -581,7 +581,12 @@ final class SqlMinistryAdapter implements MinistryAdapter
             }
         }
 
-        $this->connection->beginTransaction();
+        // The member import calls this inside its own transaction; PDO cannot
+        // nest one, so join the caller's when there is one.
+        $ownTx = !$this->connection->inTransaction();
+        if ($ownTx) {
+            $this->connection->beginTransaction();
+        }
         try {
             $delete = $this->connection->prepare('DELETE FROM ministry_member_positions WHERE ministry_member_id = :m');
             $delete->bindValue(':m', $memberId, PDO::PARAM_INT);
@@ -596,9 +601,11 @@ final class SqlMinistryAdapter implements MinistryAdapter
                 $insert->execute();
             }
 
-            $this->connection->commit();
+            if ($ownTx) {
+                $this->connection->commit();
+            }
         } catch (\Throwable $e) {
-            if ($this->connection->inTransaction()) {
+            if ($ownTx && $this->connection->inTransaction()) {
                 $this->connection->rollBack();
             }
             throw $e;

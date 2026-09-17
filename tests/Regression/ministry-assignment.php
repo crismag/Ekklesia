@@ -57,7 +57,7 @@ $assigner = new MemberMinistryAssigner(
     $ministries
 );
 
-check('members are imported with no assignment role', MemberMinistryAssigner::MEMBER_ROLE_ID === 0);
+check('members are imported with the plain member role', MemberMinistryAssigner::MEMBER_ROLE === 'member');
 
 $exact = $assigner->resolve('Creatives');
 check('an exact ministry name resolves', $exact['ids'] === [9]);
@@ -125,6 +125,62 @@ foreach (['', 'N/A', '-', 'none'] as $blank) {
 
 $dupes = $assigner->resolve('Creatives, Creative, Creatives');
 check('the same ministry named twice yields one membership', $dupes['ids'] === [9]);
+
+// --- positions -----------------------------------------------------------------
+// A word the catalogue lists as a position ("roles" in ministry-catalog.json)
+// is that ministry plus the position, however the sheet writes it.
+$usher = $assigner->resolve('Usher');
+check('a bare position resolves to its ministry', $usher['ids'] === [6]);
+check('and records the position', $usher['positions'] === [6 => ['Usher']]);
+$gsUsher = $assigner->resolve('Guest Services Usher');
+check('ministry then position is one membership with that position',
+    $gsUsher['ids'] === [6] && $gsUsher['positions'] === [6 => ['Usher']]);
+$prefixed = $assigner->resolve('GS: Usher and Emcee, Psalmist');
+check('the "GS:" form gives both positions',
+    $prefixed['positions'] === [6 => ['Usher', 'Emcee']] && in_array(1, $prefixed['ids'], true));
+$spacedPos = $assigner->resolve('Victuals GS: Usher');
+sort($spacedPos['ids']);
+check('a "GS:" after another ministry does not swallow it',
+    $spacedPos['ids'] === [4, 6] && $spacedPos['positions'] === [6 => ['Usher']]);
+$paren = $assigner->resolve('Guest Services (usher, Emcee), Creatives (Photography)');
+check('the export form assigns parenthesised positions to the ministry before them',
+    $paren['ids'] === [6, 9] && $paren['positions'] === [6 => ['Usher', 'Emcee'], 9 => ['Photography']]);
+check('with the catalogue spelling where it knows the position', $paren['positions'][6][0] === 'Usher');
+check('and a ministry without positions gets none', !isset($assigner->resolve('Creatives')['positions'][9]));
+check('a position phrase is not reported as unmatched', $paren['unmatched'] === [] && $gsUsher['unmatched'] === []);
+
+// --- export -> import round trip of the Ministry cell ----------------------------
+$memberships = [
+    ['name' => 'Guest Services', 'positions' => ['Usher', 'Emcee']],
+    ['name' => 'Gift and Arrows', 'positions' => []],
+    ['name' => 'Creatives', 'positions' => ['Photography']],
+];
+$cell = App\Services\MemberRosterXlsxWriter::ministryCell($memberships);
+check('the export writes positions after their ministry',
+    $cell === 'Guest Services (Usher, Emcee), Gift and Arrows, Creatives (Photography)');
+$bytes = (new App\Services\MemberRosterXlsxWriter())->build([[
+    'campus' => 'North York',
+    'rows' => [['id' => 1, 'last_name' => 'Doe', 'first_name' => 'Jane', 'ministry' => $cell]],
+]]);
+$xlsx = sys_get_temp_dir() . '/ministry-roundtrip-' . getmypid() . '.xlsx';
+file_put_contents($xlsx, $bytes);
+$parsedBack = (new App\Services\MemberWorkbookParser())->parseFile($xlsx, 'North York');
+@unlink($xlsx);
+$backCell = (string) ($parsedBack['rows'][0]['ministry'] ?? '');
+check('the importer reads the exported Ministry cell back unchanged', $backCell === $cell);
+$back = $assigner->resolve($backCell);
+$backIds = $back['ids'];
+sort($backIds);
+check('to the same memberships', $backIds === [6, 9, 11]);
+check('and the same positions',
+    $back['positions'] === [6 => ['Usher', 'Emcee'], 9 => ['Photography']] && $back['unmatched'] === []);
+
+// --- applying: positions follow the membership authority -------------------------
+$svcPos = (string) file_get_contents(__DIR__ . '/../../app/Services/MemberCampusImportService.php');
+check('positions are written for every listed ministry', str_contains($svcPos, 'setMemberPositions($personId, $ministryId, $positions)'));
+check('an existing membership keeps its role (a leader is not demoted)',
+    str_contains($svcPos, "if (!in_array(\$ministryId, \$have, true)) {\n                    \$this->ministryRepo->setMemberRole"));
+check('a leader membership is kept like an account leader', str_contains($svcPos, 'listLeadersByMinistry'));
 
 // The import must not invent leadership, and must not read it from the sheet.
 $svc = (string) file_get_contents(__DIR__ . '/../../app/Services/MemberCampusImportService.php');
