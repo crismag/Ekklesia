@@ -12,6 +12,10 @@
     # still on the server and still being served: /reports/css-debt-inventory.json
     # returned 200 to anyone. Deny it here too, so the directory being absent is
     # not the only thing keeping it private.
+    # The public modules serve their pages and assets; their settings, helpers and
+    # notes are for the server only.
+    RewriteRule ^(people_signup|events_rsvp)/(config|includes|sql)(/|$) - [F,L]
+    RewriteRule ^(people_signup|events_rsvp)/[^/]+\.md$ - [F,L]
     RewriteRule ^(app|bootstrap|config|database|migrations|reports|resources|routes|storage|tests|tools|design-system|vendor|node_modules)(/|$) - [F,L]
 
     # /docs/<section> is a portal route, and docs/ is also a real directory on
@@ -37,10 +41,6 @@
     # Standalone apps are separate applications served directly. Without
     # this, a directory URL (which does not match the -f test above) fell
     # through to the portal front controller and 404d as JSON.
-    # The public modules serve their pages and assets; their settings, helpers and
-    # notes are for the server only.
-    RewriteRule ^(people_signup|events_rsvp)/(config|includes|sql)(/|$) - [F,L]
-    RewriteRule ^(people_signup|events_rsvp)/[^/]+\.md$ - [F,L]
     RewriteRule ^(people_signup|events_rsvp|printable)(/|$) - [L]
 
     # All non-file sub-paths -> public/ (public/.htaccess routes to index.php)
