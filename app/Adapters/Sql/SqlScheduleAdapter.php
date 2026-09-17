@@ -178,17 +178,18 @@ final class SqlScheduleAdapter implements ScheduleAdapter
 
         $campusIds = $this->normalizeCampusIds($campusIds);
 
-        // An assignment is a person or an open role. The label is always empty:
-        // free-text assignee names are not kept.
+        // `assignee_name` carries an external name when assignments.person_id
+        // is NULL. We surface it as the label so external assignees still
+        // appear in the grid alongside people.
         $sql = 'SELECT a.id                 AS id,
                         a.occurrence_id      AS occurrence_id,
                         a.person_id          AS person_id,
                         a.serving_role_id    AS serving_role_id,
                         eo.starts_at         AS starts_on,
-                        \'\'                   AS label,
+                        COALESCE(a.assignee_name, \'\') AS label,
                         CASE
                             WHEN a.person_id IS NOT NULL THEN TRIM(CONCAT_WS(\' \', p.first_name, p.last_name))
-                            ELSE \'\'
+                            ELSE COALESCE(a.assignee_name, \'\')
                         END AS display_name
                    FROM assignments a
                    INNER JOIN event_occurrences eo ON eo.id = a.occurrence_id
@@ -541,7 +542,7 @@ final class SqlScheduleAdapter implements ScheduleAdapter
                        a.person_id           AS person_id,
                        CASE WHEN a.person_id IS NOT NULL
                             THEN TRIM(CONCAT_WS(\' \', p.first_name, p.last_name))
-                            ELSE \'\' END AS person_name,
+                            ELSE COALESCE(a.assignee_name, \'\') END AS person_name,
                        a.serving_role_id     AS serving_role_id,
                        r.name                AS role_name,
                        r.sort_order          AS role_sort_order,
@@ -609,7 +610,7 @@ final class SqlScheduleAdapter implements ScheduleAdapter
      * If the command provides $start/$end, this method performs a full diff
      * of (ministry, [start,end)): existing rows in that window that aren't
      * present in $command->assignments are deleted; new rows are inserted;
-     * matching rows with a changed person_id are updated.
+     * matching rows with a changed person_id (or label) are updated.
      *
      * If $start/$end are null, only inserts/updates run (legacy/test path).
      *
@@ -654,7 +655,8 @@ final class SqlScheduleAdapter implements ScheduleAdapter
                 $saveSql = 'SELECT a.id                 AS id,
                             a.occurrence_id      AS occurrence_id,
                             a.person_id          AS person_id,
-                            a.serving_role_id    AS serving_role_id
+                            a.serving_role_id    AS serving_role_id,
+                            COALESCE(a.assignee_name, \'\') AS label
                        FROM assignments a
                        INNER JOIN event_occurrences eo ON eo.id = a.occurrence_id
                        INNER JOIN serving_roles r      ON r.id  = a.serving_role_id
@@ -687,6 +689,7 @@ final class SqlScheduleAdapter implements ScheduleAdapter
                         'occurrence_id' => (int) $r['occurrence_id'],
                         'person_id'     => $r['person_id'] === null ? 0 : (int) $r['person_id'],
                         'serving_role_id' => (int) $r['serving_role_id'],
+                        'label'         => (string) $r['label'],
                     ];
                     $existingById[$row['id']] = $row;
                 }
@@ -697,13 +700,14 @@ final class SqlScheduleAdapter implements ScheduleAdapter
 
             $insert = $this->connection->prepare(
                 'INSERT INTO assignments
-                     (occurrence_id, serving_role_id, person_id, status, assigned_at)
+                     (occurrence_id, serving_role_id, person_id, assignee_name, status, assigned_at)
                   VALUES
-                     (:occ, :role, :person, :status, :now)'
+                     (:occ, :role, :person, :label, :status, :now)'
             );
             $update = $this->connection->prepare(
                 'UPDATE assignments
                     SET person_id = :person,
+                        assignee_name = :label,
                         status = :status,
                         assigned_at = :now
                   WHERE id = :id'
@@ -748,6 +752,7 @@ final class SqlScheduleAdapter implements ScheduleAdapter
             foreach ($idLessRows as $a) {
                 $key = $a->occurrenceId . ':' . $a->roleId;
                 $personId = $a->personId > 0 ? $a->personId : null;
+                $label    = $a->label;
                 $status   = $personId !== null ? 'assigned' : 'open';
 
                 if (!empty($existingByKey[$key])) {
@@ -758,6 +763,7 @@ final class SqlScheduleAdapter implements ScheduleAdapter
                     $insert->bindValue(':occ',    $a->occurrenceId, PDO::PARAM_INT);
                     $insert->bindValue(':role',   $a->roleId,       PDO::PARAM_INT);
                     $insert->bindValue(':person', $personId, $personId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+                    $insert->bindValue(':label',  $label === '' ? null : $label, $label === '' ? PDO::PARAM_NULL : PDO::PARAM_STR);
                     $insert->bindValue(':status', $status,          PDO::PARAM_STR);
                     $insert->bindValue(':now',    $now,             PDO::PARAM_STR);
                     $insert->execute();
@@ -795,11 +801,17 @@ final class SqlScheduleAdapter implements ScheduleAdapter
     private function upsertExisting(\PDOStatement $update, array $existing, \App\DTO\Schedules\ScheduleAssignment $a, string $now): void
     {
         $personId = $a->personId > 0 ? $a->personId : null;
+        $label    = $a->label;
         $status   = $personId !== null ? 'assigned' : 'open';
-        if ($existing['person_id'] === ($personId ?? 0)) {
+        if (
+            $existing['person_id'] === ($personId ?? 0)
+            && $existing['label']  === $label
+        ) {
             return; // unchanged
         }
         $update->bindValue(':person', $personId, $personId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        // No name is NULL, not an empty string.
+        $update->bindValue(':label',  $label === '' ? null : $label, $label === '' ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $update->bindValue(':status', $status,   PDO::PARAM_STR);
         $update->bindValue(':now',    $now,      PDO::PARAM_STR);
         $update->bindValue(':id',     $existing['id'], PDO::PARAM_INT);
