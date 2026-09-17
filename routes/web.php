@@ -906,6 +906,41 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
 
+    // Record history — who changed which person or household record, and when.
+    // Read-only, portal administrators only; the service refuses anyone else.
+    'GET /people/history' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        $isAdmin = \App\Services\RecordHistoryService::mayRead($actor);
+        $history = null;
+        $options = ['actions' => [], 'people' => []];
+        $householdName = null;
+        $personName = null;
+        $loadError = '';
+        if ($isAdmin) {
+            try {
+                $svc = \App\Providers\PortalServiceProvider::makeRecordHistoryService();
+                $history = $svc->page($actor, $req);
+                $options = $svc->filterOptions($actor);
+                if ($history['criteria']['householdId'] !== null) {
+                    $householdName = $svc->recordName($actor, 'household', (int) $history['criteria']['householdId']);
+                }
+                if ($history['criteria']['personId'] !== null) {
+                    $personName = $svc->recordName($actor, 'person', (int) $history['criteria']['personId']);
+                }
+            } catch (\Throwable $e) {
+                error_log('[people/history] ' . $e->getMessage());
+                $loadError = 'The record history could not be read just now.';
+            }
+        } else {
+            http_response_code($actor === null ? 401 : 403);
+        }
+        ob_start();
+        require __DIR__ . '/../resources/views/people-history.php';
+        return (string) ob_get_clean();
+    },
+
     'GET /docs' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);
@@ -1257,8 +1292,6 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $stats = $svc->stats();
         // Campus comes from the header selector, not from a second control on
         // the page. Two campus pickers on one screen disagreed with each other.
         $filters = [
@@ -1269,11 +1302,22 @@ $webRoutes = [
         ];
         $perPage = 25;
         $page = max(1, (int) ($req['page'] ?? 1));
-        $total = $svc->count($filters);
-        $people = $svc->list($filters, $page, $perPage);
-        $classifications = $svc->classifications();
-        $memberTypes = $svc->memberTypes();
-        $campuses = $svc->campuses();
+        // Member records are for portal administrators. Other staff who reach
+        // the admin area (schedulers, leaders) used to be shown every name and
+        // contact here; nothing is read for them now.
+        $stats = ['people' => 0, 'families' => 0, 'activeFamilies' => 0, 'classifications' => [], 'memberTypes' => []];
+        $total = 0; $people = []; $classifications = []; $memberTypes = []; $campuses = [];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
+            $stats = $svc->stats();
+            $total = $svc->count($filters);
+            // A page past the end (a filter narrowed the list) shows the last page.
+            $page = min($page, max(1, (int) ceil($total / $perPage)));
+            $people = $svc->list($filters, $page, $perPage);
+            $classifications = $svc->classifications();
+            $memberTypes = $svc->memberTypes();
+            $campuses = $svc->campuses();
+        }
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['people_flash'] ?? '');
         unset($_SESSION['people_flash']);
@@ -1287,15 +1331,24 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
         $pid = (int) ($req['id'] ?? 0);
-        $person = $pid > 0 ? $svc->find($pid) : null;
-        $person = $person ?? $svc->blank();
-        $classifications = $svc->classifications();
-        $memberTypes = $svc->memberTypes();
-        $familyRoles = $svc->familyRoles();
-        $campuses = $svc->campuses();
-        $families = $svc->families();
+        $person = []; $classifications = []; $memberTypes = []; $familyRoles = []; $campuses = []; $families = [];
+        $missing = false;
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
+            $found = $pid > 0 ? $svc->find($pid) : null;
+            $missing = $pid > 0 && $found === null;
+            $person = $found ?? $svc->blank();
+            // "Add a person to this household" arrives with the household chosen.
+            if ($found === null && (int) ($req['household_id'] ?? 0) > 0) {
+                $person['household_id'] = (int) $req['household_id'];
+            }
+            $classifications = $svc->classifications();
+            $memberTypes = $svc->memberTypes();
+            $familyRoles = $svc->familyRoles();
+            $campuses = $svc->campuses();
+            $families = $svc->families();
+        }
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['people_flash'] ?? '');
         unset($_SESSION['people_flash']);
@@ -1309,8 +1362,27 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $data = $svc->viewData((int) ($req['id'] ?? 0));
+        $data = null;
+        $ministries = []; $logins = []; $recentHistory = ['entries' => [], 'total' => 0];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
+            $data = $svc->viewData((int) ($req['id'] ?? 0));
+        }
+        if ($data !== null) {
+            $pid = (int) $data['person']['id'];
+            // Ministries and logins are shown, not edited, here: each has its
+            // own workspace (Ministries; Users & access).
+            try { $ministries = $svc->ministriesFor($pid); } catch (\Throwable) { $ministries = []; }
+            try {
+                $logins = array_values(array_filter(
+                    \App\Providers\PortalServiceProvider::makeSystemUserService()->list(),
+                    static fn (array $u): bool => $u['person_id'] === $pid,
+                ));
+            } catch (\Throwable) { $logins = []; }
+            try {
+                $recentHistory = \App\Providers\PortalServiceProvider::makeRecordHistoryService()->recent($actor, 'person', $pid, 5);
+            } catch (\Throwable) { $recentHistory = ['entries' => [], 'total' => 0]; }
+        }
         // Household context: related families (map) + shared-residence families (derived).
         $relatedLinks = []; $residenceMates = [];
         if ($data !== null && (int) ($data['person']['household_id'] ?? 0) > 0) {
@@ -1378,7 +1450,7 @@ $webRoutes = [
         }
         $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
         try {
-            $svc->delete((int) ($req['id'] ?? 0));
+            $svc->delete((int) ($req['id'] ?? 0), (int) ($actor['actorId'] ?? 0));
             header('Location: ' . $basePath . '/admin/people?notice=deleted', true, 302);
         } catch (\Throwable $e) {
             $_SESSION['people_flash'] = $e->getMessage();
@@ -1399,7 +1471,8 @@ $webRoutes = [
         $actorId = (int) ($actor['actorId'] ?? 0);
         try {
             $id = $svc->save($req, $actorId);
-            header('Location: ' . $basePath . '/admin/people/edit?id=' . $id . '&notice=saved', true, 302);
+            // Saved: back to the record, which is where the change can be seen.
+            header('Location: ' . $basePath . '/admin/people/view?id=' . $id . '&notice=saved', true, 302);
         } catch (\Throwable $e) {
             $_SESSION['people_flash'] = $e->getMessage();
             $back = (int) ($req['id'] ?? 0) > 0
@@ -1414,9 +1487,8 @@ $webRoutes = [
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $imp = \App\Providers\PortalServiceProvider::makeMemberCampusImportService();
-        $campuses = $svc->campuses();
+        $isAdmin = $actor !== null && !empty($actor['isPortalWideAdmin']);
+        $campuses = [];
         $campusId = (int) ($req['campus_id'] ?? 0);
         $hubSheet = (string) ($req['hub_sheet'] ?? \App\Services\MemberWorkbookParser::HUB_SHEET);
         $nySheet = (string) ($req['ny_sheet'] ?? '');
@@ -1429,47 +1501,65 @@ $webRoutes = [
         $rows = [];
         $counts = ['draft' => 0, 'ready' => 0, 'skip' => 0, 'applied' => 0, 'total' => 0];
         $statusFilter = (string) ($req['status'] ?? '');
-        try {
-            $batches = $imp->batches();
-            $bid = (int) ($req['batch'] ?? 0);
-            if ($bid > 0) {
-                $batch = $imp->batch($bid);
-                if ($batch) {
-                    $listed = $imp->rows($bid, $statusFilter);
-                    $rows = $listed['rows'];
-                    $counts = $listed['counts'];
-                    $campusId = (int) $batch['campus_id'];
+        /** @var list<array{relative:string,filename:string,bytes:int,mtime:int}> $exports used by the template */
+        $exports = [];
+        // Staging rows are member records in waiting: nothing is read for anyone
+        // but a portal administrator (the view refuses them too).
+        if ($isAdmin) {
+            try {
+                $campuses = \App\Providers\PortalServiceProvider::makePersonAdminService()->campuses();
+                $imp = \App\Providers\PortalServiceProvider::makeMemberCampusImportService();
+                $batches = $imp->batches();
+                $bid = (int) ($req['batch'] ?? 0);
+                if ($bid > 0) {
+                    $batch = $imp->batch($bid);
+                    if ($batch) {
+                        $listed = $imp->rows($bid, $statusFilter);
+                        $rows = $listed['rows'];
+                        $counts = $listed['counts'];
+                        $campusId = (int) $batch['campus_id'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                if ($flash === '') {
+                    $flash = $e->getMessage();
+                    $notice = 'error';
                 }
             }
-        } catch (\Throwable $e) {
-            if ($flash === '') {
-                $flash = $e->getMessage();
-                $notice = 'error';
-            }
-        }
-        // What the workbook called each ministry, and whether that landed
-        // anywhere. Read here rather than in the view so the page has no idea
-        // where the decisions are stored.
-        /** @var list<array<string,mixed>> $ministryNameRows used by the template */
-        $ministryNameRows = [];
-        /** @var list<array{id:int,name:string}> $ministryChoices used by the template */
-        $ministryChoices = [];
-        /** @var int $ministryNamesPending used by the template */
-        $ministryNamesPending = 0;
-        try {
-            $nameMap = \App\Providers\PortalServiceProvider::makeMinistryNameMap();
-            $ministryNameRows = $nameMap->rows();
-            $ministryNamesPending = $nameMap->pendingCount();
-            foreach (\App\Providers\PortalServiceProvider::makeMinistryService()->listMinistriesPublic(null) as $m) {
-                $ministryChoices[] = [
-                    'id' => (int) ($m['ministry_id'] ?? $m['ministryId'] ?? 0),
-                    'name' => (string) ($m['name'] ?? ''),
-                ];
-            }
-            usort($ministryChoices, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
-        } catch (\Throwable) {
-            // A portal without a decisions file simply shows no table.
+            // What the workbook called each ministry, and whether that landed
+            // anywhere. Read here rather than in the view so the page has no idea
+            // where the decisions are stored.
+            /** @var list<array<string,mixed>> $ministryNameRows used by the template */
             $ministryNameRows = [];
+            /** @var list<array{id:int,name:string}> $ministryChoices used by the template */
+            $ministryChoices = [];
+            /** @var int $ministryNamesPending used by the template */
+            $ministryNamesPending = 0;
+            try {
+                $nameMap = \App\Providers\PortalServiceProvider::makeMinistryNameMap();
+                $ministryNameRows = $nameMap->rows();
+                $ministryNamesPending = $nameMap->pendingCount();
+                foreach (\App\Providers\PortalServiceProvider::makeMinistryService()->listMinistriesPublic(null) as $m) {
+                    $ministryChoices[] = [
+                        'id' => (int) ($m['ministry_id'] ?? $m['ministryId'] ?? 0),
+                        'name' => (string) ($m['name'] ?? ''),
+                    ];
+                }
+                usort($ministryChoices, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+            } catch (\Throwable) {
+                // A portal without a decisions file simply shows no table.
+                $ministryNameRows = [];
+            }
+            // Workbooks exported before, newest first (backups stay on Backups & maintenance).
+            try {
+                foreach (\App\Providers\PortalServiceProvider::makeMaintenanceBackupService()->store()->listRecent() as $file) {
+                    if (str_ends_with((string) $file['filename'], '.xlsx') && count($exports) < 5) {
+                        $exports[] = $file;
+                    }
+                }
+            } catch (\Throwable) {
+                $exports = [];
+            }
         }
 
         ob_start();
@@ -2093,12 +2183,22 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
         $search = (string) ($req['q'] ?? '');
         $page = max(1, (int) ($req['page'] ?? 1));
         $perPage = 25;
-        $stats = $svc->stats();
-        $listing = $svc->list($search, $page, $perPage);
+        // Households carry addresses and contact details: administrators only.
+        $stats = ['total' => 0, 'active' => 0];
+        $listing = ['total' => 0, 'rows' => []];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
+            $stats = $svc->stats();
+            $listing = $svc->list($search, $page, $perPage);
+            $lastPage = max(1, (int) ceil(((int) $listing['total']) / $perPage));
+            if ($page > $lastPage) {
+                $page = $lastPage;
+                $listing = $svc->list($search, $page, $perPage);
+            }
+        }
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['family_flash'] ?? '');
         unset($_SESSION['family_flash']);
@@ -2112,14 +2212,24 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
         $fid = (int) ($req['id'] ?? 0);
-        $family = $fid > 0 ? $svc->find($fid) : null;
-        $family = $family ?? $svc->blank();
-        $members = $fid > 0 ? $svc->members($fid) : [];
+        $family = []; $members = []; $missing = false;
+        $recentHistory = ['entries' => [], 'total' => 0];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
+            $found = $fid > 0 ? $svc->find($fid) : null;
+            $missing = $fid > 0 && $found === null;
+            $family = $found ?? $svc->blank();
+            $members = $found !== null ? $svc->members($fid) : [];
+            if ($found !== null) {
+                try {
+                    $recentHistory = \App\Providers\PortalServiceProvider::makeRecordHistoryService()->recent($actor, 'household', $fid, 5);
+                } catch (\Throwable) { $recentHistory = ['entries' => [], 'total' => 0]; }
+            }
+        }
         // Related families (admin-confirmed map) + shared-residence families (derived).
         $relatedLinks = []; $residenceMates = []; $familyPickList = [];
-        if ($fid > 0) {
+        if ($isAdmin && !$missing && $fid > 0) {
             $rel = \App\Providers\PortalServiceProvider::makeRelatedFamiliesService();
             $raw = $rel->forFamily($fid);
             $names = $svc->namesFor(array_map(static fn ($l) => $l['other'], $raw));
@@ -2147,10 +2257,23 @@ $webRoutes = [
         }
         $rel = \App\Providers\PortalServiceProvider::makeRelatedFamiliesService();
         try {
+            $otherId = (int) ($req['other_id'] ?? 0);
+            $actorId = (int) ($actor['actorId'] ?? 0);
+            $families = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
             if (($req['action'] ?? '') === 'unlink') {
-                $rel->unlink($fid, (int) ($req['other_id'] ?? 0));
+                $label = '';
+                foreach ($rel->forFamily($fid) as $l) {
+                    if ((int) $l['other'] === $otherId) { $label = (string) $l['label']; }
+                }
+                $rel->unlink($fid, $otherId);
+                $families->recordLinkChange($actorId, 'household.unlinked', $fid, $otherId, $label);
             } else {
-                $rel->link($fid, (int) ($req['other_id'] ?? 0), (string) ($req['rel'] ?? 'extended'), (string) ($req['direction'] ?? 'parent'));
+                $rel->link($fid, $otherId, (string) ($req['rel'] ?? 'extended'), (string) ($req['direction'] ?? 'parent'));
+                $label = '';
+                foreach ($rel->forFamily($fid) as $l) {
+                    if ((int) $l['other'] === $otherId) { $label = (string) $l['label']; }
+                }
+                $families->recordLinkChange($actorId, 'household.linked', $fid, $otherId, $label);
             }
             header('Location: ' . $back . '&notice=saved', true, 302);
         } catch (\Throwable $e) {
@@ -2991,9 +3114,14 @@ $webRoutes['POST /admin/maintenance/export-xlsx'] = function (array $req) use ($
     if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
     $basePath = (string) ($req['_base_path'] ?? '');
     $actor = $resolvePortalActor($req);
+    // The workbook export lives on People & Records › Import & export; a failure
+    // goes back to whichever page asked for it.
+    $fromImport = (string) ($req['return'] ?? '') === 'import';
+    $failTo = $basePath . ($fromImport ? '/admin/maintenance/import' : '/admin/maintenance') . '?notice=error';
+    $flashKey = $fromImport ? 'people_flash' : 'maintenance_flash';
     if ($actor === null || empty($actor['isPortalWideAdmin'])) {
-        $_SESSION['maintenance_flash'] = 'Only a portal-wide admin can export members.';
-        header('Location: ' . $basePath . '/admin/maintenance?notice=error', true, 302);
+        $_SESSION[$flashKey] = 'Only a portal-wide admin can export members.';
+        header('Location: ' . $failTo, true, 302);
         return '';
     }
     try {
@@ -3025,8 +3153,8 @@ $webRoutes['POST /admin/maintenance/export-xlsx'] = function (array $req) use ($
         $_SESSION['maintenance_flash'] = 'Saved styled workbook ' . $slot['relative'] . '.';
         header('Location: ' . $basePath . '/admin/maintenance/file?path=' . rawurlencode($slot['relative']), true, 302);
     } catch (\Throwable $e) {
-        $_SESSION['maintenance_flash'] = $e->getMessage();
-        header('Location: ' . $basePath . '/admin/maintenance?notice=error', true, 302);
+        $_SESSION[$flashKey] = $e->getMessage();
+        header('Location: ' . $failTo, true, 302);
     }
     return '';
 };

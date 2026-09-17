@@ -1,7 +1,13 @@
 <?php
 /**
- * Admin · Member import — multi-step: ingest Hub + North York into staging,
- * clean rows, then apply ready records to a campus.
+ * People & Records · Import & export.
+ *
+ * Import: load a campus workbook into staging, clean the rows, then apply the
+ * ready rows to that campus (MemberCampusImportService). Export: download the
+ * member workbook (POST /admin/maintenance/export-xlsx, return=import).
+ *
+ * The staging grid's markup, classes and script are the working editor and
+ * are kept as they were; only the page around it is laid out on the kit.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -18,59 +24,63 @@
  * @var list<array<string,mixed>> $rows
  * @var array<string,int> $counts
  * @var string $statusFilter
+ * @var list<array{relative:string,filename:string,bytes:int,mtime:int}> $exports
  */
-require_once __DIR__ . '/_admin-shell.php';
+require_once __DIR__ . '/_records-kit.php';
 
 $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-$base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
-$h = static fn ($v): string => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+$base = records_h($basePath);
+$h = 'records_h';
+$exports = $exports ?? [];
 $noticeMap = [
     'ingested' => ['ok', $flash !== '' ? $flash : 'Workbook loaded into staging. Clean the rows, then apply.'],
     'imported' => ['ok', $flash !== '' ? $flash : 'Campus members updated from the cleaned staging list.'],
     'discarded' => ['ok', 'Staging batch discarded.'],
     'typed' => ['ok', $flash !== '' ? $flash : 'Member types suggested on the staged rows.'],
-    'error' => ['err', $flash !== '' ? $flash : 'Something went wrong.'],
+    'ok' => ['ok', $flash !== '' ? $flash : 'Saved.'],
+    'error' => ['error', $flash !== '' ? $flash : 'Something went wrong.'],
 ];
 $step = $batch ? 2 : 1;
 if ($batch && ($batch['status'] ?? '') === 'applied') {
     $step = 3;
 }
+$campusNames = [];
+foreach ($campuses as $c) {
+    $campusNames[(int) $c['id']] = (string) $c['name'];
+}
+$fmtSize = static fn (int $n): string => $n < 1048576 ? max(1, (int) round($n / 1024)) . ' KB' : round($n / 1048576, 1) . ' MB';
 
 ob_start();
+echo records_styles();
 ?>
 <style>
-  .mi-alert{padding:10px 14px;border-radius:8px;margin:0 0 14px;font-size:14px}
-  .mi-alert.ok{background:#e6f7ec;border:1px solid #b7e3c6;color:#1a7a3a}
-  .mi-alert.warn{background:#fff8e6;border:1px solid #f0d48a;color:#8a5a00}
-  .mi-dupes{margin:0;padding-left:18px;font-size:13px;max-height:180px;overflow:auto}
-  .mi-steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
-  .mi-step{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;background:#eef2f5;color:#5c6b63}
-  .mi-step.on{background:#0c5a45;color:#fff}
-  .mi-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 16px}
-  @media (max-width:880px){.mi-grid{grid-template-columns:1fr}}
-  .mi-field{margin:0 0 10px}
-  .mi-field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#5c6b63);margin-bottom:4px}
-  .mi-field input,.mi-field select{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line,#c7d4cd);border-radius:8px;background:#fff}
-  .mi-help{font-size:13px;color:var(--muted,#5c6b63);margin:0 0 12px;line-height:1.45}
-  .mi-btn{font:inherit;font-size:13px;font-weight:800;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;background:#0c5a45;color:#fff;text-decoration:none;display:inline-block}
-  .mi-btn.sec{background:#fff;color:var(--ink,#1b2a24);border:1px solid var(--line,#c7d4cd)}
-  .mi-btn.warn{background:#8a1f17}
-  .mi-stats{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px}
-  .mi-stat{background:#fff;border:1px solid var(--line,#dbe4ec);border-radius:10px;padding:10px 14px;min-width:90px}
-  .mi-stat b{display:block;font-size:20px}
-  .mi-stat span{font-size:12px;color:var(--muted)}
+  .mi-steps{display:flex;gap:var(--sp-2,8px);flex-wrap:wrap;margin:0;padding:0;list-style:none;counter-reset:mi}
+  .mi-steps li{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 12px 0 4px;border:1px solid var(--line,#d9e4dd);
+    border-radius:var(--radius-full,999px);background:var(--paper,#fff);font-size:13px;font-weight:650;color:var(--muted,#627169)}
+  .mi-steps li::before{counter-increment:mi;content:counter(mi);display:grid;place-items:center;width:24px;height:24px;border-radius:50%;
+    background:var(--soft,#eef4f0);color:var(--ink,#17211b);font-size:12px}
+  .mi-steps li[aria-current]{border-color:var(--teal,#117b6d);color:var(--teal-ink,#117b6d)}
+  .mi-steps li[aria-current]::before{background:var(--teal,#117b6d);color:var(--on-teal,#fff)}
+  .mi-help{font-size:13px;color:var(--muted,#627169);margin:0;line-height:1.5}
+  .mi-dupes{margin:6px 0 0;padding-left:18px;font-size:13px;max-height:180px;overflow:auto}
+  .mi-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2,8px);align-items:center}
+  .mi-confirm{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:0;max-width:56ch}
+  .mi-confirm input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
+  .mi-form{display:grid;gap:var(--sp-3,12px)}
+
+  /* ---- Staging grid and ministry-name table: unchanged editor styles ---- */
   .mi-scroll{overflow:auto;max-height:70vh;border:1px solid var(--line,#dbe4ec);border-radius:8px}
-  table.mi{width:max-content;min-width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
+  table.mi{width:max-content;min-width:100%;border-collapse:collapse;font-size:12.5px;background:var(--paper,#fff)}
   /* Ministry-name review. A row awaiting a decision is marked by a rule and a
      word, never by colour alone — this table gets printed and photocopied. */
-  tr.needs-decision th[scope=row]{border-left:3px solid #b3261e;padding-left:8px;font-weight:800}
-  tr.needs-decision td{background:#fff8f8}
+  tr.needs-decision th[scope=row]{border-left:3px solid var(--rose,#b3261e);padding-left:8px;font-weight:800}
+  tr.needs-decision td{background:color-mix(in srgb,var(--rose,#b3261e) 6%,var(--paper,#fff))}
   table.mi select{font:inherit;font-size:12.5px;min-height:32px;padding:4px 6px;
-    border:1px solid var(--line,#d0d7de);border-radius:6px;background:#fff;max-width:260px}
+    border:1px solid var(--line,#d0d7de);border-radius:6px;background:var(--paper,#fff);max-width:260px}
   table.mi select:focus-visible{outline:2px solid var(--teal,#117b6d);outline-offset:1px}
   .mi-note{font-size:12px;color:var(--muted,#57606a);margin:10px 0}
   table.mi th,table.mi td{padding:4px 6px;text-align:left;border-bottom:1px solid var(--line,#eef2f5);white-space:nowrap}
-  table.mi th{font-size:11px;text-transform:uppercase;color:var(--muted);background:#f8fafb;position:sticky;top:0}
+  table.mi th{font-size:11px;text-transform:uppercase;color:var(--muted);background:var(--soft,#f8fafb);position:sticky;top:0}
   table.mi input,table.mi select{font:inherit;border:0;background:transparent;padding:4px;min-width:70px;width:100%}
   table.mi input:focus,table.mi select:focus{background:#fffbe6;outline:2px solid #137a5f}
   .mi-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800}
@@ -81,216 +91,258 @@ ob_start();
      Both halves come from the theme now, and --blue-ink on --soft is a pair the
      contrast gate already checks for every preset. */
   .mi-badge.merged{background:var(--soft,#e8f1fb);color:var(--blue-ink,#0f4e97)}
-  .mi-tabs a{display:inline-block;margin:0 6px 10px 0;padding:4px 10px;border-radius:999px;background:#eef2f5;color:inherit;text-decoration:none;font-size:12px;font-weight:700}
-  .mi-tabs a.on{background:#0c5a45;color:#fff}
   table.mi td.saving{box-shadow:inset 0 0 0 2px #f0a500}
   table.mi td.saved{box-shadow:inset 0 0 0 2px #1a7a3a}
   table.mi td.err{box-shadow:inset 0 0 0 2px #b3261e;background:#fdecea}
 </style>
 
-<?php if ($notice !== '' && isset($noticeMap[$notice])): [$cls, $msg] = $noticeMap[$notice]; ?>
-  <div class="mi-alert <?= $cls ?>"><?= $h($msg) ?></div>
-<?php endif; ?>
+<?= records_notice_for($notice, $noticeMap) ?>
 
 <?php if (!$isAdmin): ?>
-  <article class="admin-card"><div class="admin-card-body" style="color:var(--muted)">Only a portal-wide admin can import or export members.</div></article>
+  <section class="ek-empty">
+    <strong>Import &amp; export is for portal administrators</strong>
+    <p>Importing replaces a campus roster and exporting downloads every member's details, so both are limited to administrators.</p>
+    <a class="ek-btn" href="<?= $base ?>/people">Open the directory</a>
+  </section>
 <?php else: ?>
 
-<div class="mi-steps">
-  <span class="mi-step<?= $step === 1 ? ' on' : '' ?>">1. Load worksheets</span>
-  <span class="mi-step<?= $step === 2 ? ' on' : '' ?>">2. Clean staging</span>
-  <span class="mi-step<?= $step === 3 ? ' on' : '' ?>">3. Apply to campus</span>
-</div>
+<ol class="mi-steps" aria-label="Import steps">
+  <li<?= $step === 1 ? ' aria-current="step"' : '' ?>>Load a workbook</li>
+  <li<?= $step === 2 ? ' aria-current="step"' : '' ?>>Review staging</li>
+  <li<?= $step === 3 ? ' aria-current="step"' : '' ?>>Apply to the campus</li>
+</ol>
 
-  <?php // Ministry names as the workbook wrote them, and where each one went.
-        // Rendered whenever an import has recorded anything, so an
-        // administrator can see the mapping rather than infer it from which
-        // memberships appeared. ?>
-  <?php if (!empty($ministryNameRows)): ?>
-  <article class="admin-card">
-    <div class="admin-card-head"><div>
-      <h2>Ministry names from the workbook</h2>
-      <p>
-        Every ministry name a spreadsheet has used, and the ministry it maps to.
-        <?php if (($ministryNamesPending ?? 0) > 0): ?>
-          <strong><?= (int) $ministryNamesPending ?> still need a decision</strong> — until then those
-          names are ignored and nobody is added to that ministry.
-        <?php else: ?>
-          Every name currently maps to a ministry.
-        <?php endif; ?>
-      </p>
-    </div></div>
-    <div class="admin-card-body">
-      <form method="post" action="<?= $base ?>/admin/maintenance/import/ministry-names">
-        <table class="mi">
-          <thead>
-            <tr>
-              <th scope="col">Name in the workbook</th>
-              <th scope="col">Rows</th>
-              <th scope="col">Status</th>
-              <th scope="col">Maps to</th>
-            </tr>
-          </thead>
-          <tbody>
-          <?php foreach ($ministryNameRows as $row): ?>
-            <?php
-              $decided = $row['decidedId'];
-              $current = $decided !== null ? (string) $decided : '';
-              $statusLabel = $row['needsDecision'] ? 'Not recognised'
-                  : ($decided === 0 ? 'Ignored — not a ministry'
-                  : ($decided !== null ? 'Mapped by you' : 'Matched automatically'));
-            ?>
-            <tr<?= $row['needsDecision'] ? ' class="needs-decision"' : '' ?>>
-              <th scope="row"><?= $h($row['raw']) ?></th>
-              <td><?= (int) $row['count'] ?></td>
-              <td><?= $h($statusLabel) ?></td>
-              <td>
-                <label class="sr-only" for="mn-<?= $h($row['key']) ?>">Ministry for <?= $h($row['raw']) ?></label>
-                <select id="mn-<?= $h($row['key']) ?>" name="decision[<?= $h($row['raw']) ?>]">
-                  <option value=""<?= $current === '' ? ' selected' : '' ?>>
-                    <?= $row['needsDecision'] ? '— choose a ministry —' : 'Leave as it is' ?>
+<?php // Ministry names as the workbook wrote them, and where each one went.
+      // Rendered whenever an import has recorded anything, so an
+      // administrator can see the mapping rather than infer it from which
+      // memberships appeared. ?>
+<?php if (!empty($ministryNameRows)): ?>
+<details class="ek-card"<?= ($ministryNamesPending ?? 0) > 0 ? ' open' : '' ?>>
+  <summary class="ek-card-head" style="cursor:pointer"><div>
+    <h2 style="display:inline">Ministry names from the workbook</h2>
+    <p>
+      Every ministry name a spreadsheet has used, and the ministry it maps to.
+      <?php if (($ministryNamesPending ?? 0) > 0): ?>
+        <strong><?= (int) $ministryNamesPending ?> still need a decision</strong> — until then those
+        names are ignored and nobody is added to that ministry.
+      <?php else: ?>
+        Every name currently maps to a ministry.
+      <?php endif; ?>
+    </p>
+  </div></summary>
+  <div class="ek-card-body">
+    <form method="post" action="<?= $base ?>/admin/maintenance/import/ministry-names">
+      <div class="ek-table-wrap">
+      <table class="mi">
+        <thead>
+          <tr>
+            <th scope="col">Name in the workbook</th>
+            <th scope="col">Rows</th>
+            <th scope="col">Status</th>
+            <th scope="col">Maps to</th>
+          </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($ministryNameRows as $row): ?>
+          <?php
+            $decided = $row['decidedId'];
+            $current = $decided !== null ? (string) $decided : '';
+            $statusLabel = $row['needsDecision'] ? 'Not recognised'
+                : ($decided === 0 ? 'Ignored — not a ministry'
+                : ($decided !== null ? 'Mapped by you' : 'Matched automatically'));
+          ?>
+          <tr<?= $row['needsDecision'] ? ' class="needs-decision"' : '' ?>>
+            <th scope="row"><?= $h($row['raw']) ?></th>
+            <td><?= (int) $row['count'] ?></td>
+            <td><?= $h($statusLabel) ?></td>
+            <td>
+              <label class="sr-only" for="mn-<?= $h($row['key']) ?>">Ministry for <?= $h($row['raw']) ?></label>
+              <select id="mn-<?= $h($row['key']) ?>" name="decision[<?= $h($row['raw']) ?>]">
+                <option value=""<?= $current === '' ? ' selected' : '' ?>>
+                  <?= $row['needsDecision'] ? '— choose a ministry —' : 'Leave as it is' ?>
+                </option>
+                <option value="0"<?= $current === '0' ? ' selected' : '' ?>>Not a ministry — ignore it</option>
+                <?php foreach (($ministryChoices ?? []) as $choice): ?>
+                  <option value="<?= (int) $choice['id'] ?>"<?= $current === (string) $choice['id'] ? ' selected' : '' ?>>
+                    <?= $h($choice['name']) ?>
                   </option>
-                  <option value="0"<?= $current === '0' ? ' selected' : '' ?>>Not a ministry — ignore it</option>
-                  <?php foreach (($ministryChoices ?? []) as $choice): ?>
-                    <option value="<?= (int) $choice['id'] ?>"<?= $current === (string) $choice['id'] ? ' selected' : '' ?>>
-                      <?= $h($choice['name']) ?>
-                    </option>
-                  <?php endforeach; ?>
-                </select>
-                <?php // Positions the name carried, beside the ministry it maps to. ?>
-                <?php if (!empty($row['positions'])):
-                    $positionOf = '';
-                    foreach (($ministryChoices ?? []) as $choice) {
-                        if ((int) $choice['id'] === (int) ($decided ?? $row['resolvedId'] ?? 0)) {
-                            $positionOf = (string) $choice['name'];
-                        }
-                    } ?>
-                  <span class="mi-note"><?= $h(trim($positionOf . ' (' . implode(', ', $row['positions']) . ')')) ?></span>
-                <?php endif; ?>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-          </tbody>
-        </table>
-        <p class="mi-note">
-          Saving a mapping does not change anybody's membership on its own. Apply the batch again
-          and the names will resolve.
-        </p>
-        <button type="submit">Save ministry name mappings</button>
-      </form>
-    </div>
-  </article>
-  <?php endif; ?>
+                <?php endforeach; ?>
+              </select>
+              <?php // Positions the name carried, beside the ministry it maps to. ?>
+              <?php if (!empty($row['positions'])):
+                  $positionOf = '';
+                  foreach (($ministryChoices ?? []) as $choice) {
+                      if ((int) $choice['id'] === (int) ($decided ?? $row['resolvedId'] ?? 0)) {
+                          $positionOf = (string) $choice['name'];
+                      }
+                  } ?>
+                <span class="mi-note"><?= $h(trim($positionOf . ' (' . implode(', ', $row['positions']) . ')')) ?></span>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      </div>
+      <p class="mi-note">
+        Saving a mapping does not change anybody's membership on its own. Apply the batch again
+        and the names will resolve.
+      </p>
+      <button class="ek-btn ek-btn-primary" type="submit">Save ministry name mappings</button>
+    </form>
+  </div>
+</details>
+<?php endif; ?>
 
 <?php if (!$batch): ?>
-<div class="mi-grid">
-  <article class="admin-card">
-    <div class="admin-card-head"><div>
-      <h2>1. Load Drive / Excel into staging</h2>
-      <p>Nothing is written to member records until you apply a cleaned batch.</p>
+<div class="ek-grid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))">
+  <section class="ek-card" aria-labelledby="mi-import">
+    <div class="ek-card-head"><div>
+      <h2 id="mi-import">Import a campus roster</h2>
+      <p>Load the workbook into staging. Nothing changes in member records until you review the rows and apply them.</p>
     </div></div>
-    <div class="admin-card-body">
-      <p class="mi-help">
+    <div class="ek-card-body">
+      <p class="mi-help" style="margin-bottom:12px">
         The <strong>Christlikeness Hub</strong> worksheet is enough for both North York
         and Scarborough. Merged household cells (one address covering several family
         members) are copied onto every person in that range — that only works with
         <strong>.xlsx</strong> or a Google Sheets link (downloaded as Excel). CSV drops
         those merges. A second worksheet is optional fill-in only.
       </p>
-      <form method="post" action="<?= $base ?>/admin/maintenance/import/ingest" enctype="multipart/form-data">
-        <div class="mi-field">
-          <label>Campus this roster belongs to</label>
-          <select name="campus_id" required>
-            <option value="">Choose campus…</option>
+      <form class="mi-form" method="post" action="<?= $base ?>/admin/maintenance/import/ingest" enctype="multipart/form-data">
+        <div class="ek-field">
+          <label for="mi-campus">Campus this roster belongs to</label>
+          <select class="ek-select" id="mi-campus" name="campus_id" required>
+            <option value="">Choose a campus</option>
             <?php foreach ($campuses as $c): ?>
               <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
-        <div class="mi-field">
-          <label>Campus worksheet preset</label>
-          <select name="preset" id="mi-preset">
+        <div class="ek-field">
+          <label for="mi-preset">Worksheet preset</label>
+          <select class="ek-select" name="preset" id="mi-preset">
             <option value="ny" data-primary="<?= $h(\App\Services\MemberWorkbookParser::HUB_SHEET) ?>">North York — Hub only</option>
             <option value="sc" data-primary="<?= $h(\App\Services\MemberWorkbookParser::SC_HUB_SHEET) ?>">Scarborough — Hub only</option>
             <option value="custom">Custom worksheet names</option>
           </select>
         </div>
-        <div class="mi-field">
+        <div class="ek-field">
           <label for="mi-primary">Primary worksheet (Hub)</label>
-          <input type="text" name="hub_sheet" id="mi-primary" value="<?= $h($hubSheet) ?>">
+          <input class="ek-input" type="text" name="hub_sheet" id="mi-primary" value="<?= $h($hubSheet) ?>">
         </div>
-        <div class="mi-field">
+        <div class="ek-field">
           <label for="mi-secondary">Secondary worksheet (optional fill-in)</label>
-          <input type="text" name="ny_sheet" id="mi-secondary" value="<?= $h($nySheet) ?>" placeholder="Leave blank if the Hub is enough">
+          <input class="ek-input" type="text" name="ny_sheet" id="mi-secondary" value="<?= $h($nySheet) ?>" placeholder="Leave blank if the Hub is enough">
         </div>
-        <div class="mi-field">
+        <div class="ek-field">
           <label for="mi-workbook">Excel workbook (.xlsx)</label>
-          <input id="mi-workbook" type="file" name="workbook" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+          <input class="ek-input" id="mi-workbook" type="file" name="workbook" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
         </div>
-        <div class="mi-field">
-          <label for="mi-google">…or Google Sheets link (shared with anyone with the link)</label>
-          <input id="mi-google" type="url" name="google_url" value="<?= $h($googleUrl) ?>" placeholder="https://docs.google.com/spreadsheets/d/…">
+        <div class="ek-field">
+          <label for="mi-google">Or a Google Sheets link</label>
+          <input class="ek-input" id="mi-google" type="url" name="google_url" value="<?= $h($googleUrl) ?>" placeholder="https://docs.google.com/spreadsheets/d/…">
+          <span class="ek-hint">The sheet must be shared with anyone who has the link.</span>
         </div>
-        <button class="mi-btn" type="submit">Load into staging</button>
+        <div><button class="ek-btn ek-btn-primary" type="submit">Load into staging</button></div>
       </form>
     </div>
-  </article>
+  </section>
 
-  <article class="admin-card">
-    <div class="admin-card-head"><div>
-      <h2>Export campus members</h2>
-      <p>Download the portal roster after a successful apply.</p>
-    </div></div>
-    <div class="admin-card-body">
-      <form method="post" action="<?= $base ?>/admin/maintenance/export-xlsx">
-        <div class="mi-field">
-          <label>Campus</label>
-          <select name="campus_id" required>
-            <option value="">Choose campus…</option>
-            <?php foreach ($campuses as $c): ?>
-              <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
+  <div class="rec-main">
+    <section class="ek-card" aria-labelledby="mi-export">
+      <div class="ek-card-head"><div>
+        <h2 id="mi-export">Export member records</h2>
+        <p>Download the roster as an Excel workbook, in the same layout the import reads back.</p>
+      </div></div>
+      <div class="ek-card-body">
+        <form class="mi-form" method="post" action="<?= $base ?>/admin/maintenance/export-xlsx">
+          <input type="hidden" name="return" value="import">
+          <div class="ek-field">
+            <label for="mi-export-campus">Which members</label>
+            <select class="ek-select" id="mi-export-campus" name="campus_id">
+              <option value="0">Everyone (one sheet per campus)</option>
+              <?php foreach ($campuses as $c): ?>
+                <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div><button class="ek-btn ek-btn-primary" type="submit">Download Excel workbook</button></div>
+          <p class="ek-hint" style="margin:0">A copy is kept in the private archive, listed below and on <a class="rec-link" href="<?= $base ?>/admin/maintenance">Backups &amp; maintenance</a>.</p>
+        </form>
+      </div>
+      <?php if ($exports !== []): ?>
+        <div class="ek-card-body" style="border-top:1px solid var(--line,#d9e4dd)">
+          <h3 class="rec-small rec-muted" style="margin:0 0 6px">Recent exports</h3>
+          <ul class="rec-history">
+            <?php foreach ($exports as $x): ?>
+              <li style="grid-template-columns:minmax(0,1fr) auto;align-items:center">
+                <span><?= $h(date('j M Y, H:i', (int) $x['mtime'])) ?> <span class="rec-muted">· <?= $h($fmtSize((int) $x['bytes'])) ?></span></span>
+                <a class="ek-btn ek-btn-quiet" href="<?= $base ?>/admin/maintenance/file?path=<?= urlencode((string) $x['relative']) ?>">Download<span class="sr-only"> the workbook exported <?= $h(date('j M Y, H:i', (int) $x['mtime'])) ?></span></a>
+              </li>
             <?php endforeach; ?>
-          </select>
+          </ul>
         </div>
-        <button class="mi-btn sec" type="submit">Save styled Excel to archive</button>
-      </form>
-
-      <?php if ($batches): ?>
-        <p class="mi-help" style="margin-top:16px"><strong>Recent staging batches</strong></p>
-        <ul style="margin:0;padding-left:18px;font-size:13px">
-          <?php foreach ($batches as $b): ?>
-            <li>
-              <a href="<?= $base ?>/admin/maintenance/import?batch=<?= (int) $b['id'] ?>"><?= $h($b['source_label'] ?: ('Batch #' . $b['id'])) ?></a>
-              · <?= $h($b['status']) ?> · <?= (int) $b['row_count'] ?> rows
-              · <?= $h($b['created_at']) ?>
-            </li>
-          <?php endforeach; ?>
-        </ul>
       <?php endif; ?>
-    </div>
-  </article>
+    </section>
+
+    <section class="ek-card" aria-labelledby="mi-batches">
+      <div class="ek-card-head"><div><h2 id="mi-batches">Staging batches</h2><p>Workbooks loaded before. Open one to keep cleaning it.</p></div></div>
+      <?php if (!$batches): ?>
+        <div class="ek-card-body"><p class="mi-help">No workbook has been loaded yet. Start with <a class="rec-link" href="#mi-import">Import a campus roster</a>.</p></div>
+      <?php else: ?>
+        <div class="ek-table-wrap">
+          <table class="ek-table rec-cards">
+            <caption class="sr-only">Staging batches, newest first</caption>
+            <thead><tr><th scope="col">Workbook</th><th scope="col">Campus</th><th scope="col">Status</th><th scope="col" class="is-num">Rows</th><th scope="col">Loaded</th></tr></thead>
+            <tbody>
+            <?php foreach ($batches as $b): $bStatus = (string) $b['status']; ?>
+              <tr>
+                <td class="rec-title" data-label="Workbook"><a class="rec-link" href="<?= $base ?>/admin/maintenance/import?batch=<?= (int) $b['id'] ?>"><?= $h($b['source_label'] ?: ('Batch #' . $b['id'])) ?></a></td>
+                <td data-label="Campus"><?= $h($campusNames[(int) ($b['campus_id'] ?? 0)] ?? '—') ?></td>
+                <td data-label="Status"><span class="ek-badge<?= $bStatus === 'applied' ? ' is-ok' : '' ?>"><?= $h(ucfirst($bStatus)) ?></span></td>
+                <td data-label="Rows" class="is-num"><?= (int) $b['row_count'] ?></td>
+                <td data-label="Loaded" style="white-space:nowrap"><?= $h(records_when((string) $b['created_at'])) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+    </section>
+  </div>
 </div>
+<script>
+(function () {
+  var preset = document.getElementById('mi-preset');
+  var primary = document.getElementById('mi-primary');
+  if (!preset || !primary) return;
+  preset.addEventListener('change', function () {
+    var opt = preset.options[preset.selectedIndex];
+    var p = opt.getAttribute('data-primary');
+    if (p) primary.value = p;
+  });
+})();
+</script>
 <?php else: ?>
   <?php
-    $campusName = '';
-    foreach ($campuses as $c) {
-        if ((int) $c['id'] === (int) $batch['campus_id']) {
-            $campusName = (string) $c['name'];
-        }
-    }
+    $campusName = $campusNames[(int) $batch['campus_id']] ?? '';
     $applied = ($batch['status'] ?? '') === 'applied';
   ?>
-  <article class="admin-card">
-    <div class="admin-card-head"><div>
-      <h2>2. Clean <?= $h($campusName ?: 'campus') ?> staging</h2>
-      <p>
-        Hub: <?= $h($batch['hub_sheet'] ?? '—') ?><?= !empty($batch['hub_updated']) ? ' · ' . $h($batch['hub_updated']) : '' ?>
-        <?php if (!empty($batch['ny_sheet'])): ?>
-        · Secondary: <?= $h($batch['ny_sheet']) ?><?= !empty($batch['ny_updated']) ? ' · ' . $h($batch['ny_updated']) : '' ?>
-        <?php endif; ?>
-      </p>
-    </div></div>
-    <div class="admin-card-body">
+  <section class="ek-card" aria-labelledby="mi-staging">
+    <div class="ek-card-head">
+      <div>
+        <h2 id="mi-staging"><?= $applied ? 'Applied to ' : 'Review staging for ' ?><?= $h($campusName ?: 'the campus') ?></h2>
+        <p>
+          Hub: <?= $h($batch['hub_sheet'] ?? '—') ?><?= !empty($batch['hub_updated']) ? ' · ' . $h($batch['hub_updated']) : '' ?>
+          <?php if (!empty($batch['ny_sheet'])): ?>
+          · Secondary: <?= $h($batch['ny_sheet']) ?><?= !empty($batch['ny_updated']) ? ' · ' . $h($batch['ny_updated']) : '' ?>
+          <?php endif; ?>
+        </p>
+      </div>
+      <a class="ek-btn" href="<?= $base ?>/admin/maintenance/import">Import &amp; export</a>
+    </div>
+    <div class="ek-card-body" style="display:grid;gap:var(--sp-3,12px)">
       <?php
         $dupes = is_array($batch['duplicate_report'] ?? null) ? $batch['duplicate_report'] : [];
         $otherWarnings = [];
@@ -306,68 +358,76 @@ ob_start();
         }
       ?>
       <?php if ($dupes !== []): ?>
-        <div class="mi-alert warn">
-          <strong><?= count($dupes) ?> duplicate <?= count($dupes) === 1 ? 'row was' : 'rows were' ?> removed before any member record update.</strong>
-          The kept row is the copy with more filled fields (email, phone, address). Review the list, then apply.
-          <ul class="mi-dupes">
-            <?php foreach ($dupes as $d): ?>
-              <li>Removed <?= $h($d['name'] ?? '') ?> · kept <?= $h($d['kept'] ?? '') ?></li>
-            <?php endforeach; ?>
-          </ul>
+        <div class="ek-alert" style="border-left-color:var(--gold,#c98a2b)">
+          <div>
+            <strong><?= count($dupes) ?> duplicate <?= count($dupes) === 1 ? 'row was' : 'rows were' ?> removed before any member record update.</strong>
+            The kept row is the copy with more filled fields (email, phone, address). Review the list, then apply.
+            <ul class="mi-dupes">
+              <?php foreach ($dupes as $d): ?>
+                <li>Removed <?= $h($d['name'] ?? '') ?> · kept <?= $h($d['kept'] ?? '') ?></li>
+              <?php endforeach; ?>
+            </ul>
+          </div>
         </div>
       <?php endif; ?>
       <?php if ($otherWarnings !== []): ?>
-        <div class="mi-alert err"><?= nl2br($h(implode("\n", $otherWarnings))) ?></div>
+        <div class="ek-alert is-error"><div><strong>Check these before applying.</strong><br><?= nl2br($h(implode("\n", $otherWarnings))) ?></div></div>
       <?php endif; ?>
-      <div class="mi-stats">
-        <div class="mi-stat"><b><?= (int) $counts['total'] ?></b><span>Staged</span></div>
-        <div class="mi-stat"><b><?= (int) $counts['ready'] ?></b><span>Ready</span></div>
-        <div class="mi-stat"><b><?= (int) $counts['draft'] ?></b><span>Needs review</span></div>
-        <div class="mi-stat"><b><?= (int) $counts['skip'] ?></b><span>Skip</span></div>
-      </div>
-      <div class="mi-tabs">
-        <?php foreach (['' => 'All', 'ready' => 'Ready', 'draft' => 'Draft', 'skip' => 'Skip'] as $k => $lab): ?>
-          <a class="<?= $statusFilter === $k ? 'on' : '' ?>" href="<?= $base ?>/admin/maintenance/import?batch=<?= (int) $batch['id'] ?><?= $k !== '' ? '&status=' . $h($k) : '' ?>"><?= $lab ?></a>
-        <?php endforeach; ?>
-      </div>
-      <p class="mi-help">Click a cell to edit (saves immediately). Hub values win; cells filled from North York are tagged. Draft rows and Skip rows are not applied.</p>
-      <?php if (!$applied): ?>
-        <form method="post" action="<?= $base ?>/admin/maintenance/import/apply" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px" onsubmit="return confirm('Apply <?= (int) $counts['ready'] ?> ready rows to <?= $h($campusName) ?>? Draft/skip rows will not be on this campus afterward.');">
-          <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
-          <label class="mi-help" style="display:flex;gap:8px;align-items:flex-start;margin:0">
-            <input type="checkbox" name="confirm" value="1" required>
-            <span>These ready rows are cleaned and should replace the <strong><?= $h($campusName) ?></strong> campus roster.</span>
-          </label>
-          <button class="mi-btn warn" type="submit"<?= $counts['ready'] < 1 ? ' disabled' : '' ?>>3. Apply ready rows</button>
-        </form>
-        <?php
-          // Offered only when there is something to act on, so it is not a
-          // button that quietly does nothing.
-          $blankTypes = 0;
-          foreach ($rows as $r) {
-              if (trim((string) ($r['member_type'] ?? '')) === '' && (int) ($r['birth_year'] ?? 0) > 1900) {
-                  $blankTypes++;
-              }
-          }
-        ?>
-        <?php if ($blankTypes > 0): ?>
-          <form method="post" action="<?= $base ?>/admin/maintenance/import/suggest-types" style="display:inline"
-                onsubmit="return confirm('Suggest member types for <?= (int) $blankTypes ?> row(s) from each person\'s age?\n\nThese are suggestions, not what the spreadsheet said — age indicates a member type but does not settle it. They are written to the staged rows only, so you can change them, and nothing reaches member records until you apply.');">
-            <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
-            <button class="mi-btn sec" type="submit">Fill <?= (int) $blankTypes ?> blank member type<?= $blankTypes === 1 ? '' : 's' ?> from age</button>
-          </form>
-        <?php endif; ?>
-        <form method="post" action="<?= $base ?>/admin/maintenance/import/discard" onsubmit="return confirm('Discard this spreadsheet?\n\n<?= (int) $counts['total'] ?> staged row(s) and any corrections you have made to them will be deleted. Member records are not affected — nothing from this spreadsheet has been saved to them yet.\n\nYou would need to upload the spreadsheet again to start over.');" style="display:inline">
-          <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
-          <button class="mi-btn sec" type="submit">Discard this spreadsheet</button>
-        </form>
-      <?php else: ?>
-        <p class="mi-help">This batch was applied<?= !empty($batch['applied_at']) ? ' at ' . $h($batch['applied_at']) : '' ?>.</p>
-      <?php endif; ?>
-      <a class="mi-btn sec" href="<?= $base ?>/admin/maintenance">Maintenance</a>
-      <a class="mi-btn sec" href="<?= $base ?>/admin/maintenance/import">New workbook</a>
 
-      <div class="mi-scroll" style="margin-top:14px" data-save="<?= $base ?>/admin/maintenance/import/row">
+      <div class="ek-stats">
+        <div class="ek-stat"><span class="ek-stat-label">Staged</span><span class="ek-stat-value"><?= (int) $counts['total'] ?></span></div>
+        <div class="ek-stat"><span class="ek-stat-label">Ready</span><span class="ek-stat-value"><?= (int) $counts['ready'] ?></span></div>
+        <div class="ek-stat"><span class="ek-stat-label">Needs review</span><span class="ek-stat-value"><?= (int) $counts['draft'] ?></span></div>
+        <div class="ek-stat"><span class="ek-stat-label">Skip</span><span class="ek-stat-value"><?= (int) $counts['skip'] ?></span></div>
+      </div>
+
+      <?php if (!$applied): ?>
+        <div class="mi-actions">
+          <form method="post" action="<?= $base ?>/admin/maintenance/import/apply" class="mi-actions" onsubmit="return confirm('Apply <?= (int) $counts['ready'] ?> ready rows to <?= $h($campusName) ?>? Draft/skip rows will not be on this campus afterward.');">
+            <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
+            <label class="mi-confirm">
+              <input type="checkbox" name="confirm" value="1" required>
+              <span>These ready rows are cleaned and should replace the <strong><?= $h($campusName) ?></strong> campus roster.</span>
+            </label>
+            <button class="ek-btn ek-btn-primary" type="submit"<?= $counts['ready'] < 1 ? ' disabled' : '' ?>>Apply <?= (int) $counts['ready'] ?> ready <?= (int) $counts['ready'] === 1 ? 'row' : 'rows' ?></button>
+          </form>
+        </div>
+        <div class="mi-actions">
+          <?php
+            // Offered only when there is something to act on, so it is not a
+            // button that quietly does nothing.
+            $blankTypes = 0;
+            foreach ($rows as $r) {
+                if (trim((string) ($r['member_type'] ?? '')) === '' && (int) ($r['birth_year'] ?? 0) > 1900) {
+                    $blankTypes++;
+                }
+            }
+          ?>
+          <?php if ($blankTypes > 0): ?>
+            <form method="post" action="<?= $base ?>/admin/maintenance/import/suggest-types" class="rec-inline-form"
+                  onsubmit="return confirm('Suggest member types for <?= (int) $blankTypes ?> row(s) from each person\'s age?\n\nThese are suggestions, not what the spreadsheet said — age indicates a member type but does not settle it. They are written to the staged rows only, so you can change them, and nothing reaches member records until you apply.');">
+              <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
+              <button class="ek-btn" type="submit">Fill <?= (int) $blankTypes ?> blank member type<?= $blankTypes === 1 ? '' : 's' ?> from age</button>
+            </form>
+          <?php endif; ?>
+          <form method="post" action="<?= $base ?>/admin/maintenance/import/discard" class="rec-inline-form" onsubmit="return confirm('Discard this spreadsheet?\n\n<?= (int) $counts['total'] ?> staged row(s) and any corrections you have made to them will be deleted. Member records are not affected — nothing from this spreadsheet has been saved to them yet.\n\nYou would need to upload the spreadsheet again to start over.');">
+            <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
+            <button class="ek-btn ek-btn-danger" type="submit">Discard this spreadsheet</button>
+          </form>
+        </div>
+      <?php else: ?>
+        <p class="mi-help">This batch was applied<?= !empty($batch['applied_at']) ? ' on ' . $h(records_when((string) $batch['applied_at'])) : '' ?>. The rows below are kept for reference and can no longer be edited.
+          <a class="rec-link" href="<?= $base ?>/admin/people">Open member records</a></p>
+      <?php endif; ?>
+
+      <nav class="ek-tabs is-sub" aria-label="Show rows">
+        <?php foreach (['' => 'All', 'ready' => 'Ready', 'draft' => 'Draft', 'skip' => 'Skip'] as $k => $lab): ?>
+          <a class="ek-tab" href="<?= $base ?>/admin/maintenance/import?batch=<?= (int) $batch['id'] ?><?= $k !== '' ? '&amp;status=' . $h($k) : '' ?>"<?= $statusFilter === $k ? ' aria-current="page"' : '' ?>><?= $lab ?></a>
+        <?php endforeach; ?>
+      </nav>
+      <p class="mi-help">Click a cell to edit; it saves as you leave it. Hub values win; cells filled from the secondary worksheet are tagged. Draft and Skip rows are not applied.</p>
+
+      <div class="mi-scroll" data-save="<?= $base ?>/admin/maintenance/import/row">
         <table class="mi" id="stagingGrid">
           <thead>
             <tr>
@@ -412,7 +472,7 @@ ob_start();
         </table>
       </div>
     </div>
-  </article>
+  </section>
   <script>
   (function () {
     var root = document.querySelector('[data-save]');
@@ -452,29 +512,17 @@ ob_start();
     }, true);
   })();
   </script>
-  <script>
-  (function () {
-    var preset = document.getElementById('mi-preset');
-    var primary = document.getElementById('mi-primary');
-    if (!preset || !primary) return;
-    preset.addEventListener('change', function () {
-      var opt = preset.options[preset.selectedIndex];
-      var p = opt.getAttribute('data-primary');
-      if (p) primary.value = p;
-    });
-  })();
-  </script>
 <?php endif; ?>
 
 <?php endif; ?>
 <?php
-$content = ob_get_clean();
+$content = (string) ob_get_clean();
 
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'import',
-    'pageTitle' => 'Member import · Maintenance',
-    'pageSubtitle' => 'Stage a campus Hub worksheet, clean rows, then replace that campus roster.',
-    'sectionTitle' => 'Member import',
-    'sectionDescription' => 'Load the Drive Excel workbook (.xlsx keeps merged household cells), review staging, then apply ready rows.',
+    'pageTitle' => 'Import & export',
+    'pageSubtitle' => 'Stage a campus workbook, clean the rows, apply them; download the member workbook.',
+    'sectionTitle' => 'Import & export',
+    'sectionDescription' => 'Bring a campus roster in from the Drive workbook, checking every row before it reaches member records, or download the member records as an Excel workbook.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);

@@ -20,12 +20,12 @@ visitors don't see it at all.
 ## People & families
 
 **How do I add a new person?**
-Administration → **Member records** → **+ Add person**. Only the last name is
-required. The People tab in the top bar is look-up only. To load a whole campus
-from the Hub workbook, use **Maintenance → Member import**.
+People & Records → **Member records** → **Add person**. Only the last name is
+required. The Directory is look-up only. To load a whole campus from the Hub
+workbook, use People & Records → **Import & export**.
 
 **How do I back up people or portal data?**
-**Maintenance** (portal-wide admins). Choose **Create backup** and/or a
+**Backups & maintenance** (portal-wide admins). Choose **Create backup** and/or a
 snapshot. Files are private on the server; download them from that page.
 
 **Someone is missing from a list.**
@@ -42,7 +42,7 @@ another family (or none), or deactivate the family instead.
 
 **Why won't an option (classification, role, member type) delete?**
 It's still assigned to people. Reassign everyone using it first, then delete it
-on the **Member types** page.
+on the **Record settings** page.
 
 ## Ministries, roles & scheduling
 

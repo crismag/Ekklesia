@@ -311,6 +311,17 @@ final class PortalServiceProvider
         );
     }
 
+    /** Record history: the audit trail of person and household records (read-only, admin). */
+    public static function makeRecordHistoryService(): \App\Services\RecordHistoryService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+        return new \App\Services\RecordHistoryService(
+            new \App\Repositories\DefaultRecordHistoryRepository(
+                new \App\Adapters\Sql\SqlRecordHistoryAdapter(MembersConnection::get())
+            )
+        );
+    }
+
     /**
      * System user administration (user_accounts + role assignments). Direct-PDO on
      * the member database, using the same PasswordHasher as login.

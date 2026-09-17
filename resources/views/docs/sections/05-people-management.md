@@ -1,87 +1,83 @@
 # Member records — Add, Edit & Manage
 
-The top-bar **People** tab is look-up only. Adding, editing, and deleting a
-record is Administration → **Member records** (under *People & families*). This
-section covers that admin page, the profile view, photos, and the self-service
-controls a person has on their own public profile.
+The **Directory** is look-up only. Adding, editing, and deleting a record is
+People & Records → **Member records**, which only portal administrators see.
+(Older notes call this Administration → **Member records**; it is the same
+page.) This section covers the list, the person record, the editor, photos, and
+the self-service controls a person has on their own directory profile.
 
 ## Member records
 
-Open Administration → **Member records**. The page shows:
+Open People & Records → **Member records**. The page shows:
 
-- **Stat cards** — total people, active families, and typed members.
-- **Breakdowns** — people by *classification* (Member, Guest, …) and by *member type* (Radical, Trailblazer, G&A).
-- **Quick actions** — Add person, Maintenance (backups and roster import), Campuses, and a link to the public directory.
+- **Stat cards** — total people, active households, people without a member type (and without a status, when there are any).
 - **A searchable list** of everyone, with filters and paging.
+- **Breakdowns** — people by *membership status* (Member, Guest, …) and by *member type* (Radical, Trailblazer, G&A). Each name opens the list filtered to it.
 
-The top-bar **People** tab is a different door: look someone up by ministry,
-family, birthday month, or search. It does not add records.
+**Add person** is at the top of the page. The **Directory** tab is a different
+door: look someone up by ministry, family, birthday month, or search. It does
+not add records.
 
 ### Finding people
 
 - Type a **name or email** in the search box.
-- Narrow by **classification** or **member type**. "Not set" under member type finds the people still missing one.
-- **Campus comes from the selector in the top bar**, not from this page. There is one campus control for the whole site.
-- Results paginate 25 at a time. Click a person's **name** to open their profile, or **Edit** — pinned to the right-hand edge, so it stays on screen however narrow the window.
+- Narrow by **membership status** or **member type**. "Not set" under member type finds the people still missing one.
+- **Campus comes from the selector in the top bar**, not from this page. There is one campus control for the whole site; the page says which campus it is showing.
+- Results page 25 at a time. Click a person's **name** to open their record, or **Edit** to go straight to the editor.
 
 ### Reading the list
 
-Two columns are deliberately narrow, because spelled out they took more width
-than the person's name:
-
-- **Cls** — a coloured circle for classification. Green means attending, orange not attending, grey not recorded. The letters inside are the classification's short code, so the mark still works in print and for anyone who does not separate the two colours.
-- **Type** — a symbol for member type: an arrow for G&A, a seedling for Radical, a pennant for Trailblazer.
-
-The two cards above the list — **By classification** and **By member type** —
-are also the key: every mark appears there beside the name it stands for and the
-number of people it covers. Hovering a mark names it too.
+Membership status and member type are written out in full. A small dot beside
+the status is green for attending, amber for not attending, and blue for
+prospective; the member type carries its symbol (an arrow for G&A, a seedling
+for Radical, a pennant for Trailblazer). The words always say it; the marks are
+only a second cue. On a phone each person becomes a small card.
 
 ## Adding a person
 
-1. On **Member records**, click **+ Add person**.
+1. On **Member records**, choose **Add person**.
 2. Fill in the form. **Only the last name is required** — everything else is optional (matching how the record editor validates).
-3. Click **Create person**.
+3. Choose **Add person**. You land on the new record.
 
-The editor is grouped for clarity:
+The editor is in sections:
 
-- **Name & identity** — title, first, middle, last, suffix, gender.
-- **Birth date** — month and day must be entered together (or left blank); year is optional.
-- **Membership** — classification, member type, membership date.
-- **Family & campus** — the household they belong to, their family role, and their primary campus.
-- **Contact** — emails and phones.
-- **Location** — address, city, province, postal code, country.
-- **Social** — Facebook, LinkedIn, X.
+- **Identity** — first, middle, last, preferred name, suffix, gender, and birthday (month and day together, or both blank; year optional).
+- **Contact & address** — email, phones, and address. Leave the address blank to use the household's.
+- **Household** — the household they belong to and their role in it.
+- **Membership** — membership status, member type, campus, and member since.
 
-> **Tip:** Assigning a **primary campus** here makes the person show up when that campus is selected in filters, birthdays, and ministry views.
+From a household record, **Add a person** opens the editor with that household
+already chosen.
+
+> **Tip:** Assigning a **campus** here makes the person show up when that campus is selected in filters, birthdays, and ministry views.
 
 ## Editing a person
 
-From the list, click **Edit**, or open the profile and choose **Edit**. The same
-grouped form is used, pre-filled with the person's details. Changes are saved
-against the record with an updated-by/edited-on stamp.
+From the list choose **Edit**, or open the record and choose **Edit record**.
+The same form is used, pre-filled. **Save changes** returns you to the record,
+and the change is added to the record's history.
 
-## The profile view
+## The person record
 
-Clicking a person's **name** opens their profile — a read view with:
+Clicking a person's **name** opens their record, in sections:
 
-- a **photo** (or initials when no photo is set),
-- quick info (gender, classification, member type, family role, membership date, birthday),
-- **contact** rows with call, text, email, and copy-to-clipboard buttons,
-- **address** with map links (and an embedded map when coordinates are known),
-- **campus affiliations**, and
-- a **Family** panel listing household members, each linking to their profile.
+- **Identity** — photo (or initials), names, gender, birthday.
+- **Contact & address** — call, text, email and copy buttons; map links, an embedded map when the household has been located, and **Refresh map location**.
+- **Household** — the household and the person's role, the others in it, related households, and other households at the same address. **Open household** goes to the household record.
+- **Ministries & positions** — the ministries they belong to, positions held and whether they lead. Read-only here: membership is changed in Ministries (**Manage members & leaders**).
+- **Membership** — status, member type, campus, member since.
+- **Portal logins** — any login linked to this person, its roles and when it last signed in. Read-only here: logins are managed in **Users & access**.
+- **Recent history** — the latest changes to the record, with **All history** opening Record history for this person.
+- **Delete record** — with a confirmation naming the person.
 
-### The Actions menu
+**Directory profile** at the top opens the same person as members see them.
 
-The **Actions** button (admins) offers: Edit person, View public profile,
-Change family/role, View photo, and **Delete person** (with a confirmation).
+### Refresh map location
 
-### Refresh coordinates
-
-When a person belongs to a family, a **Refresh coordinates** button looks up the
-family's map location from its address (via OpenStreetMap) and stores it, so the
-map appears. Coordinates live on the **family** record, shared by everyone in
-that household.
+When a person belongs to a household, **Refresh map location** looks up the
+household's position from its address (via OpenStreetMap) and stores it, so the
+map appears. Coordinates live on the **household** record, shared by everyone
+in it.
 
 ## Photos
 
@@ -106,23 +102,34 @@ a read-only profile.
 
 > **Warning:** Deleting a person removes their record, member type, and campus links. It can't be undone — deactivate or reassign instead when you only need to retire someone. Campus **import apply** unlinks leftover people from that campus; it does not delete them.
 
-## Importing a campus roster
+## Importing and exporting
 
-Bulk load from the Hub Excel workbook lives on **Maintenance**, not on
-**Member records** and not on the People tab. See **Import, Export & Backups**.
+Bulk load from the Hub Excel workbook, and the member workbook download, are on
+People & Records → **Import & export**. See **Import, Export & Backups**.
 
-## Families
+## Households
 
-Households are managed on the **Families** page (under *People & families*):
-search families, see member counts, and open a family to edit its shared
-address, phone, email, and wedding/anniversary date. The family editor lists its
-members (each linking to their profile) and includes the same Refresh
-coordinates button. A family can't be deleted while it still has members —
-reassign them or deactivate the family instead.
+Households are managed on People & Records → **Households**: search households,
+see how many people are in each, and open one. The household record lists its
+people (each linking to their record, with **Add a person**), related
+households (link and unlink), other households at the same address, its recent
+history, and its details — shared address, phone, email, wedding anniversary —
+with **Refresh from the address** for the map. A household can't be deleted
+while people are still in it; move them or mark the household inactive instead.
+**Review duplicates** finds household records that are really one household.
 
-## Dropdown options
+## Record history
 
-The values in the classification, family-role, and member-type dropdowns are
-managed on the **Member types** page (under *People & families*). See that page to
-add, rename, reorder, or remove options. An option that's still in use can't be
-deleted until the people using it are reassigned.
+People & Records → **Record history** lists who added or changed a person or
+household record, and when — newest first, with filters for the person, the
+kind of record, the kind of change and a date range. It is read-only and only
+portal administrators see it. Deleted people, and households linked or unlinked
+as related, are listed too; a deleted person keeps their name there. Changes from
+the earlier system are included and marked as such.
+
+## Record settings
+
+The choices in the membership status, household role and member type lists are
+managed on People & Records → **Record settings**: add, rename, reorder, or
+delete. The **People** column shows how many people have each option and opens
+them; an option still in use can't be deleted until those people are changed.

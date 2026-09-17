@@ -429,10 +429,15 @@ final readonly class PersonAdminService
         $this->audit($actorId, 'person.campus_changed', $personId);
     }
 
-    /** Delete a person. */
-    public function delete(int $id): void
+    /**
+     * Delete a person. The deletion is recorded against the person's id, with
+     * their name kept in the entry so the history still reads once the record
+     * is gone.
+     */
+    public function delete(int $id, int $actorId = 0): void
     {
-        if ($this->find($id) === null) {
+        $person = $this->find($id);
+        if ($person === null) {
             throw new \InvalidArgumentException('Unknown person.');
         }
         // Ministry memberships are kept, not cascaded: removing someone from a
@@ -443,7 +448,24 @@ final readonly class PersonAdminService
         if ($memberships > 0) {
             throw new RuntimeException("This person still belongs to $memberships ministr" . ($memberships === 1 ? 'y' : 'ies') . '. Remove them from it first.');
         }
-        $this->db->prepare('DELETE FROM people WHERE id = :id')->execute([':id' => $id]);
+        $name = trim((string) ($person['first_name'] ?? '') . ' ' . (string) ($person['last_name'] ?? ''));
+        $name = $name !== '' ? $name : 'Person #' . $id;
+        $ownTx = !$this->db->inTransaction();
+        if ($ownTx) {
+            $this->db->beginTransaction();
+        }
+        try {
+            $this->audit($actorId, 'person.deleted', $id, 'Deleted ' . $name, ['name' => $name]);
+            $this->db->prepare('DELETE FROM people WHERE id = :id')->execute([':id' => $id]);
+            if ($ownTx) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /** @return list<array{id:int,name:string}> active families for the family dropdown. */
@@ -765,11 +787,15 @@ final readonly class PersonAdminService
      * value that is not one (a login with no person) is kept as no one rather
      * than breaking the write.
      */
-    private function audit(int $actorId, string $action, int $personId): void
+    /** @param array<string,mixed>|null $details */
+    private function audit(int $actorId, string $action, int $personId, ?string $summary = null, ?array $details = null): void
     {
         $this->db->prepare(
-            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id)
-             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "person", :target)'
-        )->execute([':actor' => $actorId, ':actor2' => $actorId, ':action' => $action, ':target' => (string) $personId]);
+            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id, summary, details)
+             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "person", :target, :summary, :details)'
+        )->execute([
+            ':actor' => $actorId, ':actor2' => $actorId, ':action' => $action, ':target' => (string) $personId,
+            ':summary' => $summary, ':details' => $details === null ? null : json_encode($details),
+        ]);
     }
 }

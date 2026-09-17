@@ -132,6 +132,29 @@ final readonly class FamilyAdminService
         ], $st->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
+    /**
+     * Record that two households were linked or unlinked as related. Written on
+     * both households, so either one's history shows it.
+     *
+     * @param 'household.linked'|'household.unlinked' $action
+     */
+    public function recordLinkChange(int $actorId, string $action, int $householdId, int $otherId, string $relationshipLabel = ''): void
+    {
+        if (!in_array($action, ['household.linked', 'household.unlinked'], true) || $householdId <= 0 || $otherId <= 0) {
+            throw new InvalidArgumentException('Not a household link change.');
+        }
+        $names = $this->namesFor([$householdId, $otherId]);
+        $nameOf = static fn (int $id): string => $names[$id] ?? ('Household #' . $id);
+        $verb = $action === 'household.linked' ? 'Linked to' : 'Unlinked from';
+        foreach ([[$householdId, $otherId], [$otherId, $householdId]] as [$self, $other]) {
+            $this->audit($actorId, $action, $self, [
+                'other_household_id' => $other,
+                'other_household_name' => $nameOf($other),
+                'relationship' => $relationshipLabel,
+            ], $verb . ' ' . $nameOf($other) . ($relationshipLabel !== '' ? ' (' . $relationshipLabel . ')' : ''));
+        }
+    }
+
     /** Resolve family ids to {id,name}. @param list<int> $ids @return array<int,string> */
     public function namesFor(array $ids): array
     {
@@ -412,14 +435,14 @@ final readonly class FamilyAdminService
      *
      * @param array<string,mixed>|null $details
      */
-    private function audit(int $actorId, string $action, int $householdId, ?array $details = null): void
+    private function audit(int $actorId, string $action, int $householdId, ?array $details = null, ?string $summary = null): void
     {
         $this->db->prepare(
-            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id, details)
-             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "household", :target, :details)'
+            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id, summary, details)
+             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "household", :target, :summary, :details)'
         )->execute([
             ':actor' => $actorId, ':actor2' => $actorId, ':action' => $action, ':target' => (string) $householdId,
-            ':details' => $details === null ? null : json_encode($details),
+            ':summary' => $summary, ':details' => $details === null ? null : json_encode($details),
         ]);
     }
 }
