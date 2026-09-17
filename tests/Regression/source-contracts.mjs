@@ -48,7 +48,7 @@ console.log('Destructive confirmations');
 // prompt improved: admin-users now says "Delete the account for <email>",
 // which is better than "Delete user" and did not contain it.
 const confirms = [
-  ['resources/views/admin-users.php', /delete/i],
+  ['resources/views/admin-user-record.php', /delete/i],
   ['resources/views/admin-person-view.php', /delete/i],
   ['resources/views/admin-family-edit.php', /delete/i],
   ['resources/views/admin-campuses.php', /delete/i],

@@ -9,7 +9,9 @@ use App\Http\Requests\PortalRequestContext;
 use App\Services\AnnouncementSettingsService;
 
 /**
- * GET  /api/announcements — published, in-window items (public).
+ * GET  /api/announcements — portal notices the caller may see today: public
+ *                            ones for anyone, plus signed-in and administrator
+ *                            notices for those readers.
  * POST /api/announcements — replace the full list; portal-admin only.
  */
 final readonly class AnnouncementSettingsController
@@ -25,7 +27,15 @@ final readonly class AnnouncementSettingsController
      */
     public function show(array $request): array
     {
-        return ['items' => $this->service->publishedNow()];
+        // Not signed in (or a stale session) reads as a visitor, never as an error:
+        // the portal entry shows public notices to everyone.
+        try {
+            $actor = $this->requestContext->fromArray($request);
+        } catch (PermissionDenied) {
+            $actor = null;
+        }
+
+        return ['items' => $this->service->activeNotices($actor)];
     }
 
     /**

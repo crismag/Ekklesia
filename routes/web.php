@@ -1043,21 +1043,13 @@ $webRoutes = [
     // discoverable without each holding a permanent slot in primary navigation.
     'GET /admin/roadmap' => fn (array $req) => _adminSectionRender($req, 'admin-roadmap.php', $resolvePortalActor, $resolveCampusSelector),
 
-    // Hero rotator settings UI. The page itself is reachable for any signed-in
-    // user, but the Save action only succeeds for portal-wide admins (the API
-    // enforces this). Non-admins land on a read-only preview.
-    'GET /admin/hero' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
-        /** @var string $basePath used by the template */
-        $basePath = (string) ($req['_base_path'] ?? '');
-        /** @var ?array<string, mixed> $actor used by the template */
-        $actor = $resolvePortalActor($req);
-        /** @var array<string, mixed> $campusSelector used by the template */
-        $campusSelector = $resolveCampusSelector($req);
-        /** @var array<string, mixed> $heroConfig used by the template */
-        $heroConfig = \App\Providers\PortalServiceProvider::makeHeroSettingsService()->load();
-        ob_start();
-        require __DIR__ . '/../resources/views/admin-hero.php';
-        return (string) ob_get_clean();
+    // The home page banner ("hero") became part of Portal notices: short
+    // operational messages rather than rotating slides. Its old address opens
+    // the notices page, which offers to carry the banner's messages over.
+    'GET /admin/hero' => function (array $req): string {
+        header('Location: ' . ((string) ($req['_base_path'] ?? '')) . '/admin/announcements', true, 302);
+
+        return '';
     },
 
     // The 10 admin section pages — all share _admin-shell.php so they
@@ -1076,9 +1068,55 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $announcementConfig = \App\Providers\PortalServiceProvider::makeAnnouncementSettingsService()->load();
+        $bannerSlides = [];
+        if ($actor !== null && !empty($actor['isPortalWideAdmin']) && is_file(__DIR__ . '/../config/hero.json')) {
+            $bannerSlides = \App\Providers\PortalServiceProvider::makeHeroSettingsService()->load()['slides'];
+        }
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $notice = (string) ($req['notice'] ?? '');
+        $flash = (string) ($_SESSION['notices_flash'] ?? '');
+        unset($_SESSION['notices_flash']);
         ob_start();
         require __DIR__ . '/../resources/views/admin-announcements.php';
         return (string) ob_get_clean();
+    },
+    // Copy the retired home banner's messages into Portal notices as drafts.
+    // Only messages not already copied (same title) are added, so repeating
+    // the action adds nothing twice.
+    'POST /admin/announcements/banner-drafts' => function (array $req) use ($resolvePortalActor): string {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $target = $basePath . '/admin/announcements';
+        $actor = $resolvePortalActor($req);
+        if ($actor === null || empty($actor['isPortalWideAdmin'])) {
+            $_SESSION['notices_flash'] = 'Only a portal-wide admin can change portal notices.';
+            header('Location: ' . $target . '?notice=error', true, 302);
+            return '';
+        }
+        try {
+            $notices = \App\Providers\PortalServiceProvider::makeAnnouncementSettingsService();
+            $existing = array_map(static fn (array $i): string => mb_strtolower(trim($i['title'])), $notices->load()['items']);
+            $drafts = [];
+            foreach (\App\Providers\PortalServiceProvider::makeHeroSettingsService()->load()['slides'] as $slide) {
+                $title = mb_substr(trim((string) $slide['title']), 0, 140);
+                if ($title === '' || in_array(mb_strtolower($title), $existing, true)) {
+                    continue;
+                }
+                $drafts[] = ['title' => $title, 'body' => mb_substr(trim((string) $slide['lead']), 0, 800)];
+                $existing[] = mb_strtolower($title);
+            }
+            if ($drafts !== []) {
+                $notices->appendDrafts($drafts);
+            }
+            $_SESSION['notices_flash'] = $drafts === []
+                ? 'Every banner message is already a notice.'
+                : (count($drafts) === 1 ? 'Added 1 draft notice.' : 'Added ' . count($drafts) . ' draft notices.') . ' Review and publish the ones still needed.';
+            header('Location: ' . $target . '?notice=drafts', true, 302);
+        } catch (\Throwable $e) {
+            $_SESSION['notices_flash'] = $e->getMessage();
+            header('Location: ' . $target . '?notice=error', true, 302);
+        }
+        return '';
     },
     'GET /admin/maintenance' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
@@ -1709,19 +1747,38 @@ $webRoutes = [
         return '';
     },
 
-    // System users — manage user_accounts + role assignments.
+    // Users & access — logins, the person each belongs to, and their roles.
+    // The list is /admin/users; each login has its own record page. The old
+    // ?user_id= address (bookmarks, the previous two-pane page) redirects there.
     'GET /admin/users' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector, $resolveAllMinistries): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         $basePath = (string) ($req['_base_path'] ?? '');
+        $legacyId = (int) ($req['user_id'] ?? 0);
+        if ($legacyId > 0) {
+            $notice = (string) ($req['notice'] ?? '');
+            header('Location: ' . $basePath . '/admin/users/' . $legacyId . ($notice !== '' ? '?notice=' . rawurlencode($notice) : ''), true, 302);
+            return '';
+        }
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $users = []; $editingUser = null; $ministries = [];
+        $users = [];
+        $allUsers = [];
+        $ministries = [];
+        $filters = [
+            'q' => trim((string) ($req['q'] ?? '')),
+            'role' => (string) ($req['role'] ?? ''),
+            'state' => (string) ($req['state'] ?? ''),
+        ];
+        if (!in_array($filters['role'], array_merge([''], \App\Services\SystemUserService::ROLES, ['portal-admin']), true)) {
+            $filters['role'] = '';
+        }
+        if (!array_key_exists($filters['state'], \App\Services\LoginDirectory::STATES)) {
+            $filters['state'] = '';
+        }
         if ($isAdmin) {
-            $svc = \App\Providers\PortalServiceProvider::makeSystemUserService();
-            $users = $svc->list();
-            $uid = (int) ($req['user_id'] ?? 0);
-            $editingUser = $uid > 0 ? $svc->find($uid) : null;
+            $allUsers = \App\Providers\PortalServiceProvider::makeSystemUserService()->list();
+            $users = \App\Services\LoginDirectory::filter($allUsers, $filters['q'], $filters['role'], $filters['state']);
             $ministries = $resolveAllMinistries($req);
         }
         $currentUserId = (int) ($actor['actorId'] ?? 0);
@@ -1730,6 +1787,64 @@ $webRoutes = [
         unset($_SESSION['users_flash']);
         ob_start();
         require __DIR__ . '/../resources/views/admin-users.php';
+        return (string) ob_get_clean();
+    },
+    'GET /admin/users/new' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector, $resolveAllMinistries): string {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
+        $editingUser = null;
+        $ministries = $isAdmin ? $resolveAllMinistries($req) : [];
+        $currentUserId = (int) ($actor['actorId'] ?? 0);
+        $notice = (string) ($req['notice'] ?? '');
+        $flash = (string) ($_SESSION['users_flash'] ?? '');
+        unset($_SESSION['users_flash']);
+        $personQuery = ''; $personResults = []; $recentActivity = [];
+        ob_start();
+        require __DIR__ . '/../resources/views/admin-user-record.php';
+        return (string) ob_get_clean();
+    },
+    'GET /admin/users/{id}' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector, $resolveAllMinistries): string {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
+        $editingUser = null; $ministries = []; $personResults = []; $recentActivity = [];
+        $personQuery = trim((string) ($req['person_q'] ?? ''));
+        // Nothing about the login is fetched for someone who may not see it.
+        if ($isAdmin) {
+            $editingUser = \App\Providers\PortalServiceProvider::makeSystemUserService()->find((int) ($req['id'] ?? 0));
+            if ($editingUser === null) {
+                http_response_code(404);
+            } else {
+                $ministries = $resolveAllMinistries($req);
+                if ($personQuery !== '' && empty($editingUser['person_id'])) {
+                    try {
+                        $personResults = \App\Providers\PortalServiceProvider::makePersonAdminService()
+                            ->list(['search' => mb_substr($personQuery, 0, 80)], 1, 10);
+                    } catch (\Throwable) {
+                        $personResults = [];
+                    }
+                }
+                try {
+                    $recentActivity = \App\Providers\PortalServiceProvider::makeActivityHistoryService()->page(
+                        \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                        ['target_type' => 'user_account', 'target_id' => (string) $editingUser['id']],
+                    );
+                } catch (\Throwable) {
+                    $recentActivity = [];
+                }
+            }
+        }
+        $currentUserId = (int) ($actor['actorId'] ?? 0);
+        $notice = (string) ($req['notice'] ?? '');
+        $flash = (string) ($_SESSION['users_flash'] ?? '');
+        unset($_SESSION['users_flash']);
+        ob_start();
+        require __DIR__ . '/../resources/views/admin-user-record.php';
         return (string) ob_get_clean();
     },
     'POST /admin/users' => function (array $req) use ($resolvePortalActor): string {
@@ -1746,35 +1861,47 @@ $webRoutes = [
         $me = (int) ($actor['actorId'] ?? 0);
         $action = (string) ($req['action'] ?? '');
         $uid = (int) ($req['user_id'] ?? 0);
+        $record = static fn (int $id, string $notice): string => $target . '/' . $id . '?notice=' . $notice;
         $ci = static fn ($v) => ($v !== null && (int) $v > 0) ? (int) $v : null;
         try {
             if ($action === 'create') {
                 $newId = $svc->create(
                     (string) ($req['email'] ?? ''), (string) ($req['display_name'] ?? ''),
                     (string) ($req['password'] ?? ''), (int) ($req['is_active'] ?? 0) === 1,
-                    (int) ($req['must_change_password'] ?? 0) === 1,
+                    (int) ($req['must_change_password'] ?? 0) === 1, $me,
                 );
                 $role = (string) ($req['role'] ?? '');
                 if ($role !== '') {
-                    $svc->addRole($newId, $role, $ci($req['campus_id'] ?? null), $ci($req['ministry_id'] ?? null));
+                    $svc->addRole($newId, $role, $ci($req['campus_id'] ?? null), $ci($req['ministry_id'] ?? null), $me);
                 }
-                header('Location: ' . $target . '?notice=created&user_id=' . $newId, true, 302); return '';
+                header('Location: ' . $record($newId, 'created'), true, 302); return '';
             }
             if ($action === 'update') {
                 $svc->updateProfile($uid, (string) ($req['display_name'] ?? ''), (int) ($req['is_active'] ?? 0) === 1, (int) ($req['must_change_password'] ?? 0) === 1, $me);
-                header('Location: ' . $target . '?notice=saved&user_id=' . $uid, true, 302); return '';
+                header('Location: ' . $record($uid, 'saved'), true, 302); return '';
             }
             if ($action === 'setpw') {
-                $svc->setPassword($uid, (string) ($req['password'] ?? ''));
-                header('Location: ' . $target . '?notice=pw&user_id=' . $uid, true, 302); return '';
+                $svc->setPassword($uid, (string) ($req['password'] ?? ''), $me);
+                header('Location: ' . $record($uid, 'pw'), true, 302); return '';
             }
             if ($action === 'addrole') {
-                $svc->addRole($uid, (string) ($req['role'] ?? ''), $ci($req['campus_id'] ?? null), $ci($req['ministry_id'] ?? null));
-                header('Location: ' . $target . '?notice=role&user_id=' . $uid, true, 302); return '';
+                $svc->addRole($uid, (string) ($req['role'] ?? ''), $ci($req['campus_id'] ?? null), $ci($req['ministry_id'] ?? null), $me);
+                header('Location: ' . $record($uid, 'role'), true, 302); return '';
             }
             if ($action === 'removerole') {
-                $svc->removeRole((int) ($req['account_role_id'] ?? 0));
-                header('Location: ' . $target . '?notice=role&user_id=' . $uid, true, 302); return '';
+                $svc->removeRole((int) ($req['account_role_id'] ?? 0), $me);
+                header('Location: ' . $record($uid, 'role'), true, 302); return '';
+            }
+            if ($action === 'link') {
+                // A login belongs to one person: AuthService refuses a login that
+                // already belongs to someone else, and a person who already has one.
+                \App\Providers\PortalServiceProvider::makeAuthService()->linkLoginToPerson(
+                    \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                    $uid,
+                    (int) ($req['person_id'] ?? 0),
+                    ['ip' => $_SERVER['REMOTE_ADDR'] ?? null, 'userAgent' => $_SERVER['HTTP_USER_AGENT'] ?? null],
+                );
+                header('Location: ' . $record($uid, 'linked'), true, 302); return '';
             }
             if ($action === 'delete') {
                 $svc->delete($uid, $me);
@@ -1783,9 +1910,38 @@ $webRoutes = [
             header('Location: ' . $target, true, 302); return '';
         } catch (\Throwable $e) {
             $_SESSION['users_flash'] = $e->getMessage();
-            header('Location: ' . $target . '?notice=error' . ($uid > 0 ? '&user_id=' . $uid : ''), true, 302);
+            if ($action === 'create') {
+                header('Location: ' . $target . '/new?notice=error', true, 302);
+            } else {
+                header('Location: ' . ($uid > 0 ? $record($uid, 'error') : $target . '?notice=error'), true, 302);
+            }
             return '';
         }
+    },
+
+    // Activity history — the audit log across every kind of record, read-only.
+    'GET /admin/history' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
+        $history = null;
+        $historyError = '';
+        if ($isAdmin) {
+            try {
+                $history = \App\Providers\PortalServiceProvider::makeActivityHistoryService()->page(
+                    \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                    $req,
+                );
+            } catch (\App\Exceptions\ValidationFailed $e) {
+                $historyError = $e->getMessage();
+            } catch (\Throwable) {
+                $historyError = 'Activity history could not be read. Try again, or check the database connection under System.';
+            }
+        }
+        ob_start();
+        require __DIR__ . '/../resources/views/admin-history.php';
+        return (string) ob_get_clean();
     },
 
     // Family management — self-contained CRUD over households.

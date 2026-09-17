@@ -777,6 +777,68 @@ final readonly class AuthService
         return $this->decorateAccessUser($profile);
     }
 
+    /**
+     * Link an existing login to the person it belongs to, from Users & access.
+     *
+     * The same rule provisionPortalAccess() enforces: a login belongs to one
+     * person, so a login already linked to someone else is refused rather than
+     * moved. It is also refused when the person already has a login of their
+     * own — two logins for one person make sign-in ambiguous, and which one to
+     * keep is an administrator's decision, not something to settle by linking.
+     *
+     * @param array{ip?:?string,userAgent?:?string} $auditMeta
+     */
+    public function linkLoginToPerson(ActorContext $context, int $accountId, int $personId, array $auditMeta = []): void
+    {
+        $this->ensurePortalAdmin($context);
+        if ($accountId <= 0 || $personId <= 0) {
+            throw new ValidationFailed('Choose a login and a person.');
+        }
+        $profile = $this->repository->loadUserProfile($accountId);
+        if ($profile === null) {
+            throw new ValidationFailed('That login no longer exists.');
+        }
+        $person = $this->identityResolver?->identityFor($personId);
+        if ($person === null) {
+            throw new ValidationFailed('That person record no longer exists.');
+        }
+        $nameOf = static fn (array $identity): string => trim($identity['firstName'] . ' ' . $identity['lastName']);
+
+        $linkedPersonId = (int) ($profile['person_id'] ?? 0);
+        if ($linkedPersonId === $personId) {
+            return;
+        }
+        if ($linkedPersonId > 0) {
+            $owner = $this->identityResolver?->identityFor($linkedPersonId);
+            throw new ValidationFailed(sprintf(
+                'The login %s already belongs to %s. A login belongs to one person.',
+                (string) $profile['email'],
+                $owner !== null ? $nameOf($owner) : 'person #' . $linkedPersonId,
+            ));
+        }
+        foreach ($this->repository->listUsersForPerson($personId) as $other) {
+            if ((int) $other['id'] !== $accountId) {
+                throw new ValidationFailed(sprintf(
+                    '%s already signs in as %s. Use that login, or delete it first.',
+                    $nameOf($person),
+                    (string) $other['email'],
+                ));
+            }
+        }
+
+        $this->linkPerson($accountId, $personId);
+        $this->audit(
+            $context,
+            action: 'user_account.link',
+            targetType: 'user_account',
+            targetId: (string) $accountId,
+            summary: sprintf('Linked %s to %s', (string) $profile['email'], $nameOf($person)),
+            payload: ['personId' => $personId],
+            ip: $auditMeta['ip'] ?? null,
+            ua: $auditMeta['userAgent'] ?? null,
+        );
+    }
+
     private function ensurePortalAdmin(ActorContext $context): void
     {
         if (!$context->isPortalWideAdmin) {
