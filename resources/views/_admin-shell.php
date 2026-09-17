@@ -391,10 +391,16 @@ if (!function_exists('admin_render_page')) {
         $args['basePath'] . '/login',
     ) ?>
     <main class="admin-content ek-page" id="portal-main" tabindex="-1">
-        <?php if ($canUseAdmin && $place !== null): ?>
-        <?= ek_workspace_tabs($args['basePath'], $place[0], $place[1], $args['actor'] ?? null, $place[2]) ?>
+        <?php
+            $tabs = $canUseAdmin && $place !== null
+                ? ek_workspace_tabs($args['basePath'], $place[0], $place[1], $args['actor'] ?? null, $place[2])
+                : '';
+        ?>
+        <?php if ($tabs !== ''): ?>
+        <?= $tabs ?>
+        <?php elseif ($crumbs !== ''): /* the tabs already say where you are */ ?>
+        <p class="ek-crumbs"><?= $crumbs ?></p>
         <?php endif; ?>
-        <?php if ($crumbs !== ''): ?><p class="ek-crumbs"><?= $crumbs ?></p><?php endif; ?>
         <?= ek_page_header((string) $args['sectionTitle'], (string) $args['sectionDescription']) ?>
         <?php if ($canUseAdmin): ?>
             <?= $renderBody() ?>
