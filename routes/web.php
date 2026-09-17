@@ -941,6 +941,20 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
 
+    'GET /about' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        try {
+            $churchName = trim((string) (\App\Providers\PortalServiceProvider::makeChurchInfoService()->load()['name'] ?? ''));
+        } catch (\Throwable) {
+            $churchName = '';
+        }
+        ob_start();
+        require __DIR__ . '/../resources/views/about.php';
+        return (string) ob_get_clean();
+    },
+
     'GET /docs' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);

@@ -642,6 +642,12 @@ ok(!fs.existsSync(path.join(root, 'resources/views/docs/shortcuts.php')),
   'the unrouted Shortcuts PHP stub is gone');
 ok(read('resources/views/docs.php').includes("'leader'    => 'schedule-editor'"),
   '/docs/leader still aliases to the serving-grid guide');
+ok(read('routes/web.php').includes("'GET /about'"),
+  '/about is a public portal route');
+ok(read('resources/views/about.php').includes('Designed and developed by'),
+  'the About page credits its developer');
+ok(read('resources/views/_portal-shell.php').includes("$basePath . '/about'"),
+  'the sidebar and drawer link to About');
 
 console.log(`\nPassed: ${passed}; failed: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

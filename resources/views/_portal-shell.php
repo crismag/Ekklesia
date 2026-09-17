@@ -1457,18 +1457,22 @@ if (!function_exists('portal_header')) {
 
         // ---- Workspace sidebar (desktop) -------------------------------------
         $guideIcon = portal_icon('docs');
+        $aboutIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+        $aboutLink = '<a class="ek-side-link" href="' . $esc($basePath . '/about') . '" aria-label="About Ekklesia">' . $aboutIcon . '<span class="ek-side-label">About</span></a>';
         $collapseSvg = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
         if ($isSignedIn) {
             $sideUser = '<div class="ek-side-user"><span class="ek-avatar" aria-hidden="true">' . $esc($avatarChar ?? '?') . '</span>'
                 . '<span class="ek-side-user-name">' . $esc((string) ($actor['displayName'] ?? $actorFirstName)) . '</span></div>'
                 . '<a class="ek-side-link" href="' . $esc($basePath . '/account') . '" aria-label="Account">' . portal_icon('profile') . '<span class="ek-side-label">Account</span></a>'
                 . '<a class="ek-side-link" href="' . $esc($basePath . '/docs') . '" aria-label="User guide">' . $guideIcon . '<span class="ek-side-label">User guide</span></a>'
+                . $aboutLink
                 . '<form class="ek-side-signout" method="post" action="' . $esc($basePath . '/logout') . '" data-signout>'
                 . '<button class="ek-side-link" type="submit" aria-label="Sign out">'
                 . '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3Zm6.6 4.4L15.2 8.8l2.2 2.2H9v2h8.4l-2.2 2.2 1.4 1.4L21.2 12l-4.6-4.6Z"/></svg>'
                 . '<span class="ek-side-label">Sign out</span></button></form>';
         } else {
-            $sideUser = '<a class="ek-side-link" href="' . $esc($loginHref !== '' ? $loginHref : $basePath . '/login') . '" aria-label="' . $esc($loginLabel) . '">' . portal_icon('profile') . '<span class="ek-side-label">' . $esc($loginLabel) . '</span></a>';
+            $sideUser = '<a class="ek-side-link" href="' . $esc($loginHref !== '' ? $loginHref : $basePath . '/login') . '" aria-label="' . $esc($loginLabel) . '">' . portal_icon('profile') . '<span class="ek-side-label">' . $esc($loginLabel) . '</span></a>'
+                . $aboutLink;
         }
         $sidebarHtml = '<aside class="ek-sidebar" id="ekSidebar" aria-label="Application">'
             . '<a class="ek-side-brand" href="' . $esc($basePath) . '/" aria-label="' . $esc($brandTitle . ' home') . '">'
@@ -1502,7 +1506,8 @@ if (!function_exists('portal_header')) {
             . '<span class="drawer-item-icon">' . portal_icon('search') . '</span>'
             . '<span class="drawer-item-label">Search</span></a>';
         $drawerExtra = '<hr class="drawer-divider">'
-            . '<a class="drawer-item" href="' . $esc($basePath . '/docs') . '"><span class="drawer-item-icon">' . $guideIcon . '</span><span class="drawer-item-label">User guide</span></a>';
+            . '<a class="drawer-item" href="' . $esc($basePath . '/docs') . '"><span class="drawer-item-icon">' . $guideIcon . '</span><span class="drawer-item-label">User guide</span></a>'
+            . '<a class="drawer-item" href="' . $esc($basePath . '/about') . '"><span class="drawer-item-icon">' . $aboutIcon . '</span><span class="drawer-item-label">About Ekklesia</span></a>';
         if (!$isSignedIn) {
             $drawerExtra .= '<a class="drawer-item" href="' . $esc($loginHref !== '' ? $loginHref : $basePath . '/login') . '"><span class="drawer-item-icon">' . portal_icon('profile') . '</span><span class="drawer-item-label">' . $esc($loginLabel) . '</span></a>';
         }
