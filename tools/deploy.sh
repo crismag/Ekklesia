@@ -31,9 +31,16 @@
 #
 set -Eeuo pipefail
 
-REMOTE="${PORTAL_DEPLOY_REMOTE:-Hostinger}"
-REMOTE_PATH="${PORTAL_DEPLOY_PATH:-/home/u471078694/domains/crishub.com/public_html/christlikeness/church_portal}"
-SMOKE_URL="${PORTAL_SMOKE_URL:-https://christlikeness.crishub.com/church_portal}"
+# No defaults on purpose. Ekklesia started as a copy of the Church Portal, whose
+# production folder this script used to target; a deploy must name its target.
+REMOTE="${EKKLESIA_DEPLOY_REMOTE:?Set EKKLESIA_DEPLOY_REMOTE (ssh host alias)}"
+REMOTE_PATH="${EKKLESIA_DEPLOY_PATH:?Set EKKLESIA_DEPLOY_PATH (remote folder)}"
+SMOKE_URL="${EKKLESIA_SMOKE_URL:?Set EKKLESIA_SMOKE_URL (site URL to check)}"
+case "${REMOTE_PATH%/}" in
+  */church_portal)
+    echo "Refusing to deploy Ekklesia into the Church Portal's folder (${REMOTE_PATH})." >&2
+    exit 2 ;;
+esac
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 

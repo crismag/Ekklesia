@@ -231,8 +231,10 @@ nothing caches the outage and clients back off rather than hammer the server.
 The flag is server-owned and excluded from `rsync`; a local copy must never
 travel.
 
-The environment can be pointed elsewhere with `PORTAL_DEPLOY_REMOTE`,
-`PORTAL_DEPLOY_PATH` and `PORTAL_SMOKE_URL`.
+The target must be named every time with `EKKLESIA_DEPLOY_REMOTE`,
+`EKKLESIA_DEPLOY_PATH` and `EKKLESIA_SMOKE_URL`; there are no defaults, and the
+script refuses a path ending in `church_portal`, the Church Portal's production
+folder.
 
 ### Rollback and recovery
 
