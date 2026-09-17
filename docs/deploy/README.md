@@ -265,10 +265,11 @@ database.
 
 ### This is not hypothetical — it has now happened twice
 
-Migration `007` was never applied anywhere, and the member import failed the
-moment application code stopped creating its tables at runtime.
+In the Church Portal, the member-import migration was never applied anywhere,
+and the import failed the moment application code stopped creating its tables at
+runtime.
 
-Then migration `009` (`event_types.portal_audience`) arrived with a pull request
+Then the event-type audience migration arrived with a pull request
 and was not applied to production. The calendar query joins that column, so the
 query threw and **the calendar showed no events and no birthdays at all** — with
 no error visible to the user. The data was intact the whole time.
@@ -278,7 +279,7 @@ Run `--status` after every deploy; it takes a second and answers the question.
 
 ### Why a runner exists
 
-Migration `007-member-import-staging.sql` sat in the repository for weeks
+In the Church Portal, a member-import migration sat in the repository for weeks
 without ever being applied to the deployed database, and **nothing could have
 told us**: there was no record of which migrations had run. It stayed invisible
 because the import service created its staging tables at runtime, so the
@@ -286,33 +287,19 @@ migration was never actually needed. When that runtime DDL was removed — schem
 belongs to migrations, not to request handlers — the gap surfaced as a hard
 failure in the middle of a member import.
 
-### Two databases, one directory
+### Where migrations live
 
-`migrations/portal/` holds migrations for **both** databases:
-
-| Migration | Target | Creates |
-|---|---|---|
-| 001, 002, 003, 005, 006 | portal | `portal_users`, `portal_unavailability`, `schedule_roster`, `ministry_leaders` |
-| 007, 008 | churchcrm | `member_import_batch`/`member_import_row`, `events_event.ministry_id` |
-
-Member import staging and events live alongside `person_per` in the ChurchCRM
-database, so the directory name does not tell you where a migration belongs.
-Each file therefore declares its own target in its header:
-
-```sql
--- @connection: churchcrm
-```
-
-Missing the target defaults to `portal`. **Getting this wrong applies a
-migration to the wrong database**, which is one of the ways the original problem
-could have happened.
+The member database starts from `database/members/001_schema.sql`. Every later
+change is a file in `database/members/migrations/`, applied to the member
+database (`MEMBERS_DB_*`). The visitors SQLite file has its own schema in
+`database/visitors/001_schema.sql`.
 
 ### How it behaves
 
 - Applies in filename order and stops on the first failure.
 - **A failed migration is never recorded as applied**, so a re-run retries it.
-- Records `filename`, `connection`, a SHA-256 `checksum` and `applied_at` in
-  `portal_schema_migrations` (portal database — one place to look).
+- Records `filename`, a SHA-256 `checksum` and `applied_at` in
+  `schema_migrations` in the member database.
 - An already-applied migration is skipped, not re-executed.
 - A migration edited after being applied shows as `CHANGED SINCE APPLIED`
   rather than silently diverging.
@@ -320,15 +307,6 @@ could have happened.
   for adopting a database whose schema was created by hand. Use it only after
   confirming the objects genuinely exist: *a missing history record is not the
   same as missing schema.*
-
-Every current migration uses `IF NOT EXISTS`, so applying them to a database
-that already has the schema is a no-op rather than a risk.
-
-### Note on migration numbering
-
-There is no `004`. The sequence runs 001, 002, 003, 005, 006, 007, 008. The
-runner orders by filename and does not require contiguous numbers, so this is
-cosmetic — but it is worth knowing before someone assumes a file is missing.
 
 ## Postal area index
 
