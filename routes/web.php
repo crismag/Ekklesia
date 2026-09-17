@@ -1349,7 +1349,7 @@ $webRoutes = [
         }
         $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
         try {
-            $svc->delete((int) ($req['id'] ?? 0));
+            $svc->delete((int) ($req['id'] ?? 0), (int) ($actor['actorId'] ?? 0));
             header('Location: ' . $basePath . '/admin/people?notice=deleted', true, 302);
         } catch (\Throwable $e) {
             $_SESSION['people_flash'] = $e->getMessage();
@@ -1959,10 +1959,23 @@ $webRoutes = [
         }
         $rel = \App\Providers\PortalServiceProvider::makeRelatedFamiliesService();
         try {
+            $otherId = (int) ($req['other_id'] ?? 0);
+            $actorId = (int) ($actor['actorId'] ?? 0);
+            $families = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
             if (($req['action'] ?? '') === 'unlink') {
-                $rel->unlink($fid, (int) ($req['other_id'] ?? 0));
+                $label = '';
+                foreach ($rel->forFamily($fid) as $l) {
+                    if ((int) $l['other'] === $otherId) { $label = (string) $l['label']; }
+                }
+                $rel->unlink($fid, $otherId);
+                $families->recordLinkChange($actorId, 'household.unlinked', $fid, $otherId, $label);
             } else {
-                $rel->link($fid, (int) ($req['other_id'] ?? 0), (string) ($req['rel'] ?? 'extended'), (string) ($req['direction'] ?? 'parent'));
+                $rel->link($fid, $otherId, (string) ($req['rel'] ?? 'extended'), (string) ($req['direction'] ?? 'parent'));
+                $label = '';
+                foreach ($rel->forFamily($fid) as $l) {
+                    if ((int) $l['other'] === $otherId) { $label = (string) $l['label']; }
+                }
+                $families->recordLinkChange($actorId, 'household.linked', $fid, $otherId, $label);
             }
             header('Location: ' . $back . '&notice=saved', true, 302);
         } catch (\Throwable $e) {

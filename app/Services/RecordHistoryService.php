@@ -24,9 +24,12 @@ final class RecordHistoryService
         'person.updated' => 'Record edited',
         'person.campus_changed' => 'Campus changed',
         'person.profile_updated' => 'Profile updated by the member',
+        'person.deleted' => 'Record deleted',
         'household.created' => 'Household created',
         'household.updated' => 'Household edited',
         'household.merged' => 'Households merged',
+        'household.linked' => 'Related household linked',
+        'household.unlinked' => 'Related household unlinked',
         'legacy.edit' => 'Edited (earlier system)',
         'legacy.group' => 'Group change (earlier system)',
         'legacy.photo' => 'Photo change (earlier system)',
@@ -178,7 +181,9 @@ final class RecordHistoryService
 
     /**
      * @param array<string,mixed> $row
-     * @return array{id:int,occurredAt:string,action:string,actionLabel:string,who:string,whoPersonId:?int,recordType:string,recordId:int,recordName:?string,summary:string}
+     * formerName: the name a deleted record had, from its deletion entry.
+     *
+     * @return array{id:int,occurredAt:string,action:string,actionLabel:string,who:string,whoPersonId:?int,recordType:string,recordId:int,recordName:?string,formerName:?string,summary:string}
      */
     public function describe(array $row): array
     {
@@ -208,8 +213,18 @@ final class RecordHistoryService
             'recordType' => $type,
             'recordId' => (int) $row['target_id'],
             'recordName' => $recordName,
+            'formerName' => $recordName === null ? $this->formerName($row) : null,
             'summary' => $this->summary($row),
         ];
+    }
+
+    /** @param array<string,mixed> $row */
+    private function formerName(array $row): ?string
+    {
+        $details = is_string($row['details'] ?? null) ? json_decode((string) $row['details'], true) : null;
+        $name = is_array($details) ? trim((string) ($details['name'] ?? '')) : '';
+
+        return $name !== '' ? $name : null;
     }
 
     /** @param array<string,mixed> $row */

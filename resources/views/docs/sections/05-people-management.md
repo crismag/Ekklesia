@@ -123,8 +123,9 @@ while people are still in it; move them or mark the household inactive instead.
 People & Records → **Record history** lists who added or changed a person or
 household record, and when — newest first, with filters for the person, the
 kind of record, the kind of change and a date range. It is read-only and only
-portal administrators see it. Changes from the earlier system are included and
-marked as such.
+portal administrators see it. Deleted people, and households linked or unlinked
+as related, are listed too; a deleted person keeps their name there. Changes from
+the earlier system are included and marked as such.
 
 ## Record settings
 

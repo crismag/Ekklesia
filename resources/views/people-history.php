@@ -164,7 +164,7 @@ echo records_styles();
               <?php if ($href !== null): ?>
                 <a class="rec-link" href="<?= $href ?>"><?= $h($e['recordName'] !== '' ? $e['recordName'] : ('#' . $e['recordId'])) ?></a>
               <?php else: ?>
-                <span><?= $e['recordType'] === 'person' ? 'Person' : 'Household' ?> #<?= (int) $e['recordId'] ?> <span class="rec-muted">(no longer on record)</span></span>
+                <span><?= $e['formerName'] !== null ? $h($e['formerName']) : ($e['recordType'] === 'person' ? 'Person' : 'Household') . ' #' . (int) $e['recordId'] ?> <span class="rec-muted">(no longer on record)</span></span>
               <?php endif; ?>
               <span class="rh-type"><?= $e['recordType'] === 'person' ? 'Person' : 'Household' ?></span>
             </span></td>

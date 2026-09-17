@@ -164,6 +164,56 @@ rh_check('filter options: labelled actions and named people',
     in_array(['value' => 'household.merged', 'label' => 'Households merged'], $opts['actions'], true)
     && $opts['people'][0] === ['id' => 4, 'name' => 'Cruz, Ana'] && $opts['people'][1]['name'] === 'Person #9');
 
+// Deletions and household links are recorded --------------------------------
+rh_check('deletes and links have their own labels',
+    RecordHistoryService::actionLabel('person.deleted') === 'Record deleted'
+    && RecordHistoryService::actionLabel('household.linked') === 'Related household linked'
+    && RecordHistoryService::actionLabel('household.unlinked') === 'Related household unlinked');
+$d = $svc->describe($row(['action' => 'person.deleted', 'target_first_name' => null, 'target_last_name' => null,
+    'summary' => 'Deleted Ana Cruz', 'details' => '{"name": "Ana Cruz"}']));
+rh_check('a deleted person still reads by name', $d['recordName'] === null && $d['formerName'] === 'Ana Cruz' && $d['summary'] === 'Deleted Ana Cruz');
+rh_check('a record that still exists has no former name', $svc->describe($row())['formerName'] === null);
+
+// The writes themselves, against an in-memory database shaped like the real one.
+$db = new PDO('sqlite::memory:');
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$db->exec('CREATE TABLE people (id INTEGER PRIMARY KEY, first_name TEXT, last_name TEXT)');
+$db->exec('CREATE TABLE ministry_members (person_id INTEGER)');
+$db->exec('CREATE TABLE households (id INTEGER PRIMARY KEY, name TEXT)');
+$db->exec('CREATE TABLE user_accounts (id INTEGER PRIMARY KEY, person_id INTEGER)');
+$db->exec('CREATE TABLE audit_log (id INTEGER PRIMARY KEY, account_id INTEGER, person_id INTEGER, action TEXT, target_type TEXT, target_id TEXT, summary TEXT, details TEXT)');
+$db->exec("INSERT INTO people VALUES (4, 'Ana', 'Cruz'), (7, 'Ruth', 'Lim')");
+$db->exec('INSERT INTO user_accounts VALUES (3, 7)');
+$db->exec("INSERT INTO households VALUES (10, 'Cruz'), (11, 'Lim')");
+
+(new App\Services\PersonAdminService($db))->delete(4, 3);
+$entry = $db->query("SELECT * FROM audit_log WHERE action = 'person.deleted'")->fetch(PDO::FETCH_ASSOC);
+rh_check('deleting a person records who, which record, and its name',
+    $entry !== false && (int) $entry['account_id'] === 3 && (int) $entry['person_id'] === 7
+    && $entry['target_type'] === 'person' && $entry['target_id'] === '4'
+    && $entry['summary'] === 'Deleted Ana Cruz' && json_decode((string) $entry['details'], true)['name'] === 'Ana Cruz',
+    json_encode($entry));
+rh_check('and the person is gone', (int) $db->query('SELECT COUNT(*) FROM people WHERE id = 4')->fetchColumn() === 0);
+
+$db->exec("INSERT INTO ministry_members VALUES (7)");
+try { (new App\Services\PersonAdminService($db))->delete(7, 3); } catch (RuntimeException) {}
+rh_check('a refused delete records nothing',
+    (int) $db->query("SELECT COUNT(*) FROM audit_log WHERE target_id = '7'")->fetchColumn() === 0);
+
+$families = new App\Services\FamilyAdminService($db);
+$families->recordLinkChange(3, 'household.linked', 10, 11, "Married child's family");
+$families->recordLinkChange(3, 'household.unlinked', 10, 11);
+$links = $db->query("SELECT target_id, action, summary, account_id, person_id FROM audit_log WHERE target_type = 'household' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+rh_check('a link is recorded on both households, naming the other',
+    count($links) === 4
+    && $links[0]['target_id'] === '10' && $links[0]['summary'] === "Linked to Lim (Married child's family)"
+    && $links[1]['target_id'] === '11' && $links[1]['summary'] === "Linked to Cruz (Married child's family)"
+    && (int) $links[0]['account_id'] === 3 && (int) $links[0]['person_id'] === 7
+    && $links[2]['action'] === 'household.unlinked' && $links[2]['summary'] === 'Unlinked from Lim', json_encode($links));
+$refused = false;
+try { $families->recordLinkChange(3, 'household.merged', 10, 11); } catch (InvalidArgumentException) { $refused = true; }
+rh_check('only link changes can be recorded that way', $refused);
+
 echo "\n  Passed: $passed; failed: $failed\n";
 if ($failed > 0) {
     exit(1);
