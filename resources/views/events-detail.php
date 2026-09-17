@@ -15,8 +15,8 @@ $canManageEvents = $actor !== null && in_array('manage_events', $actor['permissi
 require_once __DIR__ . '/_portal-shell.php';
 require_once __DIR__ . '/_event-editor.php';
 
-$eventTitle   = htmlspecialchars((string) ($event['title'] ?? $event['event_title'] ?? 'Event'), ENT_QUOTES, 'UTF-8');
-$eventDesc    = htmlspecialchars((string) ($event['description'] ?? $event['event_desc'] ?? ''), ENT_QUOTES, 'UTF-8');
+$eventTitle   = htmlspecialchars((string) ($event['title'] ?? 'Event'), ENT_QUOTES, 'UTF-8');
+$eventDesc    = htmlspecialchars((string) ($event['description'] ?? ''), ENT_QUOTES, 'UTF-8');
 $eventId      = (int) ($event['event_id'] ?? 0);
 $campusIds    = array_map('intval', (array) ($event['campus_ids'] ?? []));
 $allCampuses  = empty($campusIds);
@@ -25,7 +25,7 @@ $availCampuses = is_array($event['available_campuses'] ?? null) ? $event['availa
 $schedule = is_array($schedule ?? null) ? $schedule : ['rule' => null, 'summary' => ''];
 $whenLabel = trim((string) ($schedule['summary'] ?? ''));
 if ($whenLabel === '' && $occurrences !== []) {
-    $firstStart = (string) ($occurrences[0]['occurrence_start'] ?? '');
+    $firstStart = (string) ($occurrences[0]['starts_at'] ?? '');
     if ($firstStart !== '') {
         try {
             $whenLabel = (new DateTimeImmutable($firstStart))->format('D, j M Y · H:i');
@@ -355,14 +355,14 @@ if ($whenLabel === '') {
                             'campusIds' => $campusIds,
                             'ministryId' => $event['ministry_id'] ?? $event['ministryId'] ?? 0,
                             'eventTypeId' => $event['event_type_id'] ?? $event['eventTypeId'] ?? 0,
-                            'assignmentSchedulingEnabled' => (bool) ($event['assignment_scheduling_enabled'] ?? $event['assignmentSchedulingEnabled'] ?? false),
+                            'usesServingSchedule' => (bool) ($event['uses_serving_schedule'] ?? $event['usesServingSchedule'] ?? false),
                             'tags' => $eventTags ?? [],
                             // Times come from the first occurrence: the event row
                             // carries a start, but the occurrences are what the
                             // calendar actually reads.
-                            'startDate' => substr((string) ($occurrences[0]['occurrence_start'] ?? ''), 0, 10),
-                            'startTime' => substr((string) ($occurrences[0]['occurrence_start'] ?? ''), 11, 5),
-                            'endTime' => substr((string) ($occurrences[0]['occurrence_end'] ?? ''), 11, 5),
+                            'startDate' => substr((string) ($occurrences[0]['starts_at'] ?? ''), 0, 10),
+                            'startTime' => substr((string) ($occurrences[0]['starts_at'] ?? ''), 11, 5),
+                            'endTime' => substr((string) ($occurrences[0]['ends_at'] ?? ''), 11, 5),
                         ],
                     ]) ?>
                 </div>
@@ -499,7 +499,7 @@ if ($whenLabel === '') {
                     $upcoming = [];
                     $past = [];
                     foreach ($occurrences as $occ) {
-                        $when = (string) ($occ['occurrence_start'] ?? '');
+                        $when = (string) ($occ['starts_at'] ?? '');
                         if (substr($when, 0, 10) >= $todayYmd) {
                             $upcoming[] = $occ;
                         } else {
@@ -510,8 +510,8 @@ if ($whenLabel === '') {
                         $cols = $canManageEvents ? 5 : 3;
                         $month = '';
                         foreach ($rows as $occ) {
-                            $start = !empty($occ['occurrence_start']) ? new DateTimeImmutable((string) $occ['occurrence_start']) : null;
-                            $end   = !empty($occ['occurrence_end'])   ? new DateTimeImmutable((string) $occ['occurrence_end'])   : null;
+                            $start = !empty($occ['starts_at']) ? new DateTimeImmutable((string) $occ['starts_at']) : null;
+                            $end   = !empty($occ['ends_at'])   ? new DateTimeImmutable((string) $occ['ends_at'])   : null;
                             $occId = (int) $occ['occurrence_id'];
                             $cancelled = !empty($occ['is_cancelled']);
                             $mins = $start && $end ? max(1, (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60)) : 90;
@@ -524,16 +524,16 @@ if ($whenLabel === '') {
                             $label = $start ? $start->format('D j M Y, H:i') : 'this occurrence';
                             echo '<tr' . ($cancelled ? ' class="is-cancelled"' : '') . ' data-occ="' . $occId . '"'
                                 . ' data-start="' . ($start ? $start->format('Y-m-d\TH:i') : '') . '"'
-                                . ' data-start-raw="' . htmlspecialchars((string) ($occ['occurrence_start'] ?? ''), ENT_QUOTES, 'UTF-8') . '"'
+                                . ' data-start-raw="' . htmlspecialchars((string) ($occ['starts_at'] ?? ''), ENT_QUOTES, 'UTF-8') . '"'
                                 . ' data-mins="' . $mins . '"'
-                                . ' data-otitle="' . htmlspecialchars((string) ($occ['override_title'] ?? ''), ENT_QUOTES, 'UTF-8') . '"'
-                                . ' data-odesc="' . htmlspecialchars((string) ($occ['override_desc'] ?? ''), ENT_QUOTES, 'UTF-8') . '">';
+                                . ' data-otitle="' . htmlspecialchars((string) ($occ['title_override'] ?? ''), ENT_QUOTES, 'UTF-8') . '"'
+                                . ' data-odesc="' . htmlspecialchars((string) ($occ['details_override'] ?? ''), ENT_QUOTES, 'UTF-8') . '">';
                             if ($canManageEvents) {
                                 echo '<td class="occ-c"><label><input type="checkbox" class="occ-sel" value="' . $occId . '"'
                                     . ' aria-label="Select ' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '"></label></td>';
                             }
                             echo '<td class="occ-d">' . ($start ? htmlspecialchars($start->format('D j'), ENT_QUOTES, 'UTF-8') : '—') . '</td>';
-                            $ownTitle = (string) ($occ['override_title'] ?? '');
+                            $ownTitle = (string) ($occ['title_override'] ?? '');
                             echo '<td class="occ-t">' . ($start ? htmlspecialchars($start->format('H:i'), ENT_QUOTES, 'UTF-8') : '—')
                                 . ($end && $end > $start ? '–' . htmlspecialchars($end->format('H:i'), ENT_QUOTES, 'UTF-8') : '') . '</td>';
                             // A date that says something of its own says it here,
@@ -575,8 +575,8 @@ if ($whenLabel === '') {
                     <h3>Next</h3>
                     <ul>
                     <?php foreach (array_slice($upcoming, 0, 3) as $occ):
-                        $ns = new DateTimeImmutable((string) $occ['occurrence_start']);
-                        $ne = !empty($occ['occurrence_end']) ? new DateTimeImmutable((string) $occ['occurrence_end']) : null;
+                        $ns = new DateTimeImmutable((string) $occ['starts_at']);
+                        $ne = !empty($occ['ends_at']) ? new DateTimeImmutable((string) $occ['ends_at']) : null;
                     ?>
                         <li><span class="sched-day"><?= $ns->format('D, j M') ?></span>
                             <span class="sched-time"><?= $ns->format('H:i') ?><?= $ne && $ne > $ns ? ' – ' . $ne->format('H:i') : '' ?></span></li>
@@ -760,10 +760,10 @@ if ($whenLabel === '') {
             <?php
                 $now = new DateTimeImmutable();
                 $upcoming = array_filter($occurrences, static function (array $o) use ($now): bool {
-                    if (empty($o['occurrence_start'])) return false;
-                    return new DateTimeImmutable((string) $o['occurrence_start']) >= $now;
+                    if (empty($o['starts_at'])) return false;
+                    return new DateTimeImmutable((string) $o['starts_at']) >= $now;
                 });
-                usort($upcoming, static fn (array $a, array $b): int => $a['occurrence_start'] <=> $b['occurrence_start']);
+                usort($upcoming, static fn (array $a, array $b): int => $a['starts_at'] <=> $b['starts_at']);
                 $upcoming = array_slice($upcoming, 0, 5);
             ?>
             <section class="panel" aria-label="Upcoming occurrences">
@@ -772,7 +772,7 @@ if ($whenLabel === '') {
                     <div class="empty-occ">No upcoming occurrences.</div>
                 <?php else: ?>
                 <?php foreach ($upcoming as $occ): ?>
-                <?php $dt = new DateTimeImmutable((string) $occ['occurrence_start']); ?>
+                <?php $dt = new DateTimeImmutable((string) $occ['starts_at']); ?>
                 <div class="upcoming-row">
                     <div class="date-chip">
                         <small><?= htmlspecialchars($dt->format('M'), ENT_QUOTES, 'UTF-8') ?></small>

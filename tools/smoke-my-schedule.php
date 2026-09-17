@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Proves the path:
  *   PortalAuthAdapter (mdb)        →  AuthService.login          → AuthSession
  *   PortalAuthAdapter (mdb)        →  AuthService.resolveActor   → ActorContext (with personId)
- *   ChurchCrmScheduleAdapter (cc)  ←  ScheduleService.getMySchedule
+ *   SqlScheduleAdapter (cc)  ←  ScheduleService.getMySchedule
  *
  * Usage:
  *   PORTAL_DB_USERNAME=...    PORTAL_DB_PASSWORD=...    \

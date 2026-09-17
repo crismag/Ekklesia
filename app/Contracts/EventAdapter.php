@@ -8,7 +8,7 @@ use DateTimeImmutable;
 
 interface EventAdapter
 {
-    /** @return array<int, array{event_id:int,event_title:string,event_desc:?string,occurrence_count:int,next_occurrence_at:?string}> */
+    /** @return array<int, array{event_id:int,title:string,summary:?string,occurrence_count:int,next_occurrence_at:?string}> */
     /**
      * @param list<string> $audiences audiences the actor may read; see
      *                                App\Core\EventAudience::allowedFor().
@@ -24,14 +24,14 @@ interface EventAdapter
      * Null for an event the actor may not read, identically to one that does
      * not exist — a different response would be an enumeration oracle.
      *
-     * @return array{event_id:int,event_title:string,event_desc:?string,occurrences:array}|null
+     * @return array{event_id:int,title:string,summary:?string,occurrences:array}|null
      */
     public function findEvent(int $eventId, DateTimeImmutable $start, DateTimeImmutable $end, array $audiences = []): ?array;
 
     public function createEvent(array $cmd, DateTimeImmutable $now): int;
     public function updateEvent(int $eventId, array $cmd, DateTimeImmutable $now): bool;
 
-    /** @param array<int,array{event_id:int,occurrence_start:string,occurrence_end:string}> $rows */
+    /** @param array<int,array{event_id:int,starts_at:string,ends_at:string}> $rows */
     public function insertOccurrences(int $eventId, array $rows): array;
 
     /**
@@ -57,7 +57,7 @@ interface EventAdapter
      * "This Sunday we meet at the park" is a normal thing for a church to say
      * about one week of a service that otherwise runs unchanged. Both columns
      * have existed since the schema was created and the calendar has always
-     * read override_title; nothing could ever set it, so the only way to say it
+     * read title_override; nothing could ever set it, so the only way to say it
      * was to break the date out of its series.
      *
      * Null on either clears it, and the occurrence inherits from its event
@@ -71,11 +71,11 @@ interface EventAdapter
      * answer it many times over: a service can be Christmas and family and
      * music at once.
      *
-     * @return list<array{tag_id:int,slug:string,label:string,usage_count:int}>
+     * @return list<array{slug:string,label:string,usage_count:int}>
      */
     public function listTags(): array;
 
-    /** @return list<array{tag_id:int,slug:string,label:string}> */
+    /** @return list<array{slug:string,label:string}> */
     public function tagsForEvent(int $eventId): array;
 
     /**
@@ -83,7 +83,7 @@ interface EventAdapter
      * and dropping any tag left carried by nothing.
      *
      * @param list<array{slug:string,label:string}> $tags
-     * @return list<array{tag_id:int,slug:string,label:string}>
+     * @return list<array{slug:string,label:string}>
      */
     public function setEventTags(int $eventId, array $tags): array;
 
@@ -108,7 +108,7 @@ interface EventAdapter
      * window findEvent() happens to have been asked for: a service entered at
      * the wrong time is wrong in every week it was generated into.
      *
-     * @return list<array{occurrence_id:int,occurrence_start:string,occurrence_end:string}>
+     * @return list<array{occurrence_id:int,starts_at:string,ends_at:string}>
      */
     public function listEventOccurrences(int $eventId): array;
 
@@ -137,7 +137,7 @@ interface EventAdapter
      * leaves some occurrences on the corrected time and some on the wrong one,
      * which is harder to notice than a series that is uniformly wrong.
      *
-     * @param list<array{occurrence_id:int,occurrence_start:string,occurrence_end:string}> $rows
+     * @param list<array{occurrence_id:int,starts_at:string,ends_at:string}> $rows
      * @return int rows updated
      */
     public function updateOccurrenceTimesBatch(int $eventId, array $rows): int;

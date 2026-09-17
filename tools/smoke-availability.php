@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Path:
  *   PortalAuthAdapter (mdb)      →  AuthService.login          → AuthSession
  *   PortalAuthAdapter (mdb)      →  AuthService.resolveActor   → ActorContext
- *   PortalAvailabilityAdapter    ←  AvailabilityService.create / list / delete
+ *   SqlAvailabilityAdapter    ←  AvailabilityService.create / list / delete
  *
  * Usage:
  *   php tools/smoke-availability.php <email> <password>

@@ -26,12 +26,12 @@ interface ScheduleRepository
      * Events a scheduler may pick for a window: anything with an occurrence in
      * range, on this campus.
      *
-     * Deliberately not filtered by assignment_scheduling_enabled. That flag
+     * Deliberately not filtered by uses_serving_schedule. That flag
      * chooses which event a campus *opens* with; it was never meant to decide
      * what a scheduler is allowed to look for. Filtering the picker by it meant
      * the only thing offered was the thing already selected.
      *
-     * Only rows in events_event reach this. Birthdays and holidays are not
+     * Only rows in events reach this. Birthdays and holidays are not
      * events — they arrive on the calendar from person records and the holiday
      * cache — so they cannot appear here.
      *
@@ -48,7 +48,7 @@ interface ScheduleRepository
      * @param list<int> $campusIds
      * @return list<int>
      */
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array;
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array;
 
     public function fetchScheduleBoard(DateTimeImmutable $start, DateTimeImmutable $end, array $campusIds = [], array $ministryIds = []): array;
 

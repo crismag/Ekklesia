@@ -101,22 +101,22 @@ ok(!cal.includes('allowed.includes(item.source)'), 'calendar no longer whitelist
 ok(cal.includes('/api/calendar/layers'), 'calendar fetches its chips from the server');
 ok(read('resources/views/calendar-settings.php').includes('church_portal_calendar_sources_v2'),
    'calendar settings shares the v2 key with the calendar');
-ok(read('app/Adapters/ChurchCRM/ChurchCrmCalendarAdapter.php').includes("'events:' . $slug"),
+ok(read('app/Adapters/Sql/SqlCalendarAdapter.php').includes("'events:' . $slug"),
    'calendar items namespace their source per event type');
-// The picker and the INSERT are what made the type column real; a regression in
-// either silently returns every new event to the dangling event_type = 0 state.
+// The picker and the INSERT are what make the type column real; a regression in
+// either silently returns every new event to a dangling event_type_id.
 ok(read('app/DTO/Events/EventCreateCommand.php').includes('eventTypeId'), 'create command carries the event type');
-ok(read('app/Adapters/ChurchCRM/ChurchCrmEventAdapter.php').includes(':event_type'),
-   'the events INSERT/UPDATE writes event_type');
+ok(read('app/Adapters/Sql/SqlEventAdapter.php').includes(':event_type_id'),
+   'the events INSERT/UPDATE writes event_type_id');
 const evEditor = read('resources/views/_event-editor.php');
 ok(evEditor.includes('id="eeType"'), 'the editor offers a type');
 
 const audience = read('app/Core/EventAudience.php');
 ok(audience.includes("case Leaders = 'leaders'"), 'EventAudience leaders case matches the seeded value');
 ok(audience.includes('?? self::Members'), 'EventAudience falls back to members, never leaders');
-for (const f of ['app/Adapters/ChurchCRM/ChurchCrmEventAdapter.php', 'app/Adapters/ChurchCRM/ChurchCrmCalendarAdapter.php']) {
+for (const f of ['app/Adapters/Sql/SqlEventAdapter.php', 'app/Adapters/Sql/SqlCalendarAdapter.php']) {
   const src = read(f);
-  ok(src.includes('portal_audience'), `${f} filters on portal_audience`);
+  ok(src.includes('et.audience'), `${f} filters on event_types.audience`);
   ok(src.includes('LEFT JOIN event_types'), `${f} LEFT JOINs event_types so dangling ids stay visible`);
 }
 ok(perms.includes('ViewOwnAssignments'), 'ViewOwnAssignments exists');
@@ -227,12 +227,12 @@ console.log('Events');
 const evList = read('resources/views/events-list.php');
 const evNew = read('resources/views/events-new.php');
 const evCmd = read('app/DTO/Events/EventCreateCommand.php');
-const evAdapter = read('app/Adapters/ChurchCRM/ChurchCrmEventAdapter.php');
+const evAdapter = read('app/Adapters/Sql/SqlEventAdapter.php');
 const evService = read('app/Services/EventService.php');
 const evRoutes = read('routes/web.php');
 
 // Creation used prompt('Event title') and posted a bare title to an endpoint
-// that could not succeed, because events_event.event_start is NOT NULL.
+// that could not succeed, because an event's start is NOT NULL.
 ok(!evList.includes("prompt('Event title')"), 'events list does not create events through a prompt()');
 ok(evList.includes('/events/new'), 'events list links to a real create form');
 ok(evRoutes.includes("'GET /events/new'"), 'a create-event route exists');
@@ -254,8 +254,8 @@ ok(read('resources/views/calendar.php').includes("/events/new?"),
 
 // The create path must carry a date, or every save fails on the NOT NULL column.
 ok(evCmd.includes('$startDate'), 'create command carries a start date');
-ok(!evAdapter.includes('VALUES (:title, :desc, NULL, NULL'), 'adapter no longer inserts NULL into event_start');
-ok(evAdapter.includes(':start') && evAdapter.includes(':end'), 'adapter binds a real start and end');
+ok(!evAdapter.includes('VALUES (:title, :summary, NULL'), 'adapter never inserts NULL into starts_on');
+ok(evAdapter.includes(':starts_on') && evAdapter.includes(':end_time'), 'adapter binds a real start and end');
 
 // Scheduling shapes a church calendar actually needs. The editor renders its
 // repeat options from RecurrenceRule::PRESETS, so that is where they live.
@@ -268,13 +268,13 @@ ok(evEditor.includes('RecurrenceRule::PRESETS'),
 // A preset the column cannot store must not be offered: it would silently do
 // something other than what it says.
 ok(!/First |Second |Third |Last /.test(evRule.slice(evRule.indexOf('PRESETS'), evRule.indexOf('STEPPED'))),
-   'no week-of-month preset is offered while recurrence_type cannot express one');
+   'no week-of-month preset is offered in the fixed-step presets');
 ok(evService.includes("'selected'"), 'service resolves an explicit list of selected dates');
 ok(evService.includes('resolveScheduleDates'), 'service turns the schedule choice into concrete dates');
 ok(evService.includes('insertOccurrences'), 'creating an event also creates its occurrences for the calendar');
 
 // Campus is not location, and the topbar campus context must reach the list.
-ok(evAdapter.includes('custom_location_name'), 'adapter persists a location distinct from campus');
+ok(evAdapter.includes(':location_name'), 'adapter persists a location distinct from campus');
 ok(evAdapter.includes('$hostCampusId'), 'adapter records which campus hosts the event');
 ok(evRoutes.includes('portal_campus_id'), 'events list honours the topbar campus cookie');
 

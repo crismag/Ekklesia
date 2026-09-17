@@ -7,7 +7,7 @@ namespace App\Core;
 /**
  * Who an event type is for.
  *
- * Stored on event_types.portal_audience (migration 009) and compared in SQL on
+ * Stored on event_types.audience and compared in SQL on
  * every event read path, so these string values are a data contract — renaming
  * a case without a migration would silently widen or narrow who sees what.
  *
@@ -60,9 +60,9 @@ enum EventAudience: string
     /**
      * The audience an event type row resolves to.
      *
-     * A type row can be missing entirely (events_event.event_type has carried
-     * dangling ids, and ChurchCRM's own EditEventTypes.php can delete a row the
-     * portal created), so the fallback matters: it is Members, never Leaders.
+     * A type row can be missing entirely (an event read through a LEFT JOIN
+     * whose type row is gone), so the fallback matters: it is Members, never
+     * Leaders.
      * An unclassified event is visible to signed-in users and hidden from
      * anonymous ones; it can never become restricted by accident.
      */

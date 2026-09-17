@@ -6,7 +6,7 @@ namespace App\DTO\Events;
 
 final readonly class EventDetailView
 {
-    /** @param array<int, array{occurrence_id:int, occurrence_start:string, occurrence_end:string}> $occurrences */
+    /** @param array<int, array{occurrence_id:int, starts_at:string, ends_at:string}> $occurrences */
     public function __construct(
         public int $eventId,
         public string $title,
@@ -22,7 +22,7 @@ final readonly class EventDetailView
         public ?int $eventTypeId = null,
         public ?string $eventTypeLabel = null,
         public ?string $eventTypeColor = null,
-        public bool $assignmentSchedulingEnabled = false,
+        public bool $usesServingSchedule = false,
     ) {}
 
     public function toArray(): array
@@ -40,8 +40,8 @@ final readonly class EventDetailView
             'event_type_id' => $this->eventTypeId,
             'event_type_label' => $this->eventTypeLabel,
             'event_type_color' => $this->eventTypeColor,
-            'assignment_scheduling_enabled' => $this->assignmentSchedulingEnabled,
-            'assignmentSchedulingEnabled' => $this->assignmentSchedulingEnabled,
+            'uses_serving_schedule' => $this->usesServingSchedule,
+            'usesServingSchedule' => $this->usesServingSchedule,
         ];
     }
 }

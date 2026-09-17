@@ -110,8 +110,8 @@ final class FakeEventRepository implements EventRepository
 
         return [
             'event_id' => $eventId,
-            'event_title' => 'x',
-            'event_desc' => null,
+            'title' => 'x',
+            'summary' => null,
             'occurrences' => [],
             'campus_ids' => [],
             'available_campuses' => [],
@@ -172,12 +172,12 @@ final class FakeEventRepository implements EventRepository
     public function listTags(): array
     {
         return array_map(static fn (array $t): array =>
-            $t + ['tag_id' => 1, 'usage_count' => 1], $this->tags);
+            $t + ['usage_count' => 1], $this->tags);
     }
 
     public function tagsForEvent(int $eventId): array
     {
-        return array_map(static fn (array $t): array => $t + ['tag_id' => 1], $this->tags);
+        return array_map(static fn (array $t): array => $t, $this->tags);
     }
 
     public function setEventTags(int $eventId, array $tags): array
@@ -221,7 +221,7 @@ final class FakeEventRepository implements EventRepository
      * A small in-memory series, so the retime and bulk-delete tests can assert
      * on what actually moved rather than on the fact a call was made.
      *
-     * @var list<array{occurrence_id:int,occurrence_start:string,occurrence_end:string}>
+     * @var list<array{occurrence_id:int,starts_at:string,ends_at:string}>
      */
     public array $series = [];
 
@@ -237,8 +237,8 @@ final class FakeEventRepository implements EventRepository
     {
         foreach ($this->series as $i => $row) {
             if ($row['occurrence_id'] === $occurrenceId) {
-                $this->series[$i]['occurrence_start'] = $start;
-                $this->series[$i]['occurrence_end'] = $end;
+                $this->series[$i]['starts_at'] = $start;
+                $this->series[$i]['ends_at'] = $end;
 
                 return true;
             }
@@ -268,7 +268,7 @@ final class FakeEventRepository implements EventRepository
     {
         $n = 0;
         foreach ($rows as $r) {
-            $n += $this->updateOccurrenceTimes($r['occurrence_id'], $r['occurrence_start'], $r['occurrence_end']) ? 1 : 0;
+            $n += $this->updateOccurrenceTimes($r['occurrence_id'], $r['starts_at'], $r['ends_at']) ? 1 : 0;
         }
 
         return $n;
@@ -355,15 +355,15 @@ final class FakeEventTypeRepository implements \App\Contracts\EventTypeRepositor
 {
     /** @var list<array<string,mixed>> */
     public array $rows = [
-        ['type_id' => 1, 'type_name' => 'General', 'type_active' => true, 'portal_slug' => 'general',
-         'portal_label' => 'General', 'portal_audience' => 'members', 'portal_color' => '#2c6ea5',
-         'portal_sort' => 10, 'portal_is_default' => true, 'usage_count' => 4],
-        ['type_id' => 3, 'type_name' => 'Ministry event', 'type_active' => true, 'portal_slug' => 'ministry',
-         'portal_label' => 'Ministry events', 'portal_audience' => 'leaders', 'portal_color' => '#117b6d',
-         'portal_sort' => 20, 'portal_is_default' => false, 'usage_count' => 0],
-        ['type_id' => 4, 'type_name' => 'Leadership', 'type_active' => true, 'portal_slug' => 'leadership',
-         'portal_label' => 'Leadership', 'portal_audience' => 'leaders', 'portal_color' => '#7b2445',
-         'portal_sort' => 30, 'portal_is_default' => false, 'usage_count' => 2],
+        ['id' => 1, 'name' => 'General', 'is_active' => true, 'slug' => 'general',
+         'audience' => 'members', 'color' => '#2c6ea5',
+         'sort_order' => 10, 'is_default' => true, 'usage_count' => 4],
+        ['id' => 3, 'name' => 'Ministry events', 'is_active' => true, 'slug' => 'ministry',
+         'audience' => 'leaders', 'color' => '#117b6d',
+         'sort_order' => 20, 'is_default' => false, 'usage_count' => 0],
+        ['id' => 4, 'name' => 'Leadership', 'is_active' => true, 'slug' => 'leadership',
+         'audience' => 'leaders', 'color' => '#7b2445',
+         'sort_order' => 30, 'is_default' => false, 'usage_count' => 2],
     ];
     public bool $deleted = false;
     public bool $inserted = false;
@@ -371,7 +371,7 @@ final class FakeEventTypeRepository implements \App\Contracts\EventTypeRepositor
     public function listAll(): array { return $this->rows; }
     public function find(int $typeId): ?array
     {
-        foreach ($this->rows as $r) { if ((int) $r['type_id'] === $typeId) { return $r; } }
+        foreach ($this->rows as $r) { if ((int) $r['id'] === $typeId) { return $r; } }
         return null;
     }
     public function insert(array $data): int { $this->inserted = true; return 99; }
@@ -381,7 +381,7 @@ final class FakeEventTypeRepository implements \App\Contracts\EventTypeRepositor
     public function slugExists(string $slug, ?int $exceptTypeId = null): bool
     {
         foreach ($this->rows as $r) {
-            if ($r['portal_slug'] === $slug && (int) $r['type_id'] !== $exceptTypeId) { return true; }
+            if ($r['slug'] === $slug && (int) $r['id'] !== $exceptTypeId) { return true; }
         }
         return false;
     }
@@ -415,7 +415,7 @@ final class FakeScheduleRepository implements ScheduleRepository
         return [];
     }
 
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array
     {
         return [];
     }
@@ -519,7 +519,7 @@ echo "Ministry name resolves onto event rows (migration 008 linkage)\n";
 $mrepo = new FakeMinistryNamesRepository();
 $erepo = new FakeEventRepository();
 $erepo->upcomingRows = [[
-    'event_id' => 1, 'event_title' => 'Practice', 'event_desc' => null,
+    'event_id' => 1, 'title' => 'Practice', 'summary' => null,
     'occurrence_count' => 1, 'next_occurrence_at' => '2026-09-01 09:00:00',
     'next_occurrence_end' => null, 'campus_names' => null, 'host_campus_name' => null,
     'location_name' => null, 'ministry_id' => 7,
@@ -623,7 +623,7 @@ echo "Leader-audience events are invisible to members\n";
 $leaderRepo = new FakeEventRepository();
 $leaderRepo->audience = 'leaders';
 $leaderRepo->upcomingRows = [[
-    'event_id' => 9, 'event_title' => 'Elders meeting', 'event_desc' => null,
+    'event_id' => 9, 'title' => 'Elders meeting', 'summary' => null,
     'occurrence_count' => 1, 'next_occurrence_at' => '2026-09-02 19:00:00',
     'next_occurrence_end' => null, 'campus_names' => null, 'host_campus_name' => null,
     'location_name' => null, 'ministry_id' => null,
@@ -712,7 +712,7 @@ $nthAdmin = new ActorContext(
 );
 $datesOf = static function (FakeEventRepository $repo): array {
     return array_map(
-        static fn (array $r): string => substr((string) $r['occurrence_start'], 0, 10),
+        static fn (array $r): string => substr((string) $r['starts_at'], 0, 10),
         $repo->lastOccurrenceRows,
     );
 };
@@ -724,7 +724,7 @@ $nthEvents->createEvent($nthAdmin, new EventCreateCommand(
 ));
 assert_true($datesOf($nthRepo) === ['2026-09-06', '2026-10-04', '2026-11-01', '2026-12-06', '2027-01-03'],
     'first Sunday of each month, and the date moves: ' . json_encode($datesOf($nthRepo)));
-assert_true(($nthRepo->recurrence['recurrence_week_of_month'] ?? null) === 1,
+assert_true(($nthRepo->recurrence['repeat_week_of_month'] ?? null) === 1,
     'and the rule records which Sunday');
 
 // The last of a weekday is not the fourth. November 2026 has five Sundays.
@@ -824,7 +824,7 @@ echo "One date of a series saying something of its own (EventService)\n";
 // "This Sunday we meet at the park" is a normal thing for a church to say about
 // one week of a service that otherwise runs unchanged. Both columns have
 // existed since the schema was created and the calendar has always read
-// override_title — nothing could ever set it, so the only way to say it was to
+// title_override — nothing could ever set it, so the only way to say it was to
 // break the date out of its series.
 $ovRepo = new FakeEventRepository();
 $ovEvents = new EventService($ovRepo);
@@ -933,8 +933,8 @@ $seedMixed = static function (FakeEventRepository $repo): void {
         $d = (new DateTimeImmutable('today'))->modify($offset . ' days')->setTime(7, 30);
         $repo->series[] = [
             'occurrence_id' => $id++,
-            'occurrence_start' => $d->format('Y-m-d H:i:s'),
-            'occurrence_end' => $d->modify('+90 minutes')->format('Y-m-d H:i:s'),
+            'starts_at' => $d->format('Y-m-d H:i:s'),
+            'ends_at' => $d->modify('+90 minutes')->format('Y-m-d H:i:s'),
         ];
     }
     $repo->lastOccurrenceRows = [];
@@ -949,11 +949,11 @@ $res = $schEvents->replaceSchedule($schAdmin, 1, new EventCreateCommand(
 assert_true($res['removed'] === 3, 'the three upcoming dates are replaced (removed ' . $res['removed'] . ')');
 assert_true(count($schRepo->series) === 3, 'and the three past dates survive');
 foreach ($schRepo->series as $row) {
-    assert_true(str_contains($row['occurrence_start'], '07:30:00'),
+    assert_true(str_contains($row['starts_at'], '07:30:00'),
         'a past date keeps its original time — history is not rewritten');
 }
 assert_true($res['created'] === 4, 'the new rule produced its dates (created ' . $res['created'] . ')');
-assert_true(($schRepo->recurrence['recurrence_type'] ?? '') === 'biweekly',
+assert_true(($schRepo->recurrence['repeat_frequency'] ?? '') === 'biweekly',
     'and the stored rule is the new one, not the old one');
 
 // A rule whose dates are all in the past would wipe the future and add nothing.
@@ -1002,12 +1002,12 @@ echo "This and following, without touching what came before (EventService)\n";
 $folRepo = new FakeEventRepository();
 $folEvents = new EventService($folRepo);
 $seedMixed($folRepo);
-$pivot = $folRepo->series[3]['occurrence_start'];   // the first upcoming date
+$pivot = $folRepo->series[3]['starts_at'];   // the first upcoming date
 $moved = $folEvents->retimeEventOccurrences($folAdmin ?? $schAdmin, 1, '19:00', null, 'following', $pivot);
 assert_true($moved === 3, 'the pivot and everything after it moves (moved ' . $moved . ')');
-assert_true(str_contains($folRepo->series[2]['occurrence_start'], '07:30:00'),
+assert_true(str_contains($folRepo->series[2]['starts_at'], '07:30:00'),
     'the date before the pivot is left alone');
-assert_true(str_contains($folRepo->series[3]['occurrence_start'], '19:00:00'), 'the pivot itself moves');
+assert_true(str_contains($folRepo->series[3]['starts_at'], '19:00:00'), 'the pivot itself moves');
 assert_throws(
     ValidationFailed::class,
     static fn () => $folEvents->retimeEventOccurrences($schAdmin, 1, '19:00', null, 'following', null),
@@ -1082,10 +1082,10 @@ $schedEvents->createEvent($schedAdmin, new EventCreateCommand(
     pattern: 'weekly', untilOn: '2026-10-11',
 ));
 assert_true($schedRepo->recurrence !== null, 'a repeating event stores its rule');
-assert_true(($schedRepo->recurrence['recurrence_type'] ?? '') === 'weekly', 'and the rule says weekly');
-assert_true(($schedRepo->recurrence['recurrence_days_of_week'] ?? '') === 'SU',
+assert_true(($schedRepo->recurrence['repeat_frequency'] ?? '') === 'weekly', 'and the rule says weekly');
+assert_true(($schedRepo->recurrence['repeat_weekdays'] ?? '') === 'SU',
     'and which day, taken from the start date');
-assert_true(($schedRepo->recurrence['recurrence_until'] ?? '') === '2026-10-11', 'and when it ends');
+assert_true(($schedRepo->recurrence['repeat_until'] ?? '') === '2026-10-11', 'and when it ends');
 
 $oneOffRepo = new FakeEventRepository();
 $oneOffEvents = new EventService($oneOffRepo);
@@ -1103,8 +1103,8 @@ $monthDetail = $monthEvents->createEvent($schedAdmin, new EventCreateCommand(
     title: 'Leaders meeting', startDate: '2026-01-31', startTime: '19:00',
     pattern: 'monthly', count: 3,
 ));
-assert_true(($monthRepo->recurrence['recurrence_type'] ?? '') === 'monthly', 'monthly stores monthly');
-assert_true($monthRepo->recurrence['recurrence_days_of_week'] === null,
+assert_true(($monthRepo->recurrence['repeat_frequency'] ?? '') === 'monthly', 'monthly stores monthly');
+assert_true($monthRepo->recurrence['repeat_weekdays'] === null,
     'monthly stores no weekday — it repeats on the date');
 
 echo "Repairing a mis-entered series (EventService)\n";
@@ -1127,8 +1127,8 @@ $seedSeries = static function () use ($fixRepo): void {
         $start = $day->setTime(7, 30);
         $fixRepo->series[] = [
             'occurrence_id' => $id,
-            'occurrence_start' => $start->format('Y-m-d H:i:s'),
-            'occurrence_end' => $start->modify('+90 minutes')->format('Y-m-d H:i:s'),
+            'starts_at' => $start->format('Y-m-d H:i:s'),
+            'ends_at' => $start->modify('+90 minutes')->format('Y-m-d H:i:s'),
         ];
     }
 };
@@ -1136,21 +1136,21 @@ $seedSeries = static function () use ($fixRepo): void {
 $seedSeries();
 $moved = $fixEvents->retimeEventOccurrences($fixAdmin, 1, '19:00', null, 'upcoming');
 assert_true($moved === 2, 'retiming upcoming moves only the future occurrences (moved ' . $moved . ')');
-assert_true(str_contains($fixRepo->series[0]['occurrence_start'], '07:30:00'),
+assert_true(str_contains($fixRepo->series[0]['starts_at'], '07:30:00'),
     'a past occurrence is a record of what happened and is left alone');
-assert_true(str_contains($fixRepo->series[1]['occurrence_start'], '19:00:00'),
+assert_true(str_contains($fixRepo->series[1]['starts_at'], '19:00:00'),
     'an upcoming occurrence takes the corrected time');
-assert_true(str_contains($fixRepo->series[1]['occurrence_end'], '20:30:00'),
+assert_true(str_contains($fixRepo->series[1]['ends_at'], '20:30:00'),
     'its length is preserved when no new duration is given');
-$dates = array_map(static fn (array $r): string => substr($r['occurrence_start'], 0, 10), $fixRepo->series);
+$dates = array_map(static fn (array $r): string => substr($r['starts_at'], 0, 10), $fixRepo->series);
 $seedSeries();
 $fixEvents->retimeEventOccurrences($fixAdmin, 1, '19:00', null, 'all');
-assert_true($dates === array_map(static fn (array $r): string => substr($r['occurrence_start'], 0, 10), $fixRepo->series),
+assert_true($dates === array_map(static fn (array $r): string => substr($r['starts_at'], 0, 10), $fixRepo->series),
     'retiming never moves a date — only the time of day was mistyped');
 
 $seedSeries();
 $fixEvents->retimeEventOccurrences($fixAdmin, 1, '19:00', 60, 'all');
-assert_true(str_contains($fixRepo->series[2]['occurrence_end'], '20:00:00'),
+assert_true(str_contains($fixRepo->series[2]['ends_at'], '20:00:00'),
     'a supplied duration resizes the occurrence');
 
 $seedSeries();
@@ -1164,7 +1164,7 @@ assert_throws(
     static fn () => $fixEvents->retimeEventOccurrences($fixAdmin, 1, '19:00', 0, 'all'),
     'a zero-length occurrence is refused',
 );
-assert_true(str_contains($fixRepo->series[1]['occurrence_start'], '07:30:00'),
+assert_true(str_contains($fixRepo->series[1]['starts_at'], '07:30:00'),
     'a refused retime writes nothing');
 
 // An event may hold only one occurrence per start time. Collapsing a series
@@ -1174,15 +1174,15 @@ assert_true(str_contains($fixRepo->series[1]['occurrence_start'], '07:30:00'),
 $seedSeries();
 $fixRepo->series[] = [
     'occurrence_id' => 9,
-    'occurrence_start' => (new DateTimeImmutable('today'))->modify('+7 days')->setTime(19, 0)->format('Y-m-d H:i:s'),
-    'occurrence_end' => (new DateTimeImmutable('today'))->modify('+7 days')->setTime(20, 30)->format('Y-m-d H:i:s'),
+    'starts_at' => (new DateTimeImmutable('today'))->modify('+7 days')->setTime(19, 0)->format('Y-m-d H:i:s'),
+    'ends_at' => (new DateTimeImmutable('today'))->modify('+7 days')->setTime(20, 30)->format('Y-m-d H:i:s'),
 ];
 assert_throws(
     ValidationFailed::class,
     static fn () => $fixEvents->retimeEventOccurrences($fixAdmin, 1, '19:00', null, 'upcoming'),
     'a retime that would put two occurrences on the same start is refused',
 );
-assert_true(str_contains($fixRepo->series[1]['occurrence_start'], '07:30:00'),
+assert_true(str_contains($fixRepo->series[1]['starts_at'], '07:30:00'),
     'the refused retime is all-or-nothing — nothing was moved');
 assert_throws(
     ValidationFailed::class,
@@ -1197,9 +1197,9 @@ $seedSeries();
 $fixEvents->rescheduleOccurrence($fixAdmin, 2, new DateTimeImmutable(
     (new DateTimeImmutable('today'))->modify('+8 days')->format('Y-m-d') . ' 19:00:00'
 ));
-assert_true(str_contains($fixRepo->series[1]['occurrence_start'], '19:00:00'),
+assert_true(str_contains($fixRepo->series[1]['starts_at'], '19:00:00'),
     'one occurrence can be moved to a different day and time');
-assert_true(str_contains($fixRepo->series[1]['occurrence_end'], '20:30:00'),
+assert_true(str_contains($fixRepo->series[1]['ends_at'], '20:30:00'),
     'moving one occurrence keeps the length it already had');
 
 // Bulk delete, and its assignment guard.
@@ -1247,7 +1247,7 @@ assert_throws(
     static fn () => $fixEvents->rescheduleOccurrence($repairScheduler, 2, new DateTimeImmutable('2026-12-01 19:00:00')),
     'a scheduler cannot move an occurrence of an event they may not read',
 );
-assert_true(str_contains($fixRepo->series[1]['occurrence_start'], '07:30:00')
+assert_true(str_contains($fixRepo->series[1]['starts_at'], '07:30:00')
     && count($fixRepo->series) === 3, 'the refused writes changed nothing');
 $fixRepo->audience = 'members';
 
@@ -1274,7 +1274,7 @@ $delAdmin = new ActorContext(
     permissions: PortalPermission::forRole('admin'), ministryScopeIds: [],
     isPortalWideAdmin: true,
 );
-$delRepo->series = [['occurrence_id' => 1, 'occurrence_start' => '2026-09-06 19:00:00', 'occurrence_end' => '2026-09-06 20:30:00']];
+$delRepo->series = [['occurrence_id' => 1, 'starts_at' => '2026-09-06 19:00:00', 'ends_at' => '2026-09-06 20:30:00']];
 $delRepo->batchAssignments = 3;
 assert_throws(
     ValidationFailed::class,
@@ -1736,8 +1736,8 @@ $publicRepo = new FakeEventRepository();
 $publicRepo->audience = 'public';
 $publicRepo->upcomingRows = [[
     'event_id' => 3,
-    'event_title' => 'Open house',
-    'event_desc' => null,
+    'title' => 'Open house',
+    'summary' => null,
     'occurrence_count' => 1,
     'next_occurrence_at' => null,
 ]];

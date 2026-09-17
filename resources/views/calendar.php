@@ -16,8 +16,8 @@ $canManageCalendarSettings = $actor !== null && (
 $campusSelector = is_array($campusSelector ?? null) ? $campusSelector : ['campuses' => [], 'defaultCampusId' => null];
 $campuses = is_array($campusSelector['campuses'] ?? null) ? $campusSelector['campuses'] : [];
 $ministries = is_array($availableMinistries ?? null) ? $availableMinistries : [];
-// On the calendar page we want a multi-campus default — same posture as the
-// ChurchCRM v2 calendar, which surfaces every event regardless of campus.
+// On the calendar page we want a multi-campus default, which surfaces every
+// event regardless of campus.
 // "All campuses" is selected unless the URL pins a specific campus_id.
 $rawCampusFilter = $_GET['current_campus_id'] ?? null;
 $pinnedCampusId = (is_string($rawCampusFilter) && $rawCampusFilter !== '' && ctype_digit($rawCampusFilter))
@@ -439,7 +439,7 @@ require_once __DIR__ . '/_portal-shell.php';
                 <div class="side" id="calSide">
                     <div class="panel-head cal-side-head"><h2>Sources</h2><a href="<?= $base ?>/events">Events</a></div>
                     <div class="source-list" id="sourceList"></div>
-                    <div class="note">Birthdays and anniversaries now come from the ChurchCRM people and family tables. Custom calendars are still stored in the browser until a shared settings backend is added.</div>
+                    <div class="note">Birthdays and anniversaries now come from the people and household records. Custom calendars are still stored in the browser until a shared settings backend is added.</div>
                 </div>
             </div>
         </aside>
@@ -627,7 +627,7 @@ async function json(url){const res = await fetch(url, { credentials:'same-origin
 
 // loadEvents: intentionally omitted. Event occurrences are now sourced from
 // /api/calendar/sources (see loadSystemCalendar below) which expands every
-// event_occurrence row in the window — including recurring series, with
+// event_occurrences row in the window — including recurring series, with
 // per-occurrence cancellations and title overrides honored. The previous
 // /api/events?limit=120 path returned only one date per event (next_occurrence_at)
 // which silently dropped the rest of any recurring series.

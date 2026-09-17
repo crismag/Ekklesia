@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Adapters\ChurchCRM;
+namespace App\Adapters\Sql;
 
 use App\Contracts\CalendarAdapter;
 use DateTimeImmutable;
 use PDO;
 
-final class ChurchCrmCalendarAdapter implements CalendarAdapter
+final class SqlCalendarAdapter implements CalendarAdapter
 {
     public function __construct(
         private readonly ?PDO $connection = null,
@@ -39,7 +39,7 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
         $end = $end->setTime(0, 0, 0)->modify('+1 day');
 
         // Only events carry an audience. Birthdays and anniversaries come from
-        // person_per and family_fam, are already governed by campus scope, and
+        // people and households, are already governed by campus scope, and
         // have no type to classify.
         $items = array_merge(
             $this->eventOccurrenceItems($start, $end, $campusId, $audiences),
@@ -55,60 +55,56 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
     }
 
     /**
-     * Reads every event_occurrence row in the window, joining to events_event
-     * for the title/url and to event_recurrence for the "this is a recurring
-     * series" badge. Honors per-occurrence overrides:
-     *   - is_cancelled rows are shown, marked cancelled. Hiding them was the
+     * Reads every event_occurrences row in the window, joining to events for
+     * the title/url and the "this is a recurring series" badge. Honors
+     * per-occurrence overrides:
+     *   - cancelled rows are shown, marked cancelled. Hiding them was the
      *     old behaviour and it erased the announcement: a Sunday with no
      *     service is not the same as a Sunday that was never scheduled, and
      *     somebody turns up to find out which. Nothing was ever cancelled
      *     under the old code, so this surfaces no history — it makes the
      *     cancel action mean something.
-     *   - override_title and override_desc take precedence over the parent's,
-     *     so one week of a series can say something the rest does not.
-     *   - is_modified surfaces a small "edited" hint in meta.
-     *
-     * Mirrors the FullCalendar feed in api/routes/calendar/calendar.php so
-     * the portal calendar shows the same data as the ChurchCRM v2 calendar.
+     *   - title_override and details_override take precedence over the
+     *     parent's, so one week of a series can say something the rest does not.
+     *   - a modified date (moved, or overridden) surfaces a small "edited"
+     *     hint in meta.
      *
      * @return list<array{kind:string,source:string,source_label:string,title:string,meta:?string,href:?string,date:string}>
      */
     private function eventOccurrenceItems(DateTimeImmutable $start, DateTimeImmutable $end, ?int $campusId, array $audiences = []): array
     {
         // Window comparison: include occurrences whose start falls in the
-        // window. We compare against eo.occurrence_start (datetime) using
+        // window. We compare against eo.starts_at (datetime) using
         // 'Y-m-d H:i:s'; the window endpoints are normalized to whole days
-        // by the caller, so this matches the v2/calendar feed semantics.
-        $sql = 'SELECT e.event_id,
-                       e.event_title,
-                       e.event_desc,
-                       e.inactive,
-                       eo.occurrence_id,
-                       eo.occurrence_start,
-                       eo.occurrence_end,
-                       eo.override_title,
-                       eo.override_desc,
-                       eo.is_modified,
-                       eo.is_cancelled,
-                       r.recurrence_type,
-                       e.event_type AS event_type_id,
-                       et.portal_slug AS type_slug,
-                       et.portal_label AS type_label,
-                       et.portal_color AS type_color
-                  FROM event_occurrence eo
-            INNER JOIN events_event e ON e.event_id = eo.event_id
-             LEFT JOIN event_recurrence r ON r.event_id = e.event_id
-             LEFT JOIN event_types et ON et.type_id = e.event_type
-                 WHERE e.inactive = 0
-                   AND eo.occurrence_start >= :start_at
-                   AND eo.occurrence_start <  :end_at';
+        // by the caller.
+        $sql = 'SELECT e.id AS event_id,
+                       e.title,
+                       e.summary,
+                       eo.id AS occurrence_id,
+                       eo.starts_at,
+                       eo.ends_at,
+                       eo.original_starts_at,
+                       eo.title_override,
+                       eo.details_override,
+                       eo.status,
+                       e.repeat_frequency,
+                       e.event_type_id,
+                       et.slug AS type_slug,
+                       et.name AS type_label,
+                       et.color AS type_color
+                  FROM event_occurrences eo
+            INNER JOIN events e ON e.id = eo.event_id
+             LEFT JOIN event_types et ON et.id = e.event_type_id
+                 WHERE e.is_active = 1
+                   AND eo.starts_at >= :start_at
+                   AND eo.starts_at <  :end_at';
 
         $params = [
             ':start_at' => $start->format('Y-m-d H:i:s'),
             ':end_at'   => $end->format('Y-m-d H:i:s'),
         ];
 
-        // Same predicate as ChurchCrmEventAdapter: the calendar is just another
+        // Same predicate as SqlEventAdapter: the calendar is just another
         // read path, and a leader-only event must not leak through it. The
         // fallback is 'members', never 'leaders' — see the event adapter for why.
         $audienceValues = array_values(array_unique(array_filter($audiences, 'is_string')));
@@ -121,26 +117,26 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
             $audienceKeys[] = $key;
             $params[$key] = $value;
         }
-        $sql .= ' AND COALESCE(NULLIF(et.portal_audience, ""), "members") IN (' . implode(', ', $audienceKeys) . ')';
+        $sql .= ' AND COALESCE(NULLIF(et.audience, ""), "members") IN (' . implode(', ', $audienceKeys) . ')';
 
         if ($campusId !== null) {
             // Multi-campus: include events explicitly pinned to this campus
             // OR events with no campus association (treated as church-wide).
             $sql .= ' AND (
                         EXISTS (
-                            SELECT 1 FROM events_event_campus eec
-                             WHERE eec.event_id = e.event_id
+                            SELECT 1 FROM event_campuses eec
+                             WHERE eec.event_id = e.id
                                AND eec.campus_id = :campus_id
                         )
                         OR NOT EXISTS (
-                            SELECT 1 FROM events_event_campus eec2
-                             WHERE eec2.event_id = e.event_id
+                            SELECT 1 FROM event_campuses eec2
+                             WHERE eec2.event_id = e.id
                         )
                       )';
             $params[':campus_id'] = $campusId;
         }
 
-        $sql .= ' ORDER BY eo.occurrence_start ASC, e.event_title ASC';
+        $sql .= ' ORDER BY eo.starts_at ASC, e.title ASC';
 
         $stmt = $this->connection->prepare($sql);
         foreach ($params as $key => $value) {
@@ -151,17 +147,21 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
 
         $items = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-            $start = (string) $row['occurrence_start'];
-            $title = !empty($row['override_title'])
-                ? (string) $row['override_title']
-                : (string) $row['event_title'];
+            $start = (string) $row['starts_at'];
+            $title = !empty($row['title_override'])
+                ? (string) $row['title_override']
+                : (string) $row['title'];
 
-            $cancelled = (int) ($row['is_cancelled'] ?? 0) === 1;
+            $cancelled = (string) ($row['status'] ?? 'scheduled') === 'cancelled';
+            // Modified is derived: the date was moved, or says something of its own.
+            $modified = $start !== (string) $row['original_starts_at']
+                || ($row['title_override'] ?? '') !== ''
+                || ($row['details_override'] ?? '') !== '';
             $meta = $this->formatOccurrenceMeta(
                 $start,
-                (string) $row['occurrence_end'],
-                $row['recurrence_type'] !== null ? (string) $row['recurrence_type'] : null,
-                (int) $row['is_modified'] === 1
+                (string) $row['ends_at'],
+                $row['repeat_frequency'] !== null ? (string) $row['repeat_frequency'] : null,
+                $modified
             );
             if ($cancelled) {
                 // In the text, not only in the styling: a strike-through alone
@@ -172,7 +172,7 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
 
             // One layer per event type. The events: prefix is what keeps a type
             // slug of "birthdays" from silently merging with the birthdays
-            // layer that already exists. A type the portal has not claimed has
+            // layer that already exists. An event whose type row is missing has
             // no slug, so it lands in general rather than an unnamed bucket.
             $slug = ($row['type_slug'] ?? null) !== null ? (string) $row['type_slug'] : 'general';
 
@@ -189,16 +189,16 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
                 'meta'         => $meta,
                 'cancelled'    => $cancelled,
                 // What this date says, which may not be what its series says.
-                'description'  => (string) (($row['override_desc'] ?? '') !== ''
-                    ? $row['override_desc']
-                    : ($row['event_desc'] ?? '')),
-                'overridden'   => (int) ($row['is_modified'] ?? 0) === 1,
+                'description'  => (string) (($row['details_override'] ?? '') !== ''
+                    ? $row['details_override']
+                    : ($row['summary'] ?? '')),
+                'overridden'   => $modified,
                 'href'         => '/events/' . (int) $row['event_id'],
                 'date'         => substr($start, 0, 10),
                 // Carry the full datetime so the portal's day/week views can
                 // render times — front-end falls back to "date" otherwise.
                 'starts_at'    => $start,
-                'ends_at'      => (string) $row['occurrence_end'],
+                'ends_at'      => (string) $row['ends_at'],
             ];
         }
 
@@ -235,27 +235,21 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
      */
     private function birthdayItems(DateTimeImmutable $start, DateTimeImmutable $end, ?int $campusId): array
     {
-        $sql = 'SELECT p.per_ID AS person_id,
-                       p.per_FirstName AS first_name,
-                       p.per_LastName AS last_name,
-                       p.per_BirthMonth AS birth_month,
-                       p.per_BirthDay AS birth_day,
-                       p.per_BirthYear AS birth_year
-                  FROM person_per p
-                 WHERE p.per_BirthMonth > 0
-                   AND p.per_BirthDay > 0';
+        $sql = 'SELECT p.id AS person_id,
+                       p.first_name,
+                       p.last_name,
+                       p.birth_month,
+                       p.birth_day,
+                       p.birth_year
+                  FROM people p
+                 WHERE p.birth_month > 0
+                   AND p.birth_day > 0';
         $params = [];
         if ($campusId !== null) {
-            $sql .= ' AND EXISTS (
-                        SELECT 1
-                          FROM person_campus_affiliation pca
-                         WHERE pca.person_id = p.per_ID
-                           AND pca.campus_id = :campus_id
-                           AND pca.is_primary = 1
-                      )';
+            $sql .= ' AND p.campus_id = :campus_id';
             $params[':campus_id'] = $campusId;
         }
-        $stmt = $this->connection->prepare($sql . ' ORDER BY p.per_BirthMonth ASC, p.per_BirthDay ASC, p.per_LastName ASC, p.per_FirstName ASC');
+        $stmt = $this->connection->prepare($sql . ' ORDER BY p.birth_month ASC, p.birth_day ASC, p.last_name ASC, p.first_name ASC');
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, PDO::PARAM_INT);
         }
@@ -291,34 +285,31 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
      */
     private function anniversaryItems(DateTimeImmutable $start, DateTimeImmutable $end, ?int $campusId): array
     {
-        $sql = 'SELECT f.fam_ID AS family_id,
-                       f.fam_Name AS family_name,
-                       f.fam_WeddingDate AS wedding_date
-                  FROM family_fam f
-                 WHERE f.fam_DateDeactivated IS NULL
-                   AND f.fam_WeddingDate IS NOT NULL
-                   AND f.fam_WeddingDate <> "0000-00-00"';
+        $sql = 'SELECT h.id AS household_id,
+                       h.name AS household_name,
+                       h.wedding_date
+                  FROM households h
+                 WHERE h.deactivated_on IS NULL
+                   AND h.wedding_date IS NOT NULL';
         $params = [];
         if ($campusId !== null) {
             $sql .= ' AND EXISTS (
                         SELECT 1
-                          FROM person_per p
-                          JOIN person_campus_affiliation pca ON pca.person_id = p.per_ID
-                         WHERE p.per_fam_ID = f.fam_ID
-                           AND pca.campus_id = :campus_id
-                           AND pca.is_primary = 1
+                          FROM people p
+                         WHERE p.household_id = h.id
+                           AND p.campus_id = :campus_id
                       )';
             $params[':campus_id'] = $campusId;
         }
-        $stmt = $this->connection->prepare($sql . ' ORDER BY f.fam_WeddingDate ASC, f.fam_Name ASC');
+        $stmt = $this->connection->prepare($sql . ' ORDER BY h.wedding_date ASC, h.name ASC');
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, PDO::PARAM_INT);
         }
         $stmt->execute();
 
-        $families = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $households = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return $this->expandAnnualItems(
-            rows: $families,
+            rows: $households,
             start: $start,
             end: $end,
             source: 'anniversaries',
@@ -335,10 +326,10 @@ final class ChurchCrmCalendarAdapter implements CalendarAdapter
                     return null;
                 }
                 $date = $parsed->format('Y-m-d');
-                $familyName = trim((string) $row['family_name']);
+                $householdName = trim((string) $row['household_name']);
                 $years = (int) substr($weddingDate, 0, 4) > 0 ? $year - (int) substr($weddingDate, 0, 4) : null;
                 return [
-                    'title' => 'Anniversary: ' . $familyName,
+                    'title' => 'Anniversary: ' . $householdName,
                     'meta' => $years !== null && $years > 0 ? $years . ' years' : 'Anniversary',
                     'href' => null,
                 ];

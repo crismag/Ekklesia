@@ -58,7 +58,7 @@ export type ProtectedMutation = {
 export const PROTECTED_MUTATIONS: ProtectedMutation[] = [
   { method: 'POST', path: '/api/schedules/assignments', body: { ministryId: 1, assignments: [] } },
   { method: 'POST', path: '/api/events', body: { title: 'regression-should-not-create' } },
-  { method: 'POST', path: '/admin/event-types', body: { action: 'delete', type_id: 1 } },
+  { method: 'POST', path: '/admin/event-types', body: { action: 'delete', event_type_id: 1 } },
   { method: 'POST', path: '/api/hero', body: { slides: [] } },
   { method: 'POST', path: '/api/chrome', body: { header: {} } },
   { method: 'POST', path: '/api/theme/active', body: { active: 'forest' } },

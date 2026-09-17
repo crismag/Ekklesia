@@ -9,7 +9,7 @@ declare(strict_types=1);
  *   PortalAuthAdapter (mdb DB)  →  AuthService.login           → AuthSession
  *   PortalAuthAdapter (mdb DB)  →  AuthService.resolveActor    → ActorContext
  *   PortalRequestContext        →  optional currentCampusId override
- *   ChurchCrmScheduleAdapter (churchcrm DB) ← ScheduleService.getScheduleGrid
+ *   SqlScheduleAdapter (member DB) ← ScheduleService.getScheduleGrid
  *
  * Usage:
  *   PORTAL_DB_USERNAME=...    PORTAL_DB_PASSWORD=...   \

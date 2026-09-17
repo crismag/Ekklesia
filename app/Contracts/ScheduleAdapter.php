@@ -9,12 +9,12 @@ use DateTimeImmutable;
 
 /**
  * ScheduleAdapter is the source-specific data-access boundary used by
- * repositories. Each concrete adapter targets one backend (e.g. ChurchCRM,
+ * repositories. Each concrete adapter targets one backend (e.g. SQL,
  * a future replacement, or an in-memory test double) and is the only place
  * SQL or storage-specific code may live.
  *
  * Repositories depend on this contract so that swapping the source does not
- * require changes to services, controllers, or UI. When ChurchCRM is replaced,
+ * require changes to services, controllers, or UI. When the store is replaced,
  * only the adapter implementation changes; everything above it stays untouched.
  *
  * Returned arrays are intentionally raw (associative arrays of scalars).
@@ -44,7 +44,7 @@ interface ScheduleAdapter
      *   id:int,
      *   occurrence_id:int,
      *   person_id:int,
-     *   role_id:int,
+     *   serving_role_id:int,
      *   starts_on:DateTimeImmutable,
      *   label:string
      * }>
@@ -85,7 +85,7 @@ interface ScheduleAdapter
      * @param list<int> $campusIds
      * @return list<int>
      */
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array;
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array;
 
     /**
      * One person's assignments across all ministries within [start, end).
@@ -93,7 +93,7 @@ interface ScheduleAdapter
      * @return list<array{
      *   id:int,
      *   person_id:int,
-     *   role_id:int,
+     *   serving_role_id:int,
      *   role_name:string,
      *   ministry_id:int,
      *   ministry_name:string,

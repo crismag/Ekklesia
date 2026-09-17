@@ -216,7 +216,7 @@ check('and the day before', !str_contains(json_encode($clean['entries']), 'Too e
 // The adapter is where the three sources were reconciled; assert the rules it
 // now applies, since they cannot be exercised without a database.
 echo "\nThe adapter normalises the window once, for every source\n";
-$adapter = file_get_contents(__DIR__ . '/../../app/Adapters/ChurchCRM/ChurchCrmCalendarAdapter.php');
+$adapter = file_get_contents(__DIR__ . '/../../app/Adapters/Sql/SqlCalendarAdapter.php');
 check('the start is pinned to midnight', str_contains($adapter, '$start = $start->setTime(0, 0, 0);'));
 check('the end becomes the following midnight, so the last day is whole',
     str_contains($adapter, "\$end = \$end->setTime(0, 0, 0)->modify('+1 day');"));
@@ -265,7 +265,7 @@ check('and no title comparison crept in',
     !preg_match('/event_title.*===|===.*event_title/', $controller));
 
 echo "\nOne day means midnight to midnight\n";
-// The board's SQL is `occurrence_start >= :start AND < :end`, so asking for
+// The board's SQL is `starts_at >= :start AND < :end`, so asking for
 // the same date twice is an empty range. Nine assignments on 12 Jul 2026
 // vanished exactly this way before the window was widened.
 check('the window starts at midnight', str_contains($controller, '$from = $day->setTime(0, 0, 0);'));

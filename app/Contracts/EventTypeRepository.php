@@ -27,6 +27,6 @@ interface EventTypeRepository
 
     public function setDefault(int $typeId): bool;
 
-    /** @return list<array{event_id:int,event_title:string,event_type:int}> */
+    /** @return list<array{event_id:int,title:string,event_type_id:int}> */
     public function listOrphanedEvents(): array;
 }

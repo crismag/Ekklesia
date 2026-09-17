@@ -252,7 +252,7 @@ final readonly class CalendarController
             return $items;
         }
 
-        // The board's window is half-open: occurrence_start >= start AND
+        // The board's window is half-open: starts_at >= start AND
         // < end. Passing the same date twice therefore asks for no time at all
         // and returns nothing, which is the same end-boundary trap that once
         // hid every event on the last day of a printed range. One day means

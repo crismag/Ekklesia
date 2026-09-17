@@ -157,7 +157,7 @@ final readonly class ScheduleController
      *
      * The ministry board is intentionally public because ministries print and
      * post these schedules. This endpoint still uses ScheduleService so the
-     * data path stays centralized and UI code does not query ChurchCRM.
+     * data path stays centralized and UI code does not query the database.
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -272,7 +272,7 @@ final readonly class ScheduleController
         foreach ($assignmentsRaw as $row) {
             if (!is_array($row)) continue;
             $occId = isset($row['occurrenceId']) ? (int) $row['occurrenceId'] : (int) ($row['occurrence_id'] ?? 0);
-            $roleId = (int) ($row['roleId'] ?? $row['role_id'] ?? 0);
+            $roleId = (int) ($row['roleId'] ?? $row['serving_role_id'] ?? 0);
             $personId = (int) ($row['personId'] ?? $row['person_id'] ?? 0);
             $label = (string) ($row['label'] ?? '');
             $id = isset($row['id']) && $row['id'] !== null && $row['id'] !== '' ? (int) $row['id'] : null;

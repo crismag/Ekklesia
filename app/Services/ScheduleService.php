@@ -90,7 +90,7 @@ final readonly class ScheduleService
                 fn (array $assignment): ScheduleAssignment => new ScheduleAssignment(
                     id: isset($assignment['id']) ? (int) $assignment['id'] : null,
                     personId: (int) $assignment['person_id'],
-                    roleId: (int) $assignment['role_id'],
+                    roleId: (int) $assignment['serving_role_id'],
                     startsOn: $assignment['starts_on'],
                     label: (string) ($assignment['label'] ?? ''),
                     displayName: (string) ($assignment['display_name'] ?? ''),
@@ -187,7 +187,7 @@ final readonly class ScheduleService
             static fn (array $row): MyAssignment => new MyAssignment(
                 id: (int) $row['id'],
                 personId: (int) $row['person_id'],
-                roleId: (int) $row['role_id'],
+                roleId: (int) $row['serving_role_id'],
                 roleName: (string) $row['role_name'],
                 ministryId: (int) $row['ministry_id'],
                 ministryName: (string) $row['ministry_name'],
@@ -333,10 +333,10 @@ final readonly class ScheduleService
                 return array_values($defaultIds);
             }
 
-            // Configured defaults may exist on church_campus even if the
+            // Configured defaults may exist on campuses even if the
             // adapter's is_default flag lagged; still intersect with eligible.
             $configured = [];
-            foreach ($this->scheduleRepository->listDefaultAssignmentEventIds($campusIds) as $id) {
+            foreach ($this->scheduleRepository->listDefaultSchedulingEventIds($campusIds) as $id) {
                 if (isset($eligibleIds[$id])) {
                     $configured[$id] = $id;
                 }

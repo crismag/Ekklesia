@@ -14,7 +14,7 @@ final readonly class UnavailabilityEntry
         public DateTimeImmutable $startsOn,
         public DateTimeImmutable $endsOn,
         public ?string $reason,
-        public int $createdByPortalUserId,
+        public int $createdByAccountId,
         public DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
     ) {
@@ -31,7 +31,7 @@ final readonly class UnavailabilityEntry
             'startsOn'              => $this->startsOn->format('Y-m-d'),
             'endsOn'                => $this->endsOn->format('Y-m-d'),
             'reason'                => $this->reason,
-            'createdByPortalUserId' => $this->createdByPortalUserId,
+            'createdByAccountId' => $this->createdByAccountId,
             'createdAt'             => $this->createdAt->format(DATE_ATOM),
             'updatedAt'             => $this->updatedAt->format(DATE_ATOM),
         ];

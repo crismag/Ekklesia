@@ -84,7 +84,7 @@ final readonly class EventController
             ministryId: isset($request['ministryId']) && (int) $request['ministryId'] > 0 ? (int) $request['ministryId'] : null,
             eventTypeId: $this->eventTypeIdFromRequest($request),
             defaultDurationMin: isset($request['defaultDurationMin']) ? (int) $request['defaultDurationMin'] : 90,
-            assignmentSchedulingEnabled: $this->boolFromRequest($request, 'assignmentSchedulingEnabled', 'assignment_scheduling_enabled', false) ?? false,
+            usesServingSchedule: $this->boolFromRequest($request, 'usesServingSchedule', 'uses_serving_schedule', false) ?? false,
         );
         $detail = $this->service->createEvent($actor, $cmd);
 
@@ -124,7 +124,7 @@ final readonly class EventController
             ministryId: array_key_exists('ministryId', $request) || array_key_exists('ministry_id', $request)
                 ? (int) ($request['ministryId'] ?? $request['ministry_id'] ?? 0)
                 : null,
-            assignmentSchedulingEnabled: $this->boolFromRequest($request, 'assignmentSchedulingEnabled', 'assignment_scheduling_enabled'),
+            usesServingSchedule: $this->boolFromRequest($request, 'usesServingSchedule', 'uses_serving_schedule'),
         );
         $detail = $this->service->updateEvent($actor, $id, $cmd);
 

@@ -8,7 +8,7 @@ namespace App\DTO\Events;
  * Everything needed to create a calendar event in one step.
  *
  * This previously carried only a title, description, duration and campus list —
- * no date at all — while events_event.event_start is NOT NULL with no default.
+ * no date at all — while events.starts_on is NOT NULL with no default.
  * The adapter compensated by inserting NULL, so every create attempt failed with
  * an integrity-constraint violation. Creating an event through the portal has
  * therefore never worked.
@@ -46,14 +46,14 @@ final readonly class EventCreateCommand
         // untyped event would fall back to the members audience by accident.
         public ?int $eventTypeId = null,
         public ?int $defaultDurationMin = 90,
-        public bool $assignmentSchedulingEnabled = false,
+        public bool $usesServingSchedule = false,
     ) {}
 
     public function toArray(): array
     {
         return [
             'title' => $this->title,
-            'description' => $this->description,
+            'summary' => $this->description,
             'start_date' => $this->startDate,
             'start_time' => $this->startTime,
             'end_time' => $this->endTime,
@@ -72,7 +72,7 @@ final readonly class EventCreateCommand
             'location_address' => $this->locationAddress,
             'ministry_id' => $this->ministryId,
             'defaultDurationMin' => $this->defaultDurationMin,
-            'assignment_scheduling_enabled' => $this->assignmentSchedulingEnabled,
+            'uses_serving_schedule' => $this->usesServingSchedule,
         ];
     }
 }

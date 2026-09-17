@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Adapters\Portal;
+namespace App\Adapters\Sql;
 
 use App\Contracts\SavedViewRepository;
 use App\Core\Database\MembersConnection;
@@ -15,7 +15,7 @@ use PDO;
  * deliberately knows nothing about permissions — a repository that also decides
  * authorisation ends up with two places to check and one place to forget.
  */
-final class PortalSavedViewAdapter implements SavedViewRepository
+final class SqlSavedViewAdapter implements SavedViewRepository
 {
     private ?PDO $connection;
 
@@ -41,10 +41,10 @@ final class PortalSavedViewAdapter implements SavedViewRepository
             return [];
         }
         $stmt = $this->connection->prepare(
-            "SELECT view_id, name, owner_user_id, visibility, config_version, config, updated_at
-               FROM calendar_saved_view
-              WHERE owner_user_id = :uid OR visibility = 'shared'
-           ORDER BY (owner_user_id = :uid2) DESC, name ASC"
+            "SELECT id, name, account_id, visibility, config_version, config, updated_at
+               FROM calendar_views
+              WHERE account_id = :uid OR visibility = 'shared'
+           ORDER BY (account_id = :uid2) DESC, name ASC"
         );
         $stmt->bindValue(':uid', $userId, PDO::PARAM_INT);
         $stmt->bindValue(':uid2', $userId, PDO::PARAM_INT);
@@ -60,8 +60,8 @@ final class PortalSavedViewAdapter implements SavedViewRepository
             return null;
         }
         $stmt = $this->connection->prepare(
-            'SELECT view_id, name, owner_user_id, visibility, config_version, config, updated_at
-               FROM calendar_saved_view WHERE view_id = :id LIMIT 1'
+            'SELECT id, name, account_id, visibility, config_version, config, updated_at
+               FROM calendar_views WHERE id = :id LIMIT 1'
         );
         $stmt->bindValue(':id', $viewId, PDO::PARAM_INT);
         $stmt->execute();
@@ -77,8 +77,8 @@ final class PortalSavedViewAdapter implements SavedViewRepository
             return 0;
         }
         $stmt = $this->connection->prepare(
-            'INSERT INTO calendar_saved_view
-                (name, owner_user_id, visibility, config_version, config, created_at, updated_at)
+            'INSERT INTO calendar_views
+                (name, account_id, visibility, config_version, config, created_at, updated_at)
              VALUES (:name, :owner, :vis, :ver, :cfg, NOW(), NOW())'
         );
         $stmt->bindValue(':name', $name, PDO::PARAM_STR);
@@ -98,9 +98,9 @@ final class PortalSavedViewAdapter implements SavedViewRepository
             return false;
         }
         $stmt = $this->connection->prepare(
-            'UPDATE calendar_saved_view
+            'UPDATE calendar_views
                 SET name = :name, visibility = :vis, config_version = :ver, config = :cfg, updated_at = NOW()
-              WHERE view_id = :id'
+              WHERE id = :id'
         );
         $stmt->bindValue(':name', $name, PDO::PARAM_STR);
         $stmt->bindValue(':vis', $visibility, PDO::PARAM_STR);
@@ -116,7 +116,7 @@ final class PortalSavedViewAdapter implements SavedViewRepository
         if ($this->connection === null) {
             return false;
         }
-        $stmt = $this->connection->prepare('DELETE FROM calendar_saved_view WHERE view_id = :id');
+        $stmt = $this->connection->prepare('DELETE FROM calendar_views WHERE id = :id');
         $stmt->bindValue(':id', $viewId, PDO::PARAM_INT);
 
         return $stmt->execute();
@@ -128,9 +128,9 @@ final class PortalSavedViewAdapter implements SavedViewRepository
         $decoded = json_decode((string) $row['config'], true);
 
         return [
-            'id' => (int) $row['view_id'],
+            'id' => (int) $row['id'],
             'name' => (string) $row['name'],
-            'ownerId' => (int) $row['owner_user_id'],
+            'ownerId' => (int) $row['account_id'],
             'visibility' => (string) $row['visibility'],
             'configVersion' => (int) $row['config_version'],
             // A row whose JSON has been corrupted opens as defaults rather than

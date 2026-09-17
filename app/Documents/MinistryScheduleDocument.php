@@ -9,9 +9,9 @@ namespace App\Documents;
  *
  * The document a church posts on its noticeboard does not correspond to one
  * database record. It consolidates assignments made against service occurrences
- * (assignment → roles → group_grp) with roster schedules kept separately in the
- * portal (schedule_roster*), and those two have different shapes, different
- * databases and different words for the same ideas.
+ * (assignments → serving_roles → ministries) with roster schedules kept
+ * separately (rosters → roster_slots), and those two have different shapes and
+ * different words for the same ideas.
  *
  * This is where they stop being different. Everything past this point — the
  * template, the CSS, any later renderer — sees one structure:
