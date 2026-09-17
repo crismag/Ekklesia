@@ -267,6 +267,79 @@ $renderScheduleEditor = function (array $req) use ($resolveCampusSelector, $reso
     return (string) ob_get_clean();
 };
 
+/**
+ * Visitors & RSVPs pages: resolve the actor, ask VisitorService for the page's
+ * data, render. Signed-out visitors are sent to sign in; anyone else the
+ * service refuses gets a 403 that says so.
+ *
+ * $load returns the view's variables, or null for a record that is not there.
+ */
+$visitorsPage = static function (array $req, string $view, callable $load) use ($resolvePortalActor, $resolveCampusSelector): string {
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    $basePath = (string) ($req['_base_path'] ?? '');
+    $actor = $resolvePortalActor($req);
+    if ($actor === null) {
+        // REQUEST_URI already carries the base path.
+        $next = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH) ?: $basePath . '/visitors');
+        header('Location: ' . $basePath . '/login?' . http_build_query(['next' => $next]), true, 302);
+        return '';
+    }
+    $campusSelector = $resolveCampusSelector($req);
+    $vars = [];
+    $refused = false;
+    $missing = false;
+    $unavailable = false;
+    try {
+        $context = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
+        $loaded = $load(\App\Providers\PortalServiceProvider::makeVisitorService(), $context);
+        if ($loaded === null) {
+            $missing = true;
+            http_response_code(404);
+        } else {
+            $vars = $loaded;
+        }
+    } catch (\App\Exceptions\PermissionDenied) {
+        $refused = true;
+        http_response_code(403);
+    } catch (\RuntimeException $e) {
+        // The visitors database is missing or unreadable.
+        error_log('[visitors] ' . $e->getMessage());
+        $unavailable = true;
+        http_response_code(503);
+    }
+    $flash = $_SESSION['visitors_flash'] ?? null;
+    unset($_SESSION['visitors_flash']);
+    extract($vars, EXTR_SKIP);
+    ob_start();
+    require __DIR__ . '/../resources/views/' . $view;
+    return (string) ob_get_clean();
+};
+
+/**
+ * Visitors & RSVPs form posts: run $act, keep its message (or the refusal) for
+ * the next page, and go back to $back (a path below the base path).
+ */
+$visitorsAction = static function (array $req, string $back, callable $act): string {
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    $basePath = (string) ($req['_base_path'] ?? '');
+    try {
+        $context = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
+        $message = $act(\App\Providers\PortalServiceProvider::makeVisitorService(), $context);
+        $_SESSION['visitors_flash'] = ['kind' => 'ok', 'text' => $message];
+    } catch (\App\Exceptions\PermissionDenied) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        return 'Visitors & RSVPs is for church administrators.';
+    } catch (\App\Exceptions\ValidationFailed $e) {
+        $_SESSION['visitors_flash'] = ['kind' => 'error', 'text' => $e->getMessage()];
+    } catch (\Throwable $e) {
+        error_log('[visitors] ' . $e->getMessage());
+        $_SESSION['visitors_flash'] = ['kind' => 'error', 'text' => 'That could not be saved. Please try again.'];
+    }
+    header('Location: ' . $basePath . $back, true, 303);
+    return '';
+};
+
 $webRoutes = [
     'GET /login' => function (array $req): string {
         /** @var string $basePath used by the template */
@@ -1614,7 +1687,86 @@ $webRoutes = [
             return '';
         }
     },
-    'GET /admin/outreach'   => fn (array $req) => _adminSectionRender($req, 'admin-outreach.php',   $resolvePortalActor, $resolveCampusSelector),
+    // The Sign-ups & RSVP launcher became the Visitors & RSVPs workspace.
+    'GET /admin/outreach' => function (array $req): string {
+        header('Location: ' . (string) ($req['_base_path'] ?? '') . '/visitors', true, 301);
+        return '';
+    },
+
+    // Visitors & RSVPs (docs/design/surfaces.md): registrations, RSVPs and
+    // access codes. Portal-wide administrators only; VisitorService refuses
+    // everyone else, and these handlers only decide how the refusal looks.
+    'GET /visitors' => function (array $req) use ($visitorsPage): string {
+        return $visitorsPage($req, 'visitors.php', static fn ($svc, $context) => [
+            'queue' => $svc->queue($context, (string) ($req['status'] ?? 'new'), (string) ($req['q'] ?? ''), (int) ($req['page'] ?? 1)),
+        ]);
+    },
+    'GET /visitors/rsvps' => function (array $req) use ($visitorsPage): string {
+        return $visitorsPage($req, 'visitors-rsvps.php', static fn ($svc, $context) => [
+            'overview' => $svc->rsvps($context, (string) ($req['occasion'] ?? '')),
+        ]);
+    },
+    'POST /visitors/rsvps' => function (array $req) use ($visitorsAction): string {
+        $back = '/visitors/rsvps' . (isset($req['occasion']) ? '?' . http_build_query(['occasion' => (string) $req['occasion']]) : '');
+        return $visitorsAction($req, $back, static function ($svc, $context) use ($req): string {
+            $rsvp = $svc->setAttendance($context, (int) ($req['rsvp_id'] ?? 0), (string) ($req['attendance'] ?? ''));
+            return 'Marked ' . trim((string) $rsvp['first_name'] . ' ' . (string) $rsvp['last_name']) . ' as ' . str_replace('_', ' ', (string) $rsvp['attendance']) . '.';
+        });
+    },
+    'GET /visitors/access' => function (array $req) use ($visitorsPage): string {
+        return $visitorsPage($req, 'visitors-access.php', static fn ($svc, $context) => [
+            'codes' => $svc->accessCodes($context),
+            'upcomingEvents' => $svc->upcomingEvents($context),
+        ]);
+    },
+    'POST /visitors/access' => function (array $req) use ($visitorsAction): string {
+        return $visitorsAction($req, '/visitors/access', static function ($svc, $context) use ($req): string {
+            $module = (string) ($req['module'] ?? '');
+            $word = (string) ($req['action'] ?? '') === 'generate' ? '' : (string) ($req['word'] ?? '');
+            $code = $svc->issueAccessCode($context, $module, $word, (int) ($req['days'] ?? 7), (string) ($req['note'] ?? ''));
+            return 'New ' . ($module === 'rsvp' ? 'RSVP' : 'sign-up') . ' access code saved: ' . $code['word'] . ', valid until ' . substr((string) $code['expires_at'], 0, 16) . '.';
+        });
+    },
+    'GET /visitors/{id}' => function (array $req) use ($visitorsPage): string {
+        return $visitorsPage($req, 'visitors-record.php', static function ($svc, $context) use ($req): ?array {
+            $id = ctype_digit((string) ($req['id'] ?? '')) ? (int) $req['id'] : 0;
+            $record = $id > 0 ? $svc->registration($context, $id) : null;
+            return $record === null ? null : ['record' => $record];
+        });
+    },
+    'POST /visitors/{id}' => function (array $req) use ($visitorsAction): string {
+        $id = ctype_digit((string) ($req['id'] ?? '')) ? (int) $req['id'] : 0;
+        return $visitorsAction($req, '/visitors/' . $id, static function ($svc, $context) use ($req, $id): string {
+            $action = (string) ($req['action'] ?? '');
+            if ($action === 'notes') {
+                $svc->saveNotes($context, $id, (string) ($req['reviewer_notes'] ?? ''));
+                return 'Reviewer notes saved.';
+            }
+            if ($action === 'status') {
+                $status = (string) ($req['status'] ?? '');
+                $svc->setStatus($context, $id, $status);
+                return match ($status) {
+                    'reviewed' => 'Marked reviewed.',
+                    'duplicate' => 'Marked as a duplicate.',
+                    'rejected' => 'Rejected.',
+                    default => 'Moved back to new.',
+                };
+            }
+            if ($action === 'promote') {
+                $result = $svc->promote($context, $id, [
+                    'mode' => (string) ($req['mode'] ?? ''),
+                    'person_id' => (int) ($req['person_id'] ?? 0),
+                    'membership_status_id' => (int) ($req['membership_status_id'] ?? 0),
+                    'campus_id' => (int) ($req['campus_id'] ?? 0),
+                    'force' => (string) ($req['force'] ?? '') === '1',
+                ]);
+                return $result['outcome'] === 'created'
+                    ? 'Promoted: member record #' . $result['person_id'] . ' was created.'
+                    : 'Promoted: linked to member record #' . $result['person_id'] . '.';
+            }
+            throw new \App\Exceptions\ValidationFailed('Nothing to do.');
+        });
+    },
 
     // Campus locations — self-contained CRUD over campuses.
     'GET /admin/campuses' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {

@@ -23,7 +23,7 @@ a panel.
 | **Ministries** | Ministries, Manage members & leaders, Manage ministries |
 | **Events & Calendar** | Calendar, Events, New event, Event categories, Calendar settings, Print calendar |
 | **Serving & Scheduling** | Schedules, Schedule board, Rosters, Printables |
-| **Visitors & RSVPs** | Sign-ups & RSVP, and the guest sign-up form |
+| **Visitors & RSVPs** | Visitors (registrations), RSVPs, Access codes, and the guest sign-up form |
 | **Admin** | Overview, Users & access, Church information, Campuses, Portal appearance & notices, Backups & maintenance, System |
 
 Visitors who are not signed in see Home, Events & Calendar, and the guest
@@ -91,7 +91,8 @@ you remotely, and at no other time.
 | Bring a roster in from a spreadsheet | People & Records → Import & export |
 | Make a backup | Admin → Backups & maintenance |
 | Manage a household | People & Records → Households |
-| Review guest sign-ups and event RSVPs | Visitors & RSVPs → Sign-ups & RSVP |
+| Review guest sign-ups and promote them to members | Visitors & RSVPs → Visitors |
+| See event RSVPs and mark attendance | Visitors & RSVPs → RSVPs |
 | Change the dropdown options (classifications, member types) | People & Records → Record settings |
 | Open a ministry workspace | **Ministries** |
 | Add or edit a ministry team, and who is on it | Ministries → **Manage members & leaders** |

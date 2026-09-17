@@ -185,9 +185,17 @@ check('an admin is offered all seven workspaces', count($adminWs) === 7, implode
 
 // Pages later phases build are placed, but never linked before they exist.
 $allHtml = ek_workspace_nav('/bp', $admin, null);
-foreach (['/bp/people/history', '/bp/visitors', '/bp/visitors/rsvps', '/bp/visitors/access', '/bp/admin/history'] as $href) {
+foreach (['/bp/people/history', '/bp/admin/history'] as $href) {
     check('no link to an unbuilt page: ' . $href, !str_contains($allHtml, 'href="' . $href . '"'));
 }
+
+// Visitors & RSVPs replaced the Sign-ups & RSVP launcher.
+check('an admin is offered Visitors, RSVPs and Access codes',
+    ($adminWs['visitors'] ?? []) === ['visitors', 'rsvps', 'access', 'signup'], json_encode($adminWs['visitors'] ?? null));
+check('a member is offered only the guest sign-up there', ($memberNav['visitors'] ?? []) === ['signup']);
+check('a registration record is in Visitors', (Workspaces::locate('/visitors/12')['page'] ?? '') === 'visitors');
+check('RSVPs is its own page, not a registration', (Workspaces::locate('/visitors/rsvps')['page'] ?? '') === 'rsvps');
+check('the old launcher is no longer a page', !str_contains(json_encode(Workspaces::all(), JSON_UNESCAPED_SLASHES), '/admin/outreach'));
 check('an unbuilt page is still placed in the map', Workspaces::locate('/people/history') === ['workspace' => 'people', 'page' => 'history', 'child' => null]);
 
 // Locating a URL.

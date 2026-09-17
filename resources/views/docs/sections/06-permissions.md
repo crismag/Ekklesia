@@ -74,7 +74,7 @@ The system protects against locking everyone out:
 The guest **Sign-up** and **RSVP** modules use their own admin access codes
 rather than a portal login. Each code is a fixed **ChristLikeness** prefix plus a
 rotating **WORD ID** that expires (default one week). Manage the code — set or
-generate the word and its duration — from each module's *Access code* page,
-reachable from **Sign-ups & RSVP** in the admin sidebar.
+generate the word, its duration and a note — from **Visitors & RSVPs → Access
+codes**. Issuing a new code replaces the old one at once.
 
 > **Warning:** Passwords must be at least 12 characters. Share temporary passwords privately, and encourage users to change them on first sign-in.
