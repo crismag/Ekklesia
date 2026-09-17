@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Path:
  *   SqlAuthAdapter (mdb)           →  AuthService.login          → AuthSession
  *   SqlAuthAdapter (mdb)           →  AuthService.resolveActor   → ActorContext
- *   ChurchCrmMinistryAdapter (cc)  ←  MinistryService.getRoster
+ *   SqlMinistryAdapter (mdb)       ←  MinistryService.getRoster
  *
  * Usage:
  *   php tools/smoke-ministry-roster.php <email> <password> <ministryId> [since] [campusId]

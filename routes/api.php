@@ -325,7 +325,7 @@ return [
         PortalServiceProvider::makeRequestContext(),
     ))->removeMember($req),
 
-    // Leader tag — separate from the member's role
+    // Leader — ministry_members.role
     'POST /api/ministry/{id}/leaders/{personId}' => fn (array $req) => (new MinistryController(
         PortalServiceProvider::makeMinistryService(),
         PortalServiceProvider::makeRequestContext(),

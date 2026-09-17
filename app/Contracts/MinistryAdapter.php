@@ -10,9 +10,8 @@ use DateTimeImmutable;
  * Source-specific data adapter for ministry-related queries.
  *
  * Mirrors the ScheduleAdapter / AuthAdapter pattern: this is the only layer
- * below MinistryService permitted to know ChurchCRM table names. Repositories
- * depend on this contract, services on the repository, and HTTP handlers on
- * the service. Swapping ChurchCRM out only requires a new adapter binding.
+ * below MinistryService permitted to know table names. Repositories depend on
+ * this contract, services on the repository, and HTTP handlers on the service.
  */
 interface MinistryAdapter
 {
@@ -32,8 +31,7 @@ interface MinistryAdapter
     public function findDisplayNameForPerson(int $personId): ?string;
 
     /**
-     * One ministry row keyed by group id, or null when the group does not
-     * exist or is not a ministry-style group.
+     * One ministry row by id, or null when it does not exist.
      *
      * @return array{
      *   ministry_id:int,
@@ -100,7 +98,7 @@ interface MinistryAdapter
     ): array;
 
     /**
-     * Roster rows for a ministry: every person in the group, with optional
+     * Roster rows for a ministry: every current member, with optional
      * primary-campus + serve-history aggregates over [since, …].
      *
      * @return list<array{
@@ -140,13 +138,13 @@ interface MinistryAdapter
     ): array;
 
     /**
-     * Fetch all roles for a ministry.
+     * Fetch all serving roles for a ministry.
      *
      * @return list<array{
-     *   role_id:int,
-     *   role_name:string,
-     *   order:int,
-     *   active:bool,
+     *   id:int,
+     *   name:string,
+     *   sort_order:int,
+     *   is_active:bool,
      *   assigned_count:int,
      *   assigned_members:list<array{person_id:int,display_name:string}>
      * }>
@@ -154,7 +152,7 @@ interface MinistryAdapter
     public function fetchMinistryRoles(int $ministryId): array;
 
     /**
-     * Fetch members with leader roles for a ministry.
+     * Fetch the leaders (role 'leader') of a ministry.
      *
      * @return list<array{
      *   person_id:int,
@@ -173,7 +171,7 @@ interface MinistryAdapter
      * Create a new role for a ministry.
      *
      * @param array{name:string,order:int,active:bool} $data
-     * @return array{role_id:int,role_name:string,order:int,active:bool}
+     * @return array{id:int,name:string,sort_order:int,is_active:bool}
      */
     public function createMinistryRole(int $ministryId, array $data): array;
 
@@ -181,7 +179,7 @@ interface MinistryAdapter
      * Update an existing role.
      *
      * @param array{name?:string,order?:int,active?:bool} $data
-     * @return array{role_id:int,role_name:string,order:int,active:bool,assigned_count:int,assigned_members:list<array{person_id:int,display_name:string}>}
+     * @return array{id:int,name:string,sort_order:int,is_active:bool,assigned_count:int,assigned_members:list<array{person_id:int,display_name:string}>}
      */
     public function updateMinistryRole(int $roleId, array $data): array;
 
@@ -191,32 +189,33 @@ interface MinistryAdapter
     public function deleteMinistryRole(int $roleId): bool;
 
     /**
-     * Assign a person to a role.
+     * Make a person a member of a serving role's ministry.
      */
     public function assignPersonToRole(int $personId, int $roleId): bool;
 
     /**
-     * Remove a person from a role.
+     * No person-to-serving-role link exists outside the schedule; kept for
+     * the API route, always false.
      */
     public function removePersonFromRole(int $personId, int $roleId): bool;
 
     /**
-     * Admin listing of all ministry groups with member/role counts.
+     * Admin listing of all ministries with member/leader/serving-role counts.
      *
-     * @return list<array{ministry_id:int,name:string,active:bool,campus_id:?int,member_count:int,role_count:int}>
+     * @return list<array{ministry_id:int,name:string,active:bool,campus_id:?int,member_count:int,leader_count:int,role_count:int}>
      */
     public function listMinistriesAdmin(?int $campusId = null): array;
 
     /**
-     * Create a ministry group.
+     * Create a ministry.
      *
-     * @param array{name:string,description?:string,type?:int,campus_id?:?int} $data
+     * @param array{name:string,description?:string,campus_id?:?int} $data
      * @return array<string,mixed>
      */
     public function createMinistry(array $data): array;
 
     /**
-     * Update a ministry group's name/description/campus.
+     * Update a ministry's name/description/campus.
      *
      * @param array{name:string,description?:string,campus_id?:?int} $data
      * @return array<string,mixed>
@@ -224,27 +223,38 @@ interface MinistryAdapter
     public function updateMinistry(int $ministryId, array $data): array;
 
     /**
-     * Activate or deactivate (soft delete) a ministry group.
+     * Activate or deactivate (soft delete) a ministry.
      */
     public function setMinistryActive(int $ministryId, bool $active): bool;
 
     /**
-     * Permanently delete a ministry group and its memberships/roles.
+     * Permanently delete a ministry and its memberships/serving roles.
      */
     public function deleteMinistry(int $ministryId): bool;
 
     /**
-     * Full roster of a ministry group (every person2group2role member) with
-     * each member's resolved role.
+     * Full roster of a ministry (every current member) with their membership
+     * role and positions.
      *
-     * @return list<array{person_id:int,display_name:string,role_id:int,role_name:string,is_leader:bool}>
+     * @return list<array{person_id:int,display_name:string,role:string,role_name:string,is_leader:bool,positions:list<string>}>
      */
     public function listMinistryMembers(int $ministryId, ?int $campusId = null): array;
     /** @param list<int> $personIds @return array<int,list<int>> */
     public function listMinistryIdsForPeople(array $personIds): array;
 
 
-    public function setMemberRole(int $personId, int $ministryId, int $roleId): bool;
+    /**
+     * Add or update a membership with role 'member' or 'leader'.
+     */
+    public function setMemberRole(int $personId, int $ministryId, string $role): bool;
+
+    /**
+     * Replace a member's positions ("Usher", "Emcee") in a ministry. False
+     * when the person is not a member of it.
+     *
+     * @param list<string> $positions
+     */
+    public function setMemberPositions(int $personId, int $ministryId, array $positions): bool;
 
     public function removeMemberFromMinistry(int $personId, int $ministryId): bool;
 
@@ -258,7 +268,7 @@ interface MinistryAdapter
     public function listLeadersByMinistry(?int $campusId = null): array;
 
     /**
-     * @return list<array{id:int,name:string,is_default:bool}>
+     * @return list<array{id:string,name:string,is_default:bool}>
      */
     public function listGroupRoles(int $ministryId): array;
 }

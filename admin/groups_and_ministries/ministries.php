@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Master-detail workspace: pick a ministry on the left to manage its members,
  * roles, and leaders on the right; create/edit/deactivate/delete ministries.
  *
- * Self-contained within church_portal — no dependency on the ChurchCRM app.
+ * Self-contained: no dependency on another app.
  * Reuses the portal admin shell (_admin-shell.php) and the existing
  * /api/ministry* + /api/admin/ministries endpoints.
  *
@@ -261,7 +261,7 @@ echo admin_render_page([
     let selectedId = 0;
     let currentRoles = [];
     let currentMembers = [];
-    let groupRoles = [];       // member-type roles (Member/Leader/Teacher) for the picker
+    let groupRoles = [];       // membership roles (Member / Leader) for the picker
     let leadersByMinistry = {};
 
     // ---- campus <select> options ----
@@ -410,15 +410,19 @@ echo admin_render_page([
         } catch (e) { toast(e.message, true); }
     }
 
-    // Collapse the raw person2group2role rows into one entry per person, so a
-    // member with several roles prints once and each role name shows once.
+    // One entry per person (the API sends one membership row each), with
+    // their role name and positions.
     function membersByPerson() {
         const map = new Map();
         currentMembers.forEach((m) => {
             if (!map.has(m.person_id)) {
-                map.set(m.person_id, { personId: m.person_id, name: m.display_name, roles: [] });
+                map.set(m.person_id, { personId: m.person_id, name: m.display_name, roles: [], positions: [] });
             }
-            map.get(m.person_id).roles.push({ id: m.role_id, name: m.role_name || '', isLeader: !!m.is_leader });
+            const entry = map.get(m.person_id);
+            entry.roles.push({ id: m.role, name: m.role_name || '', isLeader: !!m.is_leader });
+            (Array.isArray(m.positions) ? m.positions : []).forEach((p) => {
+                if (!entry.positions.includes(p)) entry.positions.push(p);
+            });
         });
         const rows = Array.from(map.values());
         rows.forEach((r) => { r.isLeader = r.roles.some((x) => x.isLeader); });
@@ -437,8 +441,9 @@ echo admin_render_page([
                 const roleNames = Array.from(new Set(x.roles.map((r) => r.name).filter(Boolean)));
                 const roleLabel = roleNames.length ? roleNames.map(esc).join(', ') : '—';
                 const crown = x.isLeader ? '<span class="gm-crown" title="Leader">♛</span>' : '';
+                const positions = x.positions.map((p) => ' <span class="gm-badge">' + esc(p) + '</span>').join('');
                 return '<tr>' +
-                    '<td>' + crown + esc(x.name) + '</td>' +
+                    '<td>' + crown + esc(x.name) + positions + '</td>' +
                     '<td>' + roleLabel + '</td>' +
                     (CAN_WRITE
                         ? '<td class="gm-col-lead"><button class="gm-leadbtn' + (x.isLeader ? ' on' : '') + '"' +
@@ -464,10 +469,10 @@ echo admin_render_page([
     // Role <select> (the person picker is now a typeahead, below).
     function fillRoleSelect() {
         const rSel = document.getElementById('gmAddRole');
-        // Member "group role" (member type): Member / Leader / Teacher — NOT the
-        // ministry assignment roles. Default to the group's default (Member).
+        // Membership role: Member / Leader — NOT the serving roles the
+        // scheduler uses. Default to Member.
         let list = groupRoles.slice();
-        if (!list.length) list = [{ id: 0, name: 'Member', is_default: true }];
+        if (!list.length) list = [{ id: 'member', name: 'Member', is_default: true }];
         const def = list.find((r) => r.is_default) || list[0];
         rSel.innerHTML = list.map((r) =>
             '<option value="' + r.id + '"' + (def && r.id === def.id ? ' selected' : '') + '>' + esc(r.name) + '</option>').join('');
@@ -602,11 +607,11 @@ echo admin_render_page([
     document.getElementById('gmAddMemberBtn').addEventListener('click', async () => {
         if (!guard()) return;
         const personId = parseInt(document.getElementById('gmAddPerson').value, 10);
-        const roleId = parseInt(document.getElementById('gmAddRole').value, 10);
+        const role = document.getElementById('gmAddRole').value;
         if (!personId) { toast('Pick a person.', true); return; }
-        if (!roleId) { toast('Add a role first, then pick one.', true); return; }
+        if (role !== 'member' && role !== 'leader') { toast('Pick Member or Leader.', true); return; }
         try {
-            await setMemberRole(personId, roleId);
+            await setMemberRole(personId, role);
             clearPersonPick();
             await loadRoles(selectedId);
             await loadMinistries(true);
@@ -638,10 +643,10 @@ echo admin_render_page([
         if (!e.target.closest('.gm-typeahead')) hidePersonResults();
     });
 
-    function setMemberRole(personId, roleId) {
-        return api('POST', '/api/ministry/' + selectedId + '/members/' + personId + '/role', { role_id: roleId });
+    function setMemberRole(personId, role) {
+        return api('POST', '/api/ministry/' + selectedId + '/members/' + personId + '/role', { role: role });
     }
-    // Leader is a SEPARATE tag — it never changes the member's work/assignment role.
+    // Leader is the member's ministry role; serving roles on the schedule are unaffected.
     async function tagLeader(personId) {
         await api('POST', '/api/ministry/' + selectedId + '/leaders/' + personId);
     }

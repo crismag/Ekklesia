@@ -208,7 +208,7 @@ final readonly class MinistryController
     }
 
     /**
-     * GET /api/ministry/{id}/members — full roster (all members + their role).
+     * GET /api/ministry/{id}/members — full roster (all members, role, positions).
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -223,7 +223,7 @@ final readonly class MinistryController
     }
 
     /**
-     * GET /api/ministry/{id}/group-roles — member-type roles (Member/Leader/…).
+     * GET /api/ministry/{id}/group-roles — membership roles (Member / Leader).
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -237,8 +237,8 @@ final readonly class MinistryController
     }
 
     /**
-     * POST /api/ministry/{id}/members/{personId}/role  { role_id }
-     * Set a member's single role (role_id 0 = member, no role).
+     * POST /api/ministry/{id}/members/{personId}/role  { role: 'member'|'leader' }
+     * Set a member's role (adds the membership when absent).
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -248,9 +248,9 @@ final readonly class MinistryController
         $actor = $this->requestContext->fromArray($request);
         $ministryId = (int) ($request['id'] ?? 0);
         $personId = (int) ($request['personId'] ?? 0);
-        $roleId = (int) ($request['role_id'] ?? 0);
+        $role = (string) ($request['role'] ?? 'member');
 
-        return ['success' => $this->ministryService->setMemberRole($actor, $ministryId, $personId, $roleId)];
+        return ['success' => $this->ministryService->setMemberRole($actor, $ministryId, $personId, $role)];
     }
 
     /**
@@ -269,7 +269,7 @@ final readonly class MinistryController
     }
 
     /**
-     * POST /api/ministry/{id}/leaders/{personId} — tag member as leader.
+     * POST /api/ministry/{id}/leaders/{personId} — make a member a leader.
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -284,7 +284,7 @@ final readonly class MinistryController
     }
 
     /**
-     * DELETE /api/ministry/{id}/leaders/{personId} — remove leader tag.
+     * DELETE /api/ministry/{id}/leaders/{personId} — make a leader a member.
      *
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -316,7 +316,7 @@ final readonly class MinistryController
     }
 
     // ---------------------------------------------------------------------
-    // Ministry group CRUD (admin) — GET/POST/PUT/DELETE /api/admin/ministries
+    // Ministry CRUD (admin) — GET/POST/PUT/DELETE /api/admin/ministries
     // ---------------------------------------------------------------------
 
     /**

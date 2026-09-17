@@ -8,13 +8,10 @@ declare(strict_types=1);
  * The import parsed and staged the workbook's ministry column and then dropped
  * it — the review screen showed ministries that were never going to be saved.
  *
- * How membership actually works here, established by reading the data rather
- * than the table names: one row in person2group2role_p2g2r links a person, a
- * group and a role. There is no separate membership table. Role 0 means "no
- * assignment role", which is what 282 of the 284 existing memberships carry;
- * the roles that do exist (Porter, Runner, Create1) are per-ministry scheduling
- * roles, not a Member/Leader convention. Leadership is not a role at all: it is
- * an RBAC grant in account_roles scoped to a ministry.
+ * How membership works: one ministry_members row links a person and a
+ * ministry, with role 'member' or 'leader'. Serving roles (Porter, Runner) are
+ * per-ministry scheduling roles in serving_roles, not memberships. Leadership
+ * that grants access is separate again: an account role scoped to a ministry.
  */
 
 spl_autoload_register(static function (string $class): void {
@@ -171,7 +168,7 @@ check('removals are counted and reported',
 
 // Reading current memberships must be batched: a query per person turns a
 // 250-member import into 250 round trips.
-$adapterSrc = (string) file_get_contents(__DIR__ . '/../../app/Adapters/ChurchCRM/ChurchCrmMinistryAdapter.php');
+$adapterSrc = (string) file_get_contents(__DIR__ . '/../../app/Adapters/Sql/SqlMinistryAdapter.php');
 check('current memberships are read in one query',
     str_contains($adapterSrc, 'listMinistryIdsForPeople') && str_contains($adapterSrc, 'IN ('));
 

@@ -3,15 +3,15 @@
 declare(strict_types=1);
 
 /**
- * Align ChurchCRM group_grp rows with the Hub serving-ministry catalog.
+ * Align the ministries table with the Hub serving-ministry catalog.
  *
  * Default is a dry-run. Pass --apply to rename, create, and deactivate.
  *
  *   php tools/sync-ministry-catalog.php
  *   php tools/sync-ministry-catalog.php --apply
  *
- * Existing group ids are kept on rename so memberships, roles, and schedules
- * stay attached. "GS: Usher" is Guest Services + role Usher, not a second
+ * Existing ministry ids are kept on rename so memberships, serving roles, and
+ * schedules stay attached. "GS: Usher" is Guest Services + role Usher, not a second
  * ministry. G&A is Gifts and Arrows.
  */
 
@@ -28,7 +28,7 @@ spl_autoload_register(static function (string $class): void {
 });
 
 use App\Core\Config\EnvLoader;
-use App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter;
+use App\Adapters\Sql\SqlMinistryAdapter;
 use App\Core\Database\MembersConnection;
 use App\Services\MinistryCatalog;
 
@@ -43,11 +43,11 @@ EnvLoader::loadOnce(__DIR__ . '/../.env');
 
 $catalog = MinistryCatalog::fromFile(__DIR__ . '/../config/ministry-catalog.json');
 $pdo = MembersConnection::get();
-$adapter = new ChurchCrmMinistryAdapter($pdo);
+$adapter = new SqlMinistryAdapter($pdo);
 
 $existing = $adapter->listMinistriesAdmin(null);
 if ($existing === [] && $pdo === null) {
-    fwrite(STDERR, "ChurchCRM database is not configured. Set CHURCHCRM_DB_* in .env.\n");
+    fwrite(STDERR, "The member database is not configured. Set MEMBERS_DB_* in .env.\n");
     exit(1);
 }
 
@@ -152,7 +152,7 @@ $existingRoleNames = static function ($pdo, int $ministryId): array {
     if ($pdo === null || $ministryId <= 0) {
         return [];
     }
-    $stmt = $pdo->prepare('SELECT role_name FROM roles WHERE ministry_group_id = :id');
+    $stmt = $pdo->prepare('SELECT name FROM serving_roles WHERE ministry_id = :id');
     $stmt->execute([':id' => $ministryId]);
     $names = [];
     foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $name) {

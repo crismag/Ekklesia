@@ -190,7 +190,7 @@ final class MinistryCatalog
     }
 
     /**
-     * Match an existing group_grp name to a catalog serving ministry.
+     * Match an existing ministry name to a catalog serving ministry.
      *
      * @return array{name:string,description:string,aliases:list<string>,roles:list<string>}|null
      */

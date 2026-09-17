@@ -359,33 +359,31 @@ final readonly class MinistryService
                 'firstName' => (string) ($row['first_name'] ?? ''),
                 'lastName' => (string) ($row['last_name'] ?? ''),
                 'displayName' => (string) $row['display_name'],
-                'familyId' => ($row['family_id'] ?? null) === null ? null : (int) $row['family_id'],
-                'classificationId' => ($row['classification_id'] ?? null) === null ? null : (int) $row['classification_id'],
-                'classificationName' => (string) ($row['classification_name'] ?? ''),
+                'familyId' => ($row['household_id'] ?? null) === null ? null : (int) $row['household_id'],
+                'classificationId' => ($row['membership_status_id'] ?? null) === null ? null : (int) $row['membership_status_id'],
+                'classificationName' => (string) ($row['membership_status_name'] ?? ''),
                 'memberTypeId' => ($row['member_type_id'] ?? null) === null ? null : (int) $row['member_type_id'],
                 'memberTypeName' => (string) ($row['member_type_name'] ?? ''),
-                'familyName' => (string) ($row['family_name'] ?? ''),
-                'isActive' => ($row['family_deactivated_at'] ?? null) === null,
+                'familyName' => (string) ($row['household_name'] ?? ''),
+                'isActive' => ($row['household_deactivated_on'] ?? null) === null,
                 'birthMonth' => ($row['birth_month'] ?? null) === null ? null : (int) $row['birth_month'],
                 'birthDay' => ($row['birth_day'] ?? null) === null ? null : (int) $row['birth_day'],
                 'birthYear' => ($row['birth_year'] ?? null) === null ? null : (int) $row['birth_year'],
-                'dateEntered' => ($row['date_entered'] ?? null) instanceof DateTimeImmutable ? $row['date_entered'] : null,
-                'dateLastEdited' => ($row['date_last_edited'] ?? null) instanceof DateTimeImmutable ? $row['date_last_edited'] : null,
+                'dateEntered' => ($row['created_at'] ?? null) instanceof DateTimeImmutable ? $row['created_at'] : null,
+                'dateLastEdited' => ($row['updated_at'] ?? null) instanceof DateTimeImmutable ? $row['updated_at'] : null,
                 'email' => (string) ($row['email'] ?? ''),
                 'mobilePhone' => (string) ($row['mobile_phone'] ?? ''),
                 'homePhone' => (string) ($row['home_phone'] ?? ''),
                 'address' => [
-                    'line1' => (string) ($row['address1'] ?? ''),
-                    'line2' => (string) ($row['address2'] ?? ''),
+                    'line1' => (string) ($row['address_line1'] ?? ''),
+                    'line2' => (string) ($row['address_line2'] ?? ''),
                     'city' => (string) ($row['city'] ?? ''),
-                    'state' => (string) ($row['state'] ?? ''),
-                    'zip' => (string) ($row['zip'] ?? ''),
+                    'state' => (string) ($row['region'] ?? ''),
+                    'zip' => (string) ($row['postal_code'] ?? ''),
                     'country' => (string) ($row['country'] ?? ''),
                 ],
-                'publicLinks' => array_values(array_filter([
-                    trim((string) ($row['facebook'] ?? '')) !== '' ? ['type' => 'facebook', 'label' => 'Facebook', 'url' => (string) $row['facebook']] : null,
-                    trim((string) ($row['linkedin'] ?? '')) !== '' ? ['type' => 'linkedin', 'label' => 'LinkedIn', 'url' => (string) $row['linkedin']] : null,
-                ])),
+                // Facebook / LinkedIn were never filled in and are not kept.
+                'publicLinks' => [],
                 'primaryCampusId' => $row['primary_campus_id'] === null ? null : (int) $row['primary_campus_id'],
                 'primaryCampusName' => (string) ($row['primary_campus_name'] ?? ''),
                 'assignmentCount' => (int) $row['assignment_count'],
@@ -454,14 +452,14 @@ final readonly class MinistryService
 
         return array_map(
             static function (array $row): MinistryRole {
-                $isLeaderRole = preg_match('/leader|head|coordinator|director|pastor/i', $row['role_name']) === 1;
+                $isLeaderRole = preg_match('/leader|head|coordinator|director|pastor/i', $row['name']) === 1;
 
                 return new MinistryRole(
-                    id: (int) $row['role_id'],
-                    name: (string) $row['role_name'],
+                    id: (int) $row['id'],
+                    name: (string) $row['name'],
                     isLeaderRole: $isLeaderRole,
-                    order: (int) ($row['order'] ?? 0),
-                    active: (bool) ($row['active'] ?? true),
+                    order: (int) ($row['sort_order'] ?? 0),
+                    active: (bool) ($row['is_active'] ?? true),
                     assignedCount: (int) ($row['assigned_count'] ?? 0),
                     assignedMembers: $row['assigned_members'] ?? [],
                 );
@@ -536,14 +534,14 @@ final readonly class MinistryService
         ];
 
         $rawRole = $this->ministryRepository->createMinistryRole($ministryId, $roleData);
-        $isLeaderRole = preg_match('/leader|head|coordinator|director|pastor/i', $rawRole['role_name']) === 1;
+        $isLeaderRole = preg_match('/leader|head|coordinator|director|pastor/i', $rawRole['name']) === 1;
 
         return new MinistryRole(
-            id: (int) $rawRole['role_id'],
-            name: (string) $rawRole['role_name'],
+            id: (int) $rawRole['id'],
+            name: (string) $rawRole['name'],
             isLeaderRole: $isLeaderRole,
-            order: (int) ($rawRole['order'] ?? 0),
-            active: (bool) ($rawRole['active'] ?? true),
+            order: (int) ($rawRole['sort_order'] ?? 0),
+            active: (bool) ($rawRole['is_active'] ?? true),
             assignedCount: 0,
             assignedMembers: [],
         );
@@ -578,14 +576,14 @@ final readonly class MinistryService
         }
 
         $rawRole = $this->ministryRepository->updateMinistryRole($roleId, $roleData);
-        $isLeaderRole = preg_match('/leader|head|coordinator|director|pastor/i', $rawRole['role_name']) === 1;
+        $isLeaderRole = preg_match('/leader|head|coordinator|director|pastor/i', $rawRole['name']) === 1;
 
         return new MinistryRole(
-            id: (int) $rawRole['role_id'],
-            name: (string) $rawRole['role_name'],
+            id: (int) $rawRole['id'],
+            name: (string) $rawRole['name'],
             isLeaderRole: $isLeaderRole,
-            order: (int) ($rawRole['order'] ?? 0),
-            active: (bool) ($rawRole['active'] ?? true),
+            order: (int) ($rawRole['sort_order'] ?? 0),
+            active: (bool) ($rawRole['is_active'] ?? true),
             assignedCount: (int) ($rawRole['assigned_count'] ?? 0),
             assignedMembers: $rawRole['assigned_members'] ?? [],
         );
@@ -648,18 +646,18 @@ final readonly class MinistryService
     }
 
     // ---------------------------------------------------------------------
-    // Ministry group CRUD (portal-wide admin only)
+    // Ministry CRUD (portal-wide admin only)
     // ---------------------------------------------------------------------
 
     private function requireAdmin(ActorContext $context): void
     {
         if (!$context->isPortalWideAdmin) {
-            throw new PermissionDenied('Only a portal-wide admin can manage ministry groups.');
+            throw new PermissionDenied('Only a portal-wide admin can manage ministries.');
         }
     }
 
     /**
-     * @return list<array{ministry_id:int,name:string,active:bool,campus_id:?int,member_count:int,role_count:int}>
+     * @return list<array{ministry_id:int,name:string,active:bool,campus_id:?int,member_count:int,leader_count:int,role_count:int}>
      */
     public function listMinistriesAdmin(ActorContext $context, ?int $campusId = null): array
     {
@@ -780,9 +778,9 @@ final readonly class MinistryService
     }
 
     /**
-     * Full roster (every member) of a ministry with their resolved role.
+     * Full roster (every member) of a ministry with their role and positions.
      *
-     * @return list<array{person_id:int,display_name:string,role_id:int,role_name:string,is_leader:bool}>
+     * @return list<array{person_id:int,display_name:string,role:string,role_name:string,is_leader:bool,positions:list<string>}>
      */
     public function getMinistryMembers(ActorContext $context, int $ministryId, ?int $campusId = null): array
     {
@@ -804,9 +802,9 @@ final readonly class MinistryService
     }
 
     /**
-     * Group roles (member types) for a ministry, for the "add member" picker.
+     * Membership roles (Member / Leader) for the "add member" picker.
      *
-     * @return list<array{id:int,name:string,is_default:bool}>
+     * @return list<array{id:string,name:string,is_default:bool}>
      */
     public function getGroupRoles(ActorContext $context, int $ministryId): array
     {
@@ -826,13 +824,17 @@ final readonly class MinistryService
     }
 
     /**
-     * Set a member's single role in a ministry (roleId 0 = member with no role).
-     * Adds the membership if the person isn't in the ministry yet.
+     * Set a member's role in a ministry: 'member' or 'leader'. Adds the
+     * membership if the person isn't in the ministry yet.
      */
-    public function setMemberRole(ActorContext $context, int $ministryId, int $personId, int $roleId): bool
+    public function setMemberRole(ActorContext $context, int $ministryId, int $personId, string $role): bool
     {
         if ($ministryId <= 0 || $personId <= 0) {
             throw new ValidationFailed('Ministry id and person id are required.');
+        }
+
+        if ($role !== 'member' && $role !== 'leader') {
+            throw new ValidationFailed('A ministry role is member or leader.');
         }
 
         if (!$context->hasPermission(PortalPermission::ManageSchedules)) {
@@ -843,7 +845,7 @@ final readonly class MinistryService
             throw new PermissionDenied('Actor is outside the requested ministry scope.');
         }
 
-        return $this->ministryRepository->setMemberRole($personId, $ministryId, $roleId);
+        return $this->ministryRepository->setMemberRole($personId, $ministryId, $role);
     }
 
     public function removeMemberFromMinistry(ActorContext $context, int $ministryId, int $personId): bool
@@ -864,8 +866,8 @@ final readonly class MinistryService
     }
 
     /**
-     * Tag a member as a leader of a ministry. This is a separate designation —
-     * it never changes the member's work/assignment role.
+     * Make a member a leader of a ministry (role 'leader'). Serving roles on
+     * the schedule are unaffected.
      */
     public function tagLeader(ActorContext $context, int $ministryId, int $personId): bool
     {

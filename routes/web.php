@@ -251,7 +251,7 @@ $renderScheduleEditor = function (array $req) use ($resolveCampusSelector, $reso
     $ministryName = 'Ministry #' . $ministryId;
     try {
         $ministryRepo = new \App\Repositories\DefaultMinistryRepository(
-            new \App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter(\App\Core\Database\MembersConnection::get())
+            new \App\Adapters\Sql\SqlMinistryAdapter(\App\Core\Database\MembersConnection::get())
         );
         $ministry = $ministryRepo->findMinistry($ministryId);
         if ($ministry !== null && trim((string) ($ministry['name'] ?? '')) !== '') {
@@ -361,7 +361,7 @@ $webRoutes = [
 
     'GET /scheduler/{ministry_name}' => function (array $req) use ($renderScheduleEditor, $parseCampusFilter): string {
         $ministryRepo = new \App\Repositories\DefaultMinistryRepository(
-            new \App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter(\App\Core\Database\MembersConnection::get())
+            new \App\Adapters\Sql\SqlMinistryAdapter(\App\Core\Database\MembersConnection::get())
         );
         $campusSlugs = $parseCampusFilter($req['campus'] ?? null);
         $campuses = $ministryRepo->resolveCampuses($campusSlugs);
@@ -389,7 +389,7 @@ $webRoutes = [
 
     'GET /scheduler/{campus}/{ministry_name}' => function (array $req) use ($renderScheduleEditor): string {
         $ministryRepo = new \App\Repositories\DefaultMinistryRepository(
-            new \App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter(\App\Core\Database\MembersConnection::get())
+            new \App\Adapters\Sql\SqlMinistryAdapter(\App\Core\Database\MembersConnection::get())
         );
         $resolved = $ministryRepo->resolveScheduleRoute(
             (string) ($req['campus'] ?? ''),
