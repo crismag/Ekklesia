@@ -763,8 +763,8 @@ final readonly class PersonAdminService
     private function audit(int $actorId, string $action, int $personId): void
     {
         $this->db->prepare(
-            'INSERT INTO audit_log (person_id, action, target_type, target_id)
-             VALUES ((SELECT id FROM people WHERE id = :actor), :action, "person", :target)'
-        )->execute([':actor' => $actorId, ':action' => $action, ':target' => (string) $personId]);
+            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id)
+             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "person", :target)'
+        )->execute([':actor' => $actorId, ':actor2' => $actorId, ':action' => $action, ':target' => (string) $personId]);
     }
 }

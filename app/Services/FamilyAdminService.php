@@ -407,18 +407,18 @@ final readonly class FamilyAdminService
     }
 
     /**
-     * Record who changed a household. The actor id callers pass is a person id;
-     * a value that is not one is kept as no one rather than breaking the write.
+     * Record who changed a household. The actor id is the signed-in account; its person, if any, is recorded too.
+     * An id that is not an account is kept as no one rather than breaking the write.
      *
      * @param array<string,mixed>|null $details
      */
     private function audit(int $actorId, string $action, int $householdId, ?array $details = null): void
     {
         $this->db->prepare(
-            'INSERT INTO audit_log (person_id, action, target_type, target_id, details)
-             VALUES ((SELECT id FROM people WHERE id = :actor), :action, "household", :target, :details)'
+            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id, details)
+             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "household", :target, :details)'
         )->execute([
-            ':actor' => $actorId, ':action' => $action, ':target' => (string) $householdId,
+            ':actor' => $actorId, ':actor2' => $actorId, ':action' => $action, ':target' => (string) $householdId,
             ':details' => $details === null ? null : json_encode($details),
         ]);
     }

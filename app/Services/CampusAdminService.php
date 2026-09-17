@@ -219,14 +219,14 @@ final readonly class CampusAdminService
     }
 
     /**
-     * Record who changed a campus. The actor id callers pass is a person id; a
-     * value that is not one is kept as no one rather than breaking the write.
+     * Record who changed a campus. The actor id is the signed-in account; its person, if
+     * any, is recorded too. An id that is not an account is kept as no one.
      */
     private function audit(int $actorId, string $action, int $campusId): void
     {
         $this->db->prepare(
-            'INSERT INTO audit_log (person_id, action, target_type, target_id)
-             VALUES ((SELECT id FROM people WHERE id = :actor), :action, "campus", :target)'
-        )->execute([':actor' => $actorId, ':action' => $action, ':target' => (string) $campusId]);
+            'INSERT INTO audit_log (account_id, person_id, action, target_type, target_id)
+             VALUES ((SELECT id FROM user_accounts WHERE id = :actor), (SELECT person_id FROM user_accounts WHERE id = :actor2), :action, "campus", :target)'
+        )->execute([':actor' => $actorId, ':actor2' => $actorId, ':action' => $action, ':target' => (string) $campusId]);
     }
 }

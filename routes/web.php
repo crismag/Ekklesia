@@ -915,7 +915,7 @@ $webRoutes = [
         if (!$canManage) { http_response_code(403); return json_encode(['success' => false]); }
         $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
         try {
-            $svc->setPrimaryCampus($target, (int) ($req['campus_id'] ?? 0) ?: null, (int) ($actor['personId'] ?? $actor['actorId'] ?? 0));
+            $svc->setPrimaryCampus($target, (int) ($req['campus_id'] ?? 0) ?: null, (int) ($actor['actorId'] ?? 0));
             return json_encode(['success' => true]);
         } catch (\Throwable $e) {
             http_response_code(422); return json_encode(['success' => false, 'error' => $e->getMessage()]);
@@ -1280,7 +1280,7 @@ $webRoutes = [
             return '';
         }
         $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $actorId = (int) ($actor['personId'] ?? $actor['actorId'] ?? 0);
+        $actorId = (int) ($actor['actorId'] ?? 0);
         try {
             $id = $svc->save($req, $actorId);
             header('Location: ' . $basePath . '/admin/people/edit?id=' . $id . '&notice=saved', true, 302);
@@ -1632,7 +1632,7 @@ $webRoutes = [
             return '';
         }
         $svc = \App\Providers\PortalServiceProvider::makeCampusAdminService();
-        $actorId = (int) ($actor['personId'] ?? $actor['actorId'] ?? 0);
+        $actorId = (int) ($actor['actorId'] ?? 0);
         $action = (string) ($req['action'] ?? '');
         try {
             if ($action === 'save') {
@@ -1856,7 +1856,7 @@ $webRoutes = [
             return '';
         }
         $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
-        $actorId = (int) ($actor['personId'] ?? $actor['actorId'] ?? 0);
+        $actorId = (int) ($actor['actorId'] ?? 0);
         try {
             $id = $svc->save($req, $actorId);
             header('Location: ' . $basePath . '/admin/families/edit?id=' . $id . '&notice=saved', true, 302);
@@ -1906,7 +1906,7 @@ $webRoutes = [
         }
         $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
         $rel = \App\Providers\PortalServiceProvider::makeRelatedFamiliesService();
-        $actorId = (int) ($actor['personId'] ?? $actor['actorId'] ?? 0);
+        $actorId = (int) ($actor['actorId'] ?? 0);
         $keep = (int) ($req['keep_id'] ?? 0);
         $mergeIds = $req['merge_ids'] ?? [];
         if (!is_array($mergeIds)) { $mergeIds = [$mergeIds]; }
@@ -2550,7 +2550,7 @@ $webRoutes = [
         }
         try {
             \App\Providers\PortalServiceProvider::makePersonAdminService()
-                ->saveOwnProfile($personId, $req, $personId);
+                ->saveOwnProfile($personId, $req, (int) ($actor['actorId'] ?? 0));
             return (string) json_encode(['success' => true]);
         } catch (\InvalidArgumentException $e) {
             http_response_code(422);
