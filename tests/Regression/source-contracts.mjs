@@ -70,7 +70,7 @@ console.log('Auth / schedule deny / HTML vs API');
 const web = read('routes/web.php');
 ok(web.includes("'GET /'"), 'GET / HTML route');
 ok(web.includes("'GET /admin'"), 'GET /admin HTML route');
-ok(web.includes('Home is the public visiting page'), 'home route treats missing auth as a guest, not a 500');
+ok(web.includes('Home is the portal entry for everyone'), 'home route treats missing auth as a guest, not a 500');
 ok(web.includes('isPortalWideAdmin'), 'admin mutations check isPortalWideAdmin');
 ok(web.includes('schedule_editor_denied'), 'schedule_editor_denied notice');
 const auth = read('app/Http/Controllers/Api/AuthController.php');
@@ -123,52 +123,27 @@ ok(perms.includes('ViewOwnAssignments'), 'ViewOwnAssignments exists');
 ok(perms.includes('ManageEvents'), 'ManageEvents exists');
 ok(perms.includes("'member'") && perms.includes('ViewOwnAssignments'), 'member role mapping present');
 
-console.log('Home page is the public church hub');
+console.log('Home is the portal dashboard, not the church website');
 const home = read('resources/views/index.php');
-ok(!home.includes('Continue Working'), 'home does not repeat destination tiles as Continue Working');
-ok(!home.includes('shoutoutSubmit') && !home.includes('Shout Out'), 'home does not ship a non-functional shout-out composer');
-ok(!home.includes('messageList'), 'home does not ship a placeholder message board');
-ok(home.includes('api/announcements'), 'home loads live announcements');
-ok(home.includes('api/public/events'), 'home loads public upcoming events');
-ok(home.includes('Visit'), 'home presents church visit/contact information');
-ok(home.includes('For you'), 'signed-in overlay is a For you section, not the whole page');
-ok(home.includes('This week'), 'signed-in Home shows a this-week strip');
-ok(home.includes('api/my-schedule'), 'this-week serving uses the existing my-schedule API');
-ok(home.includes('id="thisWeekList"'), 'this-week list is a For you block, not a second home page');
-ok(home.includes('Lead a ministry'), 'leaders jump into a ministry instead of duplicating People/Calendar cards');
-ok(!home.includes('Sign in to see upcoming events'), 'events are not gated behind sign-in');
-// The two columns were arranged deliberately: the wide column reads as the
-// church (who serves here, what is being said, what is coming), and the rail
-// reads as the person. Order is the whole point of the arrangement, so pin the
-// sequence rather than merely the presence of each panel.
-{
-  const at = (needle) => home.indexOf(needle);
-  const seq = (label, ...needles) => {
-    const idx = needles.map(at);
-    ok(idx.every((n) => n >= 0) && idx.every((n, i) => i === 0 || n > idx[i - 1]), label);
-  };
-  seq('home wide column runs Ministries, Announcements, Upcoming events',
-    'aria-label="Ministries"', 'aria-label="Announcements"', 'aria-label="Upcoming events"');
-  seq('home rail runs This week, For you, assignments, Visit, Shortcuts',
-    'aria-label="This week"', 'aria-label="For you"',
-    'aria-label="My upcoming assignments"', 'aria-label="Visit and contact"',
-    'aria-label="Shortcuts"');
-  // Ministries must be the first thing in the wide column, not merely present
-  // somewhere before Announcements -- the rail also mentions ministries.
-  ok(at('<div class="home-main">') < at('aria-label="Ministries"')
-    && at('aria-label="Upcoming events"') < at('<aside class="home-sidebar"'),
-    'the three wide-column panels all sit inside home-main');
+const homeSvc = read('app/Services/HomePageService.php');
+for (const [needle, what] of [
+  ['class="hero', 'a promotional hero'], ['heroBoot', 'the banner rotator'], ['api/hero', 'banner settings'],
+  ['ministry-tile', 'ministry marketing tiles'], ['Visit and contact', 'a visit/contact card'],
+  ['tel:', 'a phone link'], ['mailto:', 'an email link'], ['addressLine', 'the church address'],
+]) {
+  ok(!home.includes(needle), `home has no ${what}`);
 }
-// One footer landmark. portal_footer() renders a second <footer>, so a page
-// that builds its own must not also call it.
-ok(home.includes('<footer class="home-footer">'), 'home renders a site footer');
-// Match the echo, not the bare name -- the file explains in a comment why it
-// does not use portal_footer(), and a substring check flagged its own comment.
-ok(!home.includes('<?= portal_footer('), 'home does not stack a second footer under its own');
-ok(home.includes("portal_chrome()['footer']"),
-  'the home footer still carries the chrome-configured footer text');
-ok(home.includes('class="shortcut-box"'), 'home rail ends in clickable shortcut boxes');
-ok(!home.includes('quick-chip'), 'the shortcut chips the boxes replaced are gone');
+ok(!homeSvc.includes('makeChurchInfoService') && !homeSvc.includes('makeHeroSettingsService'),
+  'home composition reads no church presentation settings');
+ok(homeSvc.includes('Workspaces::visible('), 'home workspace shortcuts come from the workspace map');
+ok(homeSvc.includes('->getMySchedule(') && homeSvc.includes('->agenda($ctx'),
+  'home reads serving and events through the services that apply their rules');
+ok(homeSvc.includes('makeAnnouncementSettingsService') && homeSvc.includes('function portalNotices'),
+  'portal notices are read in one place, ready to move to a notices service');
+ok(!/\b(SELECT|INSERT|UPDATE|DELETE)\s/.test(homeSvc), 'HomePageService holds no SQL');
+ok(home.includes('<?= portal_footer() ?>'), 'home uses the shared portal footer');
+ok(!home.includes('Continue Working') && !home.includes('Shout Out') && !home.includes('messageList'),
+  'home ships no placeholder panels');
 
 console.log('Account profile');
 const acct = read('resources/views/account.php');
@@ -334,11 +309,9 @@ ok(read('resources/views/events-new.php').includes("portal_shell_mods('workspace
 ok(read('resources/views/docs.php').includes("portal_shell_mods('workspace')"),
   'docs grid fills the workspace; the article keeps its own readable max-width');
 ok(read('resources/views/index.php').includes("portal_shell_mods('workspace')"),
-  'public home fills the workspace like the rest of the portal');
+  'home fills the workspace like the rest of the portal');
 ok(!read('resources/views/index.php').includes("portal_shell_mods('wide')"),
-  'public home is not a centered wide column');
-ok(home.includes('<section class="hero"') && home.indexOf('<section class="hero"') < home.indexOf('id="portal-main"'),
-  'home hero is a shell sibling, same as People, not nested inside the main column');
+  'home is not a centered wide column');
 ok(read('resources/views/login.php').includes("portal_shell_mods('wide')"),
   'login opts into wide');
 ok(read('resources/views/account.php').includes("portal_shell_mods('wide')"),

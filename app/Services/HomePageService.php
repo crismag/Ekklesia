@@ -4,179 +4,418 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Core\ActorContext;
+use App\Core\Navigation\Workspaces;
+use App\Core\PortalPermission;
 use App\Providers\PortalServiceProvider;
+use DateTimeImmutable;
 
 /**
- * Composes the public church home page.
+ * Composes the portal home: a dashboard into the workspaces
+ * (docs/design/surfaces.md, "Home (portal dashboard)").
  *
- * Home is the main visiting page for everyone — not a signed-in dashboard
- * that happens to have a guest fallback. The composition has two layers:
+ * Ekklesia is the church's records and operations portal, not its website, so
+ * nothing here presents the church. Everything is read through the services
+ * that already own it and already apply their rules — event audience, "only
+ * your own schedule", ministry scope, admin-only record counts — so Home can
+ * never show more than the page it links to.
  *
- *   1. Church life (always): identity, hero, announcements, upcoming events,
- *      active ministries. These are what a visitor, member, or leader should
- *      all be able to see without signing in.
- *   2. Member overlay (the view, not this service): personal assignments and
- *      leader jump-ins. Those stay on Home so a signed-in person is not sent
- *      hunting, but they never replace layer 1.
+ * A section is null when this person is not offered it (the view renders
+ * nothing), and ['ok' => false] when it is offered but could not be read, so a
+ * failing query says so instead of pretending there is nothing to show.
  *
- * This service holds no SQL. Each feed is independently guarded so a down
- * events database still leaves announcements and church info on the page.
+ * This service holds no SQL.
  */
 final class HomePageService
 {
+    public const EVENT_WINDOW_DAYS = 14;
     public const EVENT_LIMIT = 8;
-    public const MINISTRY_LIMIT = 12;
+    public const SERVING_LIMIT = 6;
+    public const OPEN_ROLE_WINDOW_DAYS = 21;
+    /** Each ministry costs one schedule-grid read; a scheduler rarely has more. */
+    public const OPEN_ROLE_MINISTRY_LIMIT = 6;
+    public const OPEN_ROLE_OCCURRENCE_LIMIT = 3;
+
+    /** One line per workspace saying what it is for. */
+    public const WORKSPACE_PURPOSES = [
+        'home' => 'Your schedule, availability and account.',
+        'people' => 'The directory, member records and households.',
+        'ministries' => 'Each ministry’s members, leaders, serving roles and schedule.',
+        'events' => 'The church calendar and its events.',
+        'serving' => 'Who serves when: schedules, the board, rosters and printables.',
+        'visitors' => 'Guest sign-ups and event RSVPs.',
+        'admin' => 'Accounts and access, church settings, backups.',
+    ];
+
+    /** What each page open to signed-out visitors does, keyed by its label. */
+    public const PUBLIC_PAGE_PURPOSES = [
+        'Calendar' => 'Month and week views of what is scheduled.',
+        'Events' => 'Upcoming events, with times and places.',
+        'Guest sign-up' => 'Register as a guest or visitor.',
+    ];
 
     /** @param callable():mixed $fn */
-    private function attempt(callable $fn, mixed $fallback = null): mixed
+    private function attempt(callable $fn): mixed
     {
         try {
             return $fn();
         } catch (\Throwable) {
-            return $fallback;
+            return null;
         }
     }
 
     /**
-     * @return array{
-     *   church:array<string,string>,
-     *   addressLine:string,
-     *   hero:array<string,mixed>,
-     *   announcements:list<array<string,mixed>>,
-     *   events:list<array<string,mixed>>,
-     *   ministries:list<array<string,mixed>>
-     * }
+     * @return array<string,mixed>
      */
-    public function build(?int $campusId = null): array
+    public function build(?ActorContext $ctx, string $basePath, ?DateTimeImmutable $today = null): array
     {
-        $church = $this->attempt(static fn () => PortalServiceProvider::makeChurchInfoService()->load(), []);
-        $hero = $this->attempt(static fn () => PortalServiceProvider::makeHeroSettingsService()->load(), []);
-        $announcements = $this->attempt(static fn () => PortalServiceProvider::makeAnnouncementSettingsService()->publishedNow(), []);
-        $events = $this->attempt(static function () {
-            return array_map(
-                static fn ($e): array => $e->toArray(),
-                PortalServiceProvider::makeEventService()->listUpcomingPublic(self::EVENT_LIMIT),
+        $today ??= new DateTimeImmutable('today');
+        $home = self::skeleton($basePath, self::actorArray($ctx));
+        if ($ctx === null) {
+            return $home;
+        }
+
+        $home['notices'] = $this->section(fn (): array => $this->portalNotices($today));
+
+        $home['events'] = $this->section(static function () use ($ctx, $today): array {
+            $byDate = PortalServiceProvider::makeEventService()
+                ->agenda($ctx, $ctx->currentCampusId, 'upcoming', null, 60);
+
+            return self::upcomingEvents($byDate, $today, self::EVENT_WINDOW_DAYS, self::EVENT_LIMIT);
+        });
+
+        if ($ctx->personId === null) {
+            $home['unlinked'] = true;
+        } else {
+            if ($ctx->hasPermission(PortalPermission::ViewOwnAssignments)) {
+                $home['serving'] = $this->section(static function () use ($ctx, $today): array {
+                    $view = PortalServiceProvider::makeScheduleService()->getMySchedule(
+                        $ctx,
+                        (int) $ctx->personId,
+                        $today,
+                        $today->modify('+' . self::EVENT_WINDOW_DAYS . ' days'),
+                    );
+
+                    return self::servingRows(array_map(static fn ($a): array => $a->toArray(), $view->assignments));
+                });
+            }
+            $home['ministries'] = $this->section(
+                static fn (): array => self::myMinistries(PortalServiceProvider::makePersonAdminService()->ministriesFor((int) $ctx->personId)),
             );
-        }, []);
-        $ministries = $this->attempt(static function () use ($campusId) {
-            return PortalServiceProvider::makeMinistryService()->listMinistriesPublic($campusId);
-        }, []);
+        }
 
-        return self::compose([
-            'church' => is_array($church) ? $church : [],
-            'hero' => is_array($hero) ? $hero : [],
-            'announcements' => is_array($announcements) ? $announcements : [],
-            'events' => is_array($events) ? $events : [],
-            'ministries' => is_array($ministries) ? $ministries : [],
-        ]);
+        if ($ctx->hasPermission(PortalPermission::ManageSchedules) && $ctx->ministryScopeIds !== []) {
+            $home['openRoles'] = $this->section(fn (): array => $this->openRoles($ctx, $basePath, $today));
+        }
+
+        if ($ctx->isPortalWideAdmin) {
+            $home['records'] = $this->section(static function (): array {
+                $people = PortalServiceProvider::makePersonAdminService();
+                $households = PortalServiceProvider::makeFamilyAdminService()->stats();
+
+                return [
+                    'people' => $people->count([]),
+                    'households' => (int) ($households['total'] ?? 0),
+                    'withoutCampus' => $people->count(['campus' => PersonAdminService::NO_CAMPUS]),
+                ];
+            });
+        }
+
+        return $home;
     }
 
     /**
-     * @param array<string,mixed> $parts
-     * @return array{
-     *   church:array<string,string>,
-     *   addressLine:string,
-     *   hero:array<string,mixed>,
-     *   announcements:list<array<string,mixed>>,
-     *   events:list<array<string,mixed>>,
-     *   ministries:list<array<string,mixed>>
-     * }
+     * Home before anything is read: the workspace shortcuts, and every
+     * personal section absent.
+     *
+     * @param ?array<string,mixed> $actor
+     * @return array<string,mixed>
      */
-    public static function compose(array $parts): array
+    public static function skeleton(string $basePath, ?array $actor): array
     {
-        $churchIn = is_array($parts['church'] ?? null) ? $parts['church'] : [];
-        $church = [];
-        foreach (['name', 'website', 'phone', 'email', 'address', 'city', 'state', 'zip', 'country'] as $field) {
-            $church[$field] = trim((string) ($churchIn[$field] ?? ''));
-        }
-        if ($church['name'] === '') {
-            $church['name'] = 'Church Portal';
-        }
-
-        $hero = is_array($parts['hero'] ?? null) ? $parts['hero'] : [];
-        $slides = is_array($hero['slides'] ?? null) ? $hero['slides'] : [];
-        $behavior = is_array($hero['behavior'] ?? null) ? $hero['behavior'] : [];
-
-        $announcements = [];
-        foreach (is_array($parts['announcements'] ?? null) ? $parts['announcements'] : [] as $item) {
-            if (!is_array($item) || trim((string) ($item['title'] ?? '')) === '') {
-                continue;
-            }
-            $announcements[] = $item;
-        }
-
-        $events = [];
-        foreach (is_array($parts['events'] ?? null) ? $parts['events'] : [] as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $events[] = $item;
-            if (count($events) >= self::EVENT_LIMIT) {
-                break;
-            }
-        }
-
-        $ministries = [];
-        foreach (is_array($parts['ministries'] ?? null) ? $parts['ministries'] : [] as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $id = (int) ($item['ministry_id'] ?? $item['ministryId'] ?? 0);
-            $name = trim((string) ($item['name'] ?? ''));
-            if ($id <= 0 || $name === '') {
-                continue;
-            }
-            $campus = $item['campus_id'] ?? $item['campusId'] ?? null;
-            $ministries[] = [
-                'ministry_id' => $id,
-                'name' => $name,
-                'campus_id' => $campus === null || $campus === '' ? null : (int) $campus,
-            ];
-        }
-        usort($ministries, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
-        $ministries = array_slice($ministries, 0, self::MINISTRY_LIMIT);
-
         return [
-            'church' => $church,
-            'addressLine' => self::formatAddress($church),
-            'hero' => [
-                'behavior' => $behavior,
-                'slides' => $slides,
-            ],
-            'announcements' => $announcements,
-            'events' => $events,
-            'ministries' => $ministries,
+            'signedIn' => $actor !== null,
+            'unlinked' => false,
+            'workspaces' => self::workspaceCards($basePath, $actor),
+            'notices' => null,
+            'events' => null,
+            'serving' => null,
+            'ministries' => null,
+            'openRoles' => null,
+            'records' => null,
         ];
     }
 
     /**
-     * @return array{
-     *   church:array<string,string>,
-     *   addressLine:string,
-     *   hero:array<string,mixed>,
-     *   announcements:list<array<string,mixed>>,
-     *   events:list<array<string,mixed>>,
-     *   ministries:list<array<string,mixed>>
-     * }
+     * @param callable():array<mixed> $fn
+     * @return array{ok:bool,items:array<mixed>}
      */
-    public static function empty(): array
+    private function section(callable $fn): array
     {
-        return self::compose([]);
+        $items = $this->attempt($fn);
+
+        return is_array($items) ? ['ok' => true, 'items' => $items] : ['ok' => false, 'items' => []];
     }
 
-    /** @param array<string,string> $church */
-    private static function formatAddress(array $church): string
+    /**
+     * Short operational messages for portal users.
+     *
+     * Read today from the announcements settings (what the Admin workspace
+     * edits as "Portal notices"). When that becomes its own portal-notices
+     * service, this is the one method that changes.
+     *
+     * @return list<array{title:string,body:string,tag:string}>
+     */
+    private function portalNotices(DateTimeImmutable $today): array
     {
-        $line1 = trim($church['address'] ?? '');
-        $cityBits = array_values(array_filter([
-            trim($church['city'] ?? ''),
-            trim($church['state'] ?? ''),
-            trim($church['zip'] ?? ''),
-        ], static fn (string $p): bool => $p !== ''));
-        $line2 = implode(', ', $cityBits);
-        if ($line1 !== '' && $line2 !== '') {
-            return $line1 . ', ' . $line2;
+        $out = [];
+        foreach (PortalServiceProvider::makeAnnouncementSettingsService()->publishedNow($today) as $item) {
+            $title = trim((string) ($item['title'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+            $out[] = ['title' => $title, 'body' => trim((string) ($item['body'] ?? '')), 'tag' => (string) ($item['tag'] ?? '')];
         }
-        return $line1 !== '' ? $line1 : $line2;
+
+        return $out;
+    }
+
+    /**
+     * Unfilled roles in the ministries this scheduler is scoped to.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function openRoles(ActorContext $ctx, string $basePath, DateTimeImmutable $today): array
+    {
+        $names = [];
+        foreach (PortalServiceProvider::makeMinistryService()->listAccessibleMinistries($ctx) as $m) {
+            $names[(int) $m['ministryId']] = (string) $m['name'];
+        }
+        $schedules = PortalServiceProvider::makeScheduleService();
+        $end = $today->modify('+' . self::OPEN_ROLE_WINDOW_DAYS . ' days');
+
+        $ids = array_values(array_filter(
+            $ctx->ministryScopeIds,
+            static fn (int $id): bool => isset($names[$id]) && $ctx->canAccessMinistry($id),
+        ));
+        usort($ids, static fn (int $a, int $b): int => strcasecmp($names[$a], $names[$b]));
+
+        $out = [];
+        foreach (array_slice($ids, 0, self::OPEN_ROLE_MINISTRY_LIMIT) as $id) {
+            // The editor's own read, with the events it opens with by default,
+            // so "open" here means an empty cell there.
+            $grid = $this->attempt(static fn () => $schedules->getScheduleGrid($ctx, $id, $today, $end)->toArray());
+            if (!is_array($grid)) {
+                continue;
+            }
+            $occurrences = self::openRolesFromGrid($grid, self::OPEN_ROLE_OCCURRENCE_LIMIT);
+            if ($occurrences === []) {
+                continue;
+            }
+            $out[] = [
+                'ministryId' => $id,
+                'ministryName' => $names[$id],
+                'href' => rtrim($basePath, '/') . '/schedules?' . http_build_query([
+                    'ministry_id' => $id,
+                    'start' => $today->format('Y-m-d'),
+                    'end' => $end->format('Y-m-d'),
+                ]),
+                'occurrences' => $occurrences,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Occurrences in a schedule grid that have roles nobody is assigned to.
+     *
+     * @param array<string,mixed> $grid ScheduleGrid::toArray()
+     * @return list<array{occurrenceId:int,eventTitle:string,startsOn:string,roleCount:int,open:list<string>}>
+     */
+    public static function openRolesFromGrid(array $grid, int $limit = PHP_INT_MAX): array
+    {
+        $roles = [];
+        foreach (is_array($grid['roles'] ?? null) ? $grid['roles'] : [] as $role) {
+            if (is_array($role) && (int) ($role['id'] ?? 0) > 0) {
+                $roles[(int) $role['id']] = (string) ($role['name'] ?? '');
+            }
+        }
+        if ($roles === []) {
+            return [];
+        }
+        $filled = [];
+        foreach (is_array($grid['assignments'] ?? null) ? $grid['assignments'] : [] as $a) {
+            if (!is_array($a)) {
+                continue;
+            }
+            // A row with nobody on it (no person, no external name) is an open
+            // slot the editor recorded, not a filled one.
+            $someone = (int) ($a['personId'] ?? 0) > 0
+                || trim((string) ($a['label'] ?? '')) !== ''
+                || trim((string) ($a['displayName'] ?? '')) !== '';
+            if ($someone) {
+                $filled[(int) ($a['occurrenceId'] ?? 0)][(int) ($a['roleId'] ?? 0)] = true;
+            }
+        }
+        $occurrences = array_values(array_filter(
+            is_array($grid['occurrences'] ?? null) ? $grid['occurrences'] : [],
+            'is_array',
+        ));
+        usort($occurrences, static fn (array $x, array $y): int => strcmp((string) ($x['startsOn'] ?? ''), (string) ($y['startsOn'] ?? '')));
+
+        $out = [];
+        foreach ($occurrences as $o) {
+            $id = (int) ($o['id'] ?? 0);
+            $open = [];
+            foreach ($roles as $roleId => $name) {
+                if (!isset($filled[$id][$roleId])) {
+                    $open[] = $name;
+                }
+            }
+            if ($open === []) {
+                continue;
+            }
+            $out[] = [
+                'occurrenceId' => $id,
+                'eventTitle' => (string) ($o['eventTitle'] ?? ''),
+                'startsOn' => (string) ($o['startsOn'] ?? ''),
+                'roleCount' => count($roles),
+                'open' => $open,
+            ];
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The next occurrences within the window, from EventService::agenda().
+     *
+     * @param array<string,list<array<string,mixed>>> $byDate
+     * @return list<array{eventId:int,title:string,startsAt:string,location:string,cancelled:bool}>
+     */
+    public static function upcomingEvents(array $byDate, DateTimeImmutable $today, int $days, int $limit): array
+    {
+        $from = $today->setTime(0, 0)->format('Y-m-d H:i:s');
+        $to = $today->setTime(0, 0)->modify('+' . $days . ' days')->format('Y-m-d H:i:s');
+        $out = [];
+        foreach ($byDate as $rows) {
+            foreach (is_array($rows) ? $rows : [] as $r) {
+                $at = (string) ($r['starts_at'] ?? '');
+                if ($at < $from || $at >= $to) {
+                    continue;
+                }
+                $out[] = [
+                    'eventId' => (int) ($r['event_id'] ?? 0),
+                    'title' => (string) ($r['title'] ?? ''),
+                    'startsAt' => $at,
+                    'location' => (string) ($r['location_name'] ?? $r['host_campus_name'] ?? ''),
+                    'cancelled' => (bool) ($r['is_cancelled'] ?? false),
+                ];
+            }
+        }
+        usort($out, static fn (array $a, array $b): int => strcmp($a['startsAt'], $b['startsAt']));
+
+        return array_slice($out, 0, $limit);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $assignments MyAssignment::toArray()
+     * @return list<array{eventId:int,eventTitle:string,roleName:string,ministryName:string,startsOn:string}>
+     */
+    public static function servingRows(array $assignments): array
+    {
+        $out = [];
+        foreach ($assignments as $a) {
+            $out[] = [
+                'eventId' => (int) ($a['eventId'] ?? 0),
+                'eventTitle' => (string) ($a['eventTitle'] ?? ''),
+                'roleName' => (string) ($a['roleName'] ?? ''),
+                'ministryName' => (string) ($a['ministryName'] ?? ''),
+                'startsOn' => (string) ($a['startsOn'] ?? ''),
+            ];
+        }
+        usort($out, static fn (array $x, array $y): int => strcmp($x['startsOn'], $y['startsOn']));
+
+        return array_slice($out, 0, self::SERVING_LIMIT);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $rows PersonAdminService::ministriesFor()
+     * @return list<array{ministryId:int,name:string,isLeader:bool,roles:string}>
+     */
+    public static function myMinistries(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $m) {
+            $id = (int) ($m['ministry_id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+            $out[] = [
+                'ministryId' => $id,
+                'name' => (string) ($m['name'] ?? ''),
+                'isLeader' => (bool) ($m['is_leader'] ?? false),
+                'roles' => (string) ($m['roles'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * A card per workspace this person can use, from the workspace map, so
+     * Home offers exactly what the sidebar offers.
+     *
+     * @param ?array<string,mixed> $actor
+     * @return list<array{id:string,label:string,icon:string,purpose:string,href:string,pages:list<array{label:string,href:string,external:bool}>}>
+     */
+    public static function workspaceCards(string $basePath, ?array $actor): array
+    {
+        $cards = [];
+        foreach (Workspaces::visible($basePath, $actor) as $ws) {
+            $pages = [];
+            foreach ($ws['pages'] as $page) {
+                if ($ws['id'] === 'home' && $page['id'] === 'home') {
+                    continue;   // this page
+                }
+                $pages[] = ['label' => (string) $page['label'], 'href' => (string) $page['href'], 'external' => !empty($page['external'])];
+            }
+            if ($pages === []) {
+                continue;
+            }
+            $cards[] = [
+                'id' => (string) $ws['id'],
+                'label' => (string) $ws['label'],
+                'icon' => (string) $ws['icon'],
+                'purpose' => self::WORKSPACE_PURPOSES[$ws['id']] ?? '',
+                'href' => $pages[0]['href'],
+                'pages' => $pages,
+            ];
+        }
+
+        return $cards;
+    }
+
+    /** @return ?array<string,mixed> the shape Workspaces::visible() and the shell read */
+    public static function actorArray(?ActorContext $ctx): ?array
+    {
+        if ($ctx === null) {
+            return null;
+        }
+
+        return [
+            'actorId' => $ctx->actorId,
+            'personId' => $ctx->personId,
+            'displayName' => $ctx->displayName,
+            'isPortalWideAdmin' => $ctx->isPortalWideAdmin,
+            'permissions' => array_map(static fn (PortalPermission $p): string => $p->value, $ctx->permissions),
+            'ministryScopeIds' => $ctx->ministryScopeIds,
+            'currentCampusId' => $ctx->currentCampusId,
+            'currentCampusIds' => $ctx->currentCampusIds,
+        ];
     }
 }

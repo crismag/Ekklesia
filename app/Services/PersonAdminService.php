@@ -18,6 +18,9 @@ use RuntimeException;
  */
 final readonly class PersonAdminService
 {
+    /** The campus filter value meaning "no primary campus". No campus has this id. */
+    public const NO_CAMPUS = -1;
+
     public function __construct(private PDO $db)
     {
     }
@@ -126,6 +129,8 @@ final readonly class PersonAdminService
         if ($campus > 0) {
             $where[] = 'p.campus_id = :campus';
             $params[':campus'] = $campus;
+        } elseif ($campus === self::NO_CAMPUS) {
+            $where[] = 'p.campus_id IS NULL';
         }
         // -1 means "has none", which is the one an administrator filling gaps
         // actually wants; there is no member type with that id.

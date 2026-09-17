@@ -2574,59 +2574,49 @@ $webRoutes = [
         }
     },
 
-    'GET /' => function (array $req) use ($resolvePortalActor, $resolveAvailableMinistries, $resolveCampusSelector): string {
+    'GET /' => function (array $req) use ($resolveCampusSelector): string {
         /** @var string $basePath used by the template */
         $basePath = (string) ($req['_base_path'] ?? '');
-        // Home is the public visiting page. A missing portal DB, expired session
-        // store, or auth wiring fault must not 500 the church feed — guests
-        // still need events, announcements, ministries, and visit information.
-        $actor = null;
+        // Home is the portal entry for everyone: the dashboard when signed in,
+        // sign-in and the open portal functions when not. A missing session
+        // store or auth fault must not 500 it; the visitor is treated as signed
+        // out, which offers only what anyone may use.
+        $ctx = null;
         try {
-            $actor = $resolvePortalActor($req);
+            $ctx = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
         } catch (\Throwable) {
-            $actor = null;
-        }
-        $availableMinistries = [];
-        try {
-            $availableMinistries = $resolveAvailableMinistries($req);
-        } catch (\Throwable) {
-            $availableMinistries = [];
-        }
-        $campusSelector = ['campuses' => [], 'defaultCampusId' => null];
-        try {
-            $campusSelector = $resolveCampusSelector($req);
-        } catch (\Throwable) {
-            $campusSelector = ['campuses' => [], 'defaultCampusId' => null];
-        }
-        $home = \App\Services\HomePageService::empty();
-        try {
-            $home = \App\Providers\PortalServiceProvider::makeHomePageService()->build(
-                isset($req['current_campus_id']) && (int) $req['current_campus_id'] > 0
-                    ? (int) $req['current_campus_id']
-                    : null,
-            );
-        } catch (\Throwable) {
-            $home = \App\Services\HomePageService::empty();
-        }
-        $churchName = (string) ($home['church']['name'] ?? 'Church Portal');
-        $weekStart = new \DateTimeImmutable('today');
-        $weekEnd = $weekStart->modify('+7 days');
-        $thisWeekEvents = [];
-        foreach (is_array($home['events'] ?? null) ? $home['events'] : [] as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $when = (string) ($item['next_occurrence_at'] ?? '');
-            if ($when === '') {
-                continue;
-            }
+            // A campus parameter outside this person's scope must not make a
+            // signed-in person look signed out; drop it and resolve again.
             try {
-                $at = new \DateTimeImmutable($when);
-            } catch (\Exception) {
-                continue;
+                $ctx = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray(
+                    array_diff_key($req, ['current_campus_id' => true, 'current_campus_ids' => true]),
+                );
+            } catch (\Throwable) {
+                $ctx = null;
             }
-            if ($at >= $weekStart && $at < $weekEnd) {
-                $thisWeekEvents[] = $item;
+        }
+        // The campus the top bar shows (cookie or parameter), when this person
+        // may see it, so Home's events agree with the selector.
+        $homeCampusId = _campusContext($req);
+        if ($ctx !== null && $homeCampusId !== null && $ctx->canAccessCampus($homeCampusId)) {
+            $ctx = $ctx->withCurrentCampusId($homeCampusId);
+        }
+        /** @var ?array<string, mixed> $actor used by the template */
+        $actor = \App\Services\HomePageService::actorArray($ctx);
+        /** @var array<string, mixed> $home used by the template */
+        $home = \App\Services\HomePageService::skeleton($basePath, $actor);
+        try {
+            $home = \App\Providers\PortalServiceProvider::makeHomePageService()->build($ctx, $basePath);
+        } catch (\Throwable) {
+            // Keep the skeleton: the workspace shortcuts still work.
+        }
+        /** @var array<string, mixed> $campusSelector used by the template */
+        $campusSelector = ['campuses' => [], 'defaultCampusId' => null];
+        if ($ctx !== null) {
+            try {
+                $campusSelector = $resolveCampusSelector($req);
+            } catch (\Throwable) {
+                $campusSelector = ['campuses' => [], 'defaultCampusId' => null];
             }
         }
         ob_start();

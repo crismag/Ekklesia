@@ -1752,28 +1752,7 @@ assert_throws(\App\Exceptions\ValidationFailed::class, static fn () => $ann->sav
 ]), 'announcement without a body is rejected');
 @unlink($annFile);
 
-echo "Public home composition\n";
-$home = \App\Services\HomePageService::compose([
-    'church' => ['name' => 'Christlikeness', 'address' => '4544 Dufferin St.', 'city' => 'NorthYork', 'state' => 'ON', 'zip' => 'L4K 5M5', 'phone' => '555'],
-    'announcements' => [['id' => 'live1', 'title' => 'Choir', 'body' => 'Thursday', 'tag' => 'Ministry']],
-    'events' => [
-        ['event_id' => 9, 'title' => 'Sunday Service', 'occurrence_count' => 4, 'next_occurrence_at' => '2026-08-30 09:00:00'],
-        'skip-me',
-    ],
-    'ministries' => [
-        ['ministry_id' => 4, 'name' => 'Victuals', 'campus_id' => 1],
-        ['ministryId' => 2, 'name' => 'Psalmist'],
-        ['ministry_id' => 0, 'name' => 'Broken'],
-    ],
-    'hero' => ['slides' => [['kicker' => 'Welcome', 'title' => 'Hello', 'lead' => 'Come']]],
-]);
-assert_true($home['church']['name'] === 'Christlikeness', 'home church name is public identity');
-assert_true(str_contains($home['addressLine'], '4544 Dufferin'), 'home formats a visit address');
-assert_true(count($home['events']) === 1 && $home['events'][0]['event_id'] === 9, 'home keeps upcoming event rows and drops junk');
-assert_true($home['ministries'][0]['name'] === 'Psalmist' && $home['ministries'][1]['name'] === 'Victuals', 'home ministries are sorted by name');
-assert_true(count($home['announcements']) === 1, 'home announcements pass through');
-$emptyHome = \App\Services\HomePageService::empty();
-assert_true($emptyHome['church']['name'] === 'Church Portal' && $emptyHome['events'] === [] && $emptyHome['ministries'] === [], 'empty home still has a public church name');
+// The portal home is covered by tests/Regression/home-dashboard.php.
 
 $publicRepo = new FakeEventRepository();
 $publicRepo->audience = 'public';
