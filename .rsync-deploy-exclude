@@ -43,4 +43,5 @@ config/theme.json
 storage/maintenance.flag
 # Server-owned site lock (password prompt) for private deployments such as the demo.
 .htaccess-site-lock
+site-gate.php
 .htaccess.locked

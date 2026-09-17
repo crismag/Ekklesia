@@ -237,11 +237,12 @@ script refuses a path ending in `church_portal`, the Church Portal's production
 folder.
 
 **A private site** (the demo at ekklesiademo.crishub.com, which runs on real
-member data) keeps a server-only `.htaccess-site-lock` beside `.htaccess`: HTTP
-Basic authentication for the whole site, with the password file outside the web
-folder (`~/.htpasswds/…`). The deploy writes it on top of the repository's
-`.htaccess` and swaps the file in with one rename, so the site is never unlocked, and `EKKLESIA_SMOKE_AUTH=user:password` lets the smoke checks
-through.
+member data) is locked with the site gate in `tools/site-gate/`: every request
+without the gate's session cookie is sent to a password form, once per browser
+session. The lock lives in a server-only `.htaccess-site-lock`; the deploy writes
+it on top of the repository's `.htaccess` and swaps the file in with one rename,
+so the site is never unlocked. `EKKLESIA_SMOKE_COOKIE=ekklesia_site=<token>` lets
+the smoke checks through.
 
 ### Rollback and recovery
 

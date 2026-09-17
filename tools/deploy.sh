@@ -30,7 +30,8 @@
 #   tools/deploy.sh --skip-tests    sync without the local gate (say why)
 #
 # A private site (the demo): keep a server-only .htaccess-site-lock beside
-# .htaccess, and set EKKLESIA_SMOKE_AUTH=user:password for the smoke checks.
+# .htaccess (see tools/site-gate/README.md), and set EKKLESIA_SMOKE_COOKIE for the
+# smoke checks.
 #
 set -Eeuo pipefail
 
@@ -151,10 +152,13 @@ ssh "$REMOTE" "rm -f '$REMOTE_PATH/storage/maintenance.flag'"
 GATE_UP=0
 
 FAILED=0
-# A locked site answers 401 to strangers; EKKLESIA_SMOKE_AUTH=user:password
-# lets the smoke checks through.
+# A locked site answers 401 to strangers. EKKLESIA_SMOKE_COOKIE=name=value (the
+# site gate's cookie) or EKKLESIA_SMOKE_AUTH=user:password lets the smoke checks
+# through.
 SMOKE_AUTH=()
-if [ -n "${EKKLESIA_SMOKE_AUTH:-}" ]; then
+if [ -n "${EKKLESIA_SMOKE_COOKIE:-}" ]; then
+  SMOKE_AUTH=(-b "$EKKLESIA_SMOKE_COOKIE")
+elif [ -n "${EKKLESIA_SMOKE_AUTH:-}" ]; then
   SMOKE_AUTH=(-u "$EKKLESIA_SMOKE_AUTH")
 fi
 for path in "" "/events" "/calendar" "/api/public/events?limit=1"; do
