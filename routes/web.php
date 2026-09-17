@@ -1868,12 +1868,22 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
         $search = (string) ($req['q'] ?? '');
         $page = max(1, (int) ($req['page'] ?? 1));
         $perPage = 25;
-        $stats = $svc->stats();
-        $listing = $svc->list($search, $page, $perPage);
+        // Households carry addresses and contact details: administrators only.
+        $stats = ['total' => 0, 'active' => 0];
+        $listing = ['total' => 0, 'rows' => []];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
+            $stats = $svc->stats();
+            $listing = $svc->list($search, $page, $perPage);
+            $lastPage = max(1, (int) ceil(((int) $listing['total']) / $perPage));
+            if ($page > $lastPage) {
+                $page = $lastPage;
+                $listing = $svc->list($search, $page, $perPage);
+            }
+        }
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['family_flash'] ?? '');
         unset($_SESSION['family_flash']);
@@ -1887,14 +1897,24 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
         $fid = (int) ($req['id'] ?? 0);
-        $family = $fid > 0 ? $svc->find($fid) : null;
-        $family = $family ?? $svc->blank();
-        $members = $fid > 0 ? $svc->members($fid) : [];
+        $family = []; $members = []; $missing = false;
+        $recentHistory = ['entries' => [], 'total' => 0];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
+            $found = $fid > 0 ? $svc->find($fid) : null;
+            $missing = $fid > 0 && $found === null;
+            $family = $found ?? $svc->blank();
+            $members = $found !== null ? $svc->members($fid) : [];
+            if ($found !== null) {
+                try {
+                    $recentHistory = \App\Providers\PortalServiceProvider::makeRecordHistoryService()->recent($actor, 'household', $fid, 5);
+                } catch (\Throwable) { $recentHistory = ['entries' => [], 'total' => 0]; }
+            }
+        }
         // Related families (admin-confirmed map) + shared-residence families (derived).
         $relatedLinks = []; $residenceMates = []; $familyPickList = [];
-        if ($fid > 0) {
+        if ($isAdmin && !$missing && $fid > 0) {
             $rel = \App\Providers\PortalServiceProvider::makeRelatedFamiliesService();
             $raw = $rel->forFamily($fid);
             $names = $svc->namesFor(array_map(static fn ($l) => $l['other'], $raw));
