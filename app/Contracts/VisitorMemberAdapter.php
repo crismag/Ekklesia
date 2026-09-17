@@ -26,6 +26,15 @@ interface VisitorMemberAdapter
      * @param list<int> $personIds
      * @return array<int,array{id:int,name:string,city:string}>
      */
+    /**
+     * Who each account is, for "promoted by": the account's person's name, else
+     * its display name, else its email.
+     *
+     * @param list<int> $accountIds
+     * @return array<int,string>
+     */
+    public function accountNames(array $accountIds): array;
+
     public function peopleByIds(array $personIds): array;
 
     /** @return list<array{id:int,name:string}> membership_statuses in their order */

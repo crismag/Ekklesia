@@ -121,6 +121,18 @@ final class VisitorService
     }
 
     /**
+     * How many registrations are in each review state, for dashboards.
+     *
+     * @return array<string,int>
+     */
+    public function registrationCounts(?ActorContext $actor): array
+    {
+        $this->authorize($actor);
+
+        return $this->visitors->countRegistrationsByStatus();
+    }
+
+    /**
      * One registration with everything a reviewer decides from.
      *
      * @return ?array<string,mixed>
@@ -158,6 +170,7 @@ final class VisitorService
             'matches' => $matches,
             'duplicates' => $duplicates,
             'promotions' => $promotions,
+            'promoters' => $this->members->accountNames(array_map(static fn (array $p): int => (int) ($p['promoted_by_account_id'] ?? 0), $promotions)),
             'rsvps' => $rsvps,
             'people' => $this->members->peopleByIds($personIds),
             'source_event' => $events[(int) ($row['source_event_id'] ?? 0)] ?? null,

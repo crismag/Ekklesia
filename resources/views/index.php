@@ -210,6 +210,9 @@ $section = static fn (string $key): ?array => is_array($home[$key] ?? null) ? $h
             <a class="ek-stat" href="<?= $base ?>/admin/people"><span class="ek-stat-label">People</span><span class="ek-stat-value"><?= number_format((int) $r['people']) ?></span></a>
             <a class="ek-stat" href="<?= $base ?>/admin/families"><span class="ek-stat-label">Households</span><span class="ek-stat-value"><?= number_format((int) $r['households']) ?></span></a>
             <div class="ek-stat"><span class="ek-stat-label">Without a primary campus</span><span class="ek-stat-value"><?= number_format((int) $r['withoutCampus']) ?></span></div>
+            <?php if (($r['newRegistrations'] ?? null) !== null): ?>
+            <a class="ek-stat" href="<?= $base ?>/visitors"><span class="ek-stat-label">New visitor registrations</span><span class="ek-stat-value"><?= number_format((int) $r['newRegistrations']) ?></span></a>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
     </section>

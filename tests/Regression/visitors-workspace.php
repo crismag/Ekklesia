@@ -180,6 +180,8 @@ final class FakeMembers implements VisitorMemberRepository
         return array_values(array_filter($this->people, static fn ($p) =>
             ($lastName !== '' && strtolower($p['last_name']) === $lastName) || ($email !== '' && in_array($email, $p['emails'], true))));
     }
+    public function accountNames(array $accountIds): array { return []; }
+
     public function peopleByIds(array $personIds): array
     {
         $out = [];

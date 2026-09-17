@@ -49,6 +49,29 @@ final class SqlVisitorMemberAdapter implements VisitorMemberAdapter
         ], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
+    public function accountNames(array $accountIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $accountIds), static fn (int $n): bool => $n > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT a.id, a.email, a.display_name, p.first_name, p.last_name
+               FROM user_accounts a LEFT JOIN people p ON p.id = a.person_id
+              WHERE a.id IN ($ph)"
+        );
+        $stmt->execute($ids);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+            $person = trim((string) ($r['first_name'] ?? '') . ' ' . (string) ($r['last_name'] ?? ''));
+            $display = trim((string) ($r['display_name'] ?? ''));
+            $out[(int) $r['id']] = $person !== '' ? $person : ($display !== '' ? $display : (string) $r['email']);
+        }
+
+        return $out;
+    }
+
     public function peopleByIds(array $personIds): array
     {
         $ids = array_values(array_unique(array_filter(array_map('intval', $personIds), static fn (int $n): bool => $n > 0)));

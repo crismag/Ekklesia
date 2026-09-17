@@ -75,7 +75,7 @@ final class HomePageService
             return $home;
         }
 
-        $home['notices'] = $this->section(fn (): array => $this->portalNotices($today));
+        $home['notices'] = $this->section(fn (): array => $this->portalNotices($ctx, $today));
 
         $home['events'] = $this->section(static function () use ($ctx, $today): array {
             $byDate = PortalServiceProvider::makeEventService()
@@ -109,14 +109,22 @@ final class HomePageService
         }
 
         if ($ctx->isPortalWideAdmin) {
-            $home['records'] = $this->section(static function (): array {
+            $home['records'] = $this->section(static function () use ($ctx): array {
                 $people = PortalServiceProvider::makePersonAdminService();
                 $households = PortalServiceProvider::makeFamilyAdminService()->stats();
+
+                $registrations = null;
+                try {
+                    $registrations = (int) (PortalServiceProvider::makeVisitorService()->registrationCounts($ctx)['new'] ?? 0);
+                } catch (\Throwable) {
+                    // The visitors database may be unavailable; the other counts still stand.
+                }
 
                 return [
                     'people' => $people->count([]),
                     'households' => (int) ($households['total'] ?? 0),
                     'withoutCampus' => $people->count(['campus' => PersonAdminService::NO_CAMPUS]),
+                    'newRegistrations' => $registrations,
                 ];
             });
         }
@@ -160,16 +168,16 @@ final class HomePageService
     /**
      * Short operational messages for portal users.
      *
-     * Read today from the announcements settings (what the Admin workspace
-     * edits as "Portal notices"). When that becomes its own portal-notices
-     * service, this is the one method that changes.
+     * The Portal notices the Admin workspace publishes, for this reader's
+     * audience.
      *
      * @return list<array{title:string,body:string,tag:string}>
      */
-    private function portalNotices(DateTimeImmutable $today): array
+    private function portalNotices(ActorContext $ctx, DateTimeImmutable $today): array
     {
         $out = [];
-        foreach (PortalServiceProvider::makeAnnouncementSettingsService()->publishedNow($today) as $item) {
+        // activeNotices applies the audience: admins-only notices reach admins.
+        foreach (PortalServiceProvider::makeAnnouncementSettingsService()->activeNotices($ctx, $today) as $item) {
             $title = trim((string) ($item['title'] ?? ''));
             if ($title === '') {
                 continue;
@@ -377,11 +385,11 @@ final class HomePageService
     {
         $cards = [];
         foreach (Workspaces::visible($basePath, $actor) as $ws) {
+            if ($ws['id'] === 'home') {
+                continue;   // Home is this page; its other pages are in the sidebar.
+            }
             $pages = [];
             foreach ($ws['pages'] as $page) {
-                if ($ws['id'] === 'home' && $page['id'] === 'home') {
-                    continue;   // this page
-                }
                 $pages[] = ['label' => (string) $page['label'], 'href' => (string) $page['href'], 'external' => !empty($page['external'])];
             }
             if ($pages === []) {

@@ -163,7 +163,9 @@ echo visitors_render([
             $html .= '<p style="margin:0 0 8px">' . ($p['outcome'] === 'created' ? 'Created member record ' : 'Linked to member record ')
                 . $personLink($pid, $people[$pid]['name'] ?? 'Member #' . $pid)
                 . ' on ' . visitors_e(visitors_when((string) $p['promoted_at']))
-                . ($p['promoted_by_account_id'] !== null ? ' by account #' . (int) $p['promoted_by_account_id'] : ' from the sign-up review page') . '.</p>'
+                . ($p['promoted_by_account_id'] !== null
+                    ? ' by ' . visitors_e($record['promoters'][(int) $p['promoted_by_account_id']] ?? 'account #' . (int) $p['promoted_by_account_id'])
+                    : ' from the sign-up review page') . '.</p>'
                 . ($p['notes'] ? '<p class="vs-small vs-muted" style="margin:0 0 8px">' . visitors_e($p['notes']) . '</p>' : '');
         }
         $html .= '</div></section>';

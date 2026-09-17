@@ -16,6 +16,11 @@ final class DefaultVisitorMemberRepository implements VisitorMemberRepository
         return $this->adapter->personCandidates($lastName, $email);
     }
 
+    public function accountNames(array $accountIds): array
+    {
+        return $this->adapter->accountNames($accountIds);
+    }
+
     public function peopleByIds(array $personIds): array
     {
         return $this->adapter->peopleByIds($personIds);
