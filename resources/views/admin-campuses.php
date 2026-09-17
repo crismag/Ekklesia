@@ -1,7 +1,7 @@
 <?php
 /**
- * Admin · Campus Locations — self-contained CRUD over church_campus.
- * Data + actions come from CampusAdminService (no ChurchCRM dependency).
+ * Admin · Campus Locations — self-contained CRUD over campuses.
+ * Data + actions come from CampusAdminService.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -19,7 +19,7 @@ $base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
 $h = static fn ($v): string => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 $ec = $editingCampus;
 $v = static fn (string $k) => htmlspecialchars((string) ($ec[$k] ?? ''), ENT_QUOTES, 'UTF-8');
-$editing = (int) ($ec['campus_id'] ?? 0) > 0;
+$editing = (int) ($ec['id'] ?? 0) > 0;
 
 $noticeMap = [
     'saved'   => ['ok', 'Campus saved.'],
@@ -82,12 +82,12 @@ ob_start();
       <?php if (!$campuses): ?>
         <tr><td colspan="<?= $isAdmin ? 5 : 4 ?>" style="color:var(--muted);padding:18px;text-align:center">No campuses yet.</td></tr>
       <?php endif; ?>
-      <?php foreach ($campuses as $c): $cid = (int) $c['campus_id']; ?>
+      <?php foreach ($campuses as $c): $cid = (int) $c['id']; ?>
         <tr>
-          <td><b><?= $h($c['campus_name']) ?></b>
+          <td><b><?= $h($c['name']) ?></b>
             <?php if ((int) $c['is_main'] === 1): ?> <span class="cx-badge cx-main">Main</span><?php endif; ?></td>
-          <td><?= $h($c['campus_code']) ?></td>
-          <td><?= $h(trim(($c['city'] ?? '') . (($c['state'] ?? '') !== '' ? ', ' . $c['state'] : ''))) ?></td>
+          <td><?= $h($c['code']) ?></td>
+          <td><?= $h(trim(($c['city'] ?? '') . (($c['region'] ?? '') !== '' ? ', ' . $c['region'] : ''))) ?></td>
           <td><span class="cx-badge <?= (int) $c['is_active'] === 1 ? 'cx-on' : 'cx-off' ?>"><?= (int) $c['is_active'] === 1 ? 'Active' : 'Inactive' ?></span></td>
           <?php if ($isAdmin): ?>
           <td><div class="cx-actions">
@@ -98,7 +98,7 @@ ob_start();
                 <button class="cx-btn" type="submit">Set main</button>
               </form>
               <form method="post" action="<?= $base ?>/admin/campuses" style="display:inline"
-                    onsubmit="return confirm('Delete campus &quot;<?= $h($c['campus_name']) ?>&quot;? This cannot be undone.');">
+                    onsubmit="return confirm('Delete campus &quot;<?= $h($c['name']) ?>&quot;? This cannot be undone.');">
                 <input type="hidden" name="action" value="delete"><input type="hidden" name="campus_id" value="<?= $cid ?>">
                 <button class="cx-btn danger" type="submit">Delete</button>
               </form>
@@ -116,22 +116,22 @@ ob_start();
 <form class="cx-form" method="post" action="<?= $base ?>/admin/campuses">
   <h3 style="margin:0 0 12px"><?= $editing ? 'Edit campus' : 'Add a campus' ?></h3>
   <input type="hidden" name="action" value="save">
-  <input type="hidden" name="campus_id" value="<?= (int) ($ec['campus_id'] ?? 0) ?>">
+  <input type="hidden" name="id" value="<?= (int) ($ec['id'] ?? 0) ?>">
   <div class="cx-grid">
-    <div class="cx-field"><label for="cx_campus_name">Name <span class="cx-req">*</span></label><input id="cx_campus_name" type="text" name="campus_name" maxlength="150" required value="<?= $v('campus_name') ?>"></div>
-    <div class="cx-field"><label for="cx_campus_code">Code</label><input id="cx_campus_code" type="text" name="campus_code" maxlength="40" value="<?= $v('campus_code') ?>"></div>
-    <div class="cx-field full"><label for="cx_address1">Address line 1</label><input id="cx_address1" type="text" name="address1" maxlength="150" value="<?= $v('address1') ?>"></div>
-    <div class="cx-field full"><label for="cx_address2">Address line 2</label><input id="cx_address2" type="text" name="address2" maxlength="150" value="<?= $v('address2') ?>"></div>
+    <div class="cx-field"><label for="cx_name">Name <span class="cx-req">*</span></label><input id="cx_name" type="text" name="name" maxlength="150" required value="<?= $v('name') ?>"></div>
+    <div class="cx-field"><label for="cx_code">Code</label><input id="cx_code" type="text" name="code" maxlength="40" value="<?= $v('code') ?>"></div>
+    <div class="cx-field full"><label for="cx_address_line1">Address line 1</label><input id="cx_address_line1" type="text" name="address_line1" maxlength="150" value="<?= $v('address_line1') ?>"></div>
+    <div class="cx-field full"><label for="cx_address_line2">Address line 2</label><input id="cx_address_line2" type="text" name="address_line2" maxlength="150" value="<?= $v('address_line2') ?>"></div>
     <div class="cx-field"><label for="cx_city">City</label><input id="cx_city" type="text" name="city" maxlength="100" value="<?= $v('city') ?>"></div>
-    <div class="cx-field"><label for="cx_state">Province / State</label><input id="cx_state" type="text" name="state" maxlength="50" value="<?= $v('state') ?>"></div>
-    <div class="cx-field"><label for="cx_zip">Postal code</label><input id="cx_zip" type="text" name="zip" maxlength="20" value="<?= $v('zip') ?>"></div>
+    <div class="cx-field"><label for="cx_region">Province / State</label><input id="cx_region" type="text" name="region" maxlength="50" value="<?= $v('region') ?>"></div>
+    <div class="cx-field"><label for="cx_postal_code">Postal code</label><input id="cx_postal_code" type="text" name="postal_code" maxlength="20" value="<?= $v('postal_code') ?>"></div>
     <div class="cx-field"><label for="cx_country">Country</label><input id="cx_country" type="text" name="country" maxlength="100" value="<?= $v('country') ?>"></div>
     <div class="cx-field"><label for="cx_phone">Phone</label><input id="cx_phone" type="text" name="phone" maxlength="50" value="<?= $v('phone') ?>"></div>
     <div class="cx-field"><label for="cx_email">Email</label><input id="cx_email" type="email" name="email" maxlength="120" value="<?= $v('email') ?>"></div>
     <div class="cx-field"><label for="cx_website">Website</label><input id="cx_website" type="text" name="website" maxlength="200" value="<?= $v('website') ?>"></div>
-    <div class="cx-field"><label for="cx_time_zone">Time zone</label><input id="cx_time_zone" type="text" name="time_zone" maxlength="100" value="<?= $v('time_zone') ?>"></div>
+    <div class="cx-field"><label for="cx_time_zone">Time zone</label><input id="cx_time_zone" type="text" name="time_zone" maxlength="64" value="<?= $v('time_zone') ?>"></div>
     <?php if ($editing):
-        $currentDefault = (int) ($ec['default_assignment_event_id'] ?? 0);
+        $currentDefault = (int) ($ec['default_scheduling_event_id'] ?? 0);
         $assignmentEvents = is_array($assignmentEvents ?? null) ? $assignmentEvents : [];
         $defaultStillListed = false;
         foreach ($assignmentEvents as $ev) {
@@ -142,8 +142,8 @@ ob_start();
         }
     ?>
     <div class="cx-field full">
-      <label for="cx_default_assignment_event_id">Default assignment event</label>
-      <select id="cx_default_assignment_event_id" name="default_assignment_event_id" style="width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line,#c7d4cd);border-radius:8px;background:#fff">
+      <label for="cx_default_scheduling_event_id">Default assignment event</label>
+      <select id="cx_default_scheduling_event_id" name="default_scheduling_event_id" style="width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line,#c7d4cd);border-radius:8px;background:#fff">
         <option value="">None — scheduler opens with an empty event list until one is chosen</option>
         <?php if ($currentDefault > 0 && !$defaultStillListed): ?>
           <option value="<?= $currentDefault ?>" selected>Current default (event #<?= $currentDefault ?> — no longer eligible)</option>

@@ -167,8 +167,7 @@ final class PortalServiceProvider
     }
 
     /**
-     * Campus administration (CRUD over church_campus). Direct-PDO, no adapter —
-     * self-contained so it survives ChurchCRM decommissioning.
+     * Campus administration (CRUD over campuses). Direct-PDO, no adapter.
      */
     public static function makeCampusAdminService(): \App\Services\CampusAdminService
     {
@@ -186,8 +185,8 @@ final class PortalServiceProvider
     }
 
     /**
-     * People administration (person_per + family_fam + person_custom, shared DB).
-     * Direct-PDO, no ChurchCRM dependency.
+     * People administration (people + households + option lists, member DB).
+     * Direct-PDO.
      */
     public static function makePersonAdminService(): \App\Services\PersonAdminService
     {
@@ -259,24 +258,27 @@ final class PortalServiceProvider
         );
     }
 
-    /** Family administration (family_fam + members). Direct-PDO, no ChurchCRM dependency. */
+    /** Family administration (households + members). Direct-PDO. */
     public static function makeFamilyAdminService(): \App\Services\FamilyAdminService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
         return new \App\Services\FamilyAdminService(MembersConnection::get());
     }
 
-    /** Option manager (list_lst). Direct-PDO, no ChurchCRM dependency. */
+    /** Option manager (membership_statuses, household_roles, member_types). Direct-PDO. */
     public static function makeOptionAdminService(): \App\Services\OptionAdminService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
         return new \App\Services\OptionAdminService(MembersConnection::get());
     }
 
-    /** Related-families map (portal-owned JSON). No database columns. */
+    /** Related families (household_links). */
     public static function makeRelatedFamiliesService(): \App\Services\RelatedFamiliesService
     {
-        return new \App\Services\RelatedFamiliesService(dirname(__DIR__, 2) . '/config/related-families.json');
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+        return new \App\Services\RelatedFamiliesService(
+            new \App\Adapters\Sql\SqlHouseholdLinkAdapter(MembersConnection::get())
+        );
     }
 
     /**

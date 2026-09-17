@@ -9,15 +9,14 @@ use PDO;
 use RuntimeException;
 
 /**
- * Family administration — CRUD over family_fam (+ member lookups from person_per)
- * in the shared database. Direct-PDO, self-contained: NO dependency on any
- * ChurchCRM PHP so it keeps working after ChurchCRM is decommissioned.
+ * Family administration — CRUD over `households` (+ member lookups from
+ * `people`) in the member database. Direct-PDO, self-contained.
  */
 final readonly class FamilyAdminService
 {
     private const STR_FIELDS = [
-        'fam_Name', 'fam_Address1', 'fam_Address2', 'fam_City', 'fam_State',
-        'fam_Zip', 'fam_Country', 'fam_HomePhone', 'fam_Email',
+        'name', 'address_line1', 'address_line2', 'city', 'region',
+        'postal_code', 'country', 'home_phone', 'email',
     ];
 
     public function __construct(private PDO $db)
@@ -31,22 +30,22 @@ final readonly class FamilyAdminService
         $params = [];
         $search = trim($search);
         if ($search !== '') {
-            $where = ' WHERE CONCAT(f.fam_Name, " ", COALESCE(f.fam_City, ""), " ", COALESCE(f.fam_Email, "")) LIKE :s';
+            $where = ' WHERE CONCAT(f.name, " ", COALESCE(f.city, ""), " ", COALESCE(f.email, "")) LIKE :s';
             $params[':s'] = '%' . $search . '%';
         }
         $total = (int) (function () use ($where, $params) {
-            $st = $this->db->prepare('SELECT COUNT(*) FROM family_fam f' . $where);
+            $st = $this->db->prepare('SELECT COUNT(*) FROM households f' . $where);
             $st->execute($params);
             return $st->fetchColumn();
         })();
 
         $perPage = max(1, min(200, $perPage));
         $offset = max(0, ($page - 1) * $perPage);
-        $sql = 'SELECT f.fam_ID AS id, f.fam_Name AS name, f.fam_City AS city, f.fam_State AS state,
-                       f.fam_Email AS email, f.fam_HomePhone AS phone, f.fam_DateDeactivated AS deactivated,
-                       (SELECT COUNT(*) FROM person_per p WHERE p.per_fam_ID = f.fam_ID) AS members
-                  FROM family_fam f' . $where
-             . ' ORDER BY f.fam_Name ASC LIMIT :limit OFFSET :offset';
+        $sql = 'SELECT f.id, f.name, f.city, f.region,
+                       f.email, f.home_phone, f.deactivated_on,
+                       (SELECT COUNT(*) FROM people p WHERE p.household_id = f.id) AS members
+                  FROM households f' . $where
+             . ' ORDER BY f.name ASC LIMIT :limit OFFSET :offset';
         $st = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
             $st->bindValue($k, $v);
@@ -60,8 +59,8 @@ final readonly class FamilyAdminService
     /** @return array{total:int,active:int} */
     public function stats(): array
     {
-        $total = (int) $this->db->query('SELECT COUNT(*) FROM family_fam')->fetchColumn();
-        $active = (int) $this->db->query('SELECT COUNT(*) FROM family_fam WHERE fam_DateDeactivated IS NULL')->fetchColumn();
+        $total = (int) $this->db->query('SELECT COUNT(*) FROM households')->fetchColumn();
+        $active = (int) $this->db->query('SELECT COUNT(*) FROM households WHERE deactivated_on IS NULL')->fetchColumn();
         return ['total' => $total, 'active' => $active];
     }
 
@@ -71,7 +70,7 @@ final readonly class FamilyAdminService
         if ($id <= 0) {
             return null;
         }
-        $st = $this->db->prepare('SELECT * FROM family_fam WHERE fam_ID = :id');
+        $st = $this->db->prepare('SELECT * FROM households WHERE id = :id');
         $st->execute([':id' => $id]);
         return $st->fetch(PDO::FETCH_ASSOC) ?: null;
     }
@@ -79,10 +78,10 @@ final readonly class FamilyAdminService
     public function blank(): array
     {
         return [
-            'fam_ID' => 0, 'fam_Name' => '', 'fam_Address1' => '', 'fam_Address2' => '',
-            'fam_City' => '', 'fam_State' => 'Ontario', 'fam_Zip' => '', 'fam_Country' => 'CA',
-            'fam_HomePhone' => '', 'fam_Email' => '', 'fam_WeddingDate' => null,
-            'fam_SendNewsLetter' => 'FALSE', 'fam_DateDeactivated' => null,
+            'id' => 0, 'name' => '', 'address_line1' => '', 'address_line2' => '',
+            'city' => '', 'region' => 'Ontario', 'postal_code' => '', 'country' => 'CA',
+            'home_phone' => '', 'email' => '', 'wedding_date' => null,
+            'send_newsletter' => 0, 'deactivated_on' => null,
         ];
     }
 
@@ -93,13 +92,13 @@ final readonly class FamilyAdminService
             return [];
         }
         $st = $this->db->prepare(
-            'SELECT p.per_ID AS id, p.per_FirstName AS first_name, p.per_LastName AS last_name,
-                    p.per_Email AS email, p.per_CellPhone AS cell,
-                    fmr.lst_OptionName AS family_role, p.per_fmr_ID AS role_id
-               FROM person_per p
-               LEFT JOIN list_lst fmr ON fmr.lst_ID = 2 AND fmr.lst_OptionID = p.per_fmr_ID
-              WHERE p.per_fam_ID = :fam
-              ORDER BY p.per_fmr_ID ASC, p.per_LastName ASC, p.per_FirstName ASC'
+            'SELECT p.id, p.first_name, p.last_name,
+                    p.email, p.mobile_phone,
+                    hr.name AS family_role, p.household_role_id
+               FROM people p
+               LEFT JOIN household_roles hr ON hr.id = p.household_role_id
+              WHERE p.household_id = :fam
+              ORDER BY hr.sort_order IS NULL, hr.sort_order ASC, p.last_name ASC, p.first_name ASC'
         );
         $st->execute([':fam' => $famId]);
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -115,17 +114,17 @@ final readonly class FamilyAdminService
     public function residenceMates(int $famId): array
     {
         $fam = $this->find($famId);
-        $addr = trim((string) ($fam['fam_Address1'] ?? ''));
+        $addr = trim((string) ($fam['address_line1'] ?? ''));
         if ($fam === null || $addr === '') {
             return [];
         }
         $st = $this->db->prepare(
-            'SELECT f.fam_ID AS id, f.fam_Name AS name,
-                    (SELECT COUNT(*) FROM person_per p WHERE p.per_fam_ID = f.fam_ID) AS members
-               FROM family_fam f
-              WHERE f.fam_ID <> :self AND f.fam_DateDeactivated IS NULL
-                AND TRIM(f.fam_Address1) = :addr
-              ORDER BY f.fam_Name'
+            'SELECT f.id, f.name,
+                    (SELECT COUNT(*) FROM people p WHERE p.household_id = f.id) AS members
+               FROM households f
+              WHERE f.id <> :self AND f.deactivated_on IS NULL
+                AND TRIM(f.address_line1) = :addr
+              ORDER BY f.name'
         );
         $st->execute([':self' => $famId, ':addr' => $addr]);
         return array_map(static fn (array $r): array => [
@@ -141,11 +140,11 @@ final readonly class FamilyAdminService
             return [];
         }
         $in = implode(',', array_fill(0, count($ids), '?'));
-        $st = $this->db->prepare("SELECT fam_ID, fam_Name FROM family_fam WHERE fam_ID IN ($in)");
+        $st = $this->db->prepare("SELECT id, name FROM households WHERE id IN ($in)");
         $st->execute($ids);
         $out = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
-            $out[(int) $r['fam_ID']] = (string) $r['fam_Name'];
+            $out[(int) $r['id']] = (string) $r['name'];
         }
         return $out;
     }
@@ -153,7 +152,7 @@ final readonly class FamilyAdminService
     /** Active families for the "link a family" dropdown. @return list<array{id:int,name:string}> */
     public function pickList(int $excludeId = 0): array
     {
-        $st = $this->db->prepare('SELECT fam_ID AS id, fam_Name AS name FROM family_fam WHERE fam_DateDeactivated IS NULL AND fam_ID <> :ex ORDER BY fam_Name');
+        $st = $this->db->prepare('SELECT id, name FROM households WHERE deactivated_on IS NULL AND id <> :ex ORDER BY name');
         $st->execute([':ex' => $excludeId]);
         return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name']], $st->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
@@ -164,11 +163,11 @@ final readonly class FamilyAdminService
      */
     public function save(array $in, int $actorId): int
     {
-        $name = trim((string) ($in['fam_Name'] ?? ''));
+        $name = trim((string) ($in['name'] ?? ''));
         if ($name === '') {
             throw new InvalidArgumentException('Family name is required.');
         }
-        $email = trim((string) ($in['fam_Email'] ?? ''));
+        $email = trim((string) ($in['email'] ?? ''));
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Email address looks invalid.');
         }
@@ -178,37 +177,36 @@ final readonly class FamilyAdminService
             $v = trim((string) ($in[$f] ?? ''));
             $values[$f] = $v === '' ? null : $v;
         }
-        $values['fam_Name'] = $name;
-        $wed = trim((string) ($in['fam_WeddingDate'] ?? ''));
-        $values['fam_WeddingDate'] = $wed !== '' && strtotime($wed) ? date('Y-m-d', (int) strtotime($wed)) : null;
-        $values['fam_SendNewsLetter'] = (int) ($in['fam_SendNewsLetter'] ?? 0) === 1 ? 'TRUE' : 'FALSE';
+        $values['name'] = $name;
+        $wed = trim((string) ($in['wedding_date'] ?? ''));
+        $values['wedding_date'] = $wed !== '' && strtotime($wed) ? date('Y-m-d', (int) strtotime($wed)) : null;
+        $values['send_newsletter'] = (int) ($in['send_newsletter'] ?? 0) === 1 ? 1 : 0;
         // Active flag: deactivated when the checkbox is unchecked.
         $active = (int) ($in['is_active'] ?? 1) === 1;
 
-        $id = (int) ($in['fam_ID'] ?? 0);
+        $id = (int) ($in['id'] ?? 0);
         if ($id > 0) {
             $set = implode(', ', array_map(static fn ($c) => "`$c` = :$c", array_keys($values)));
-            $sql = "UPDATE family_fam SET $set,
-                        fam_DateDeactivated = :deact, fam_DateLastEdited = NOW(), fam_EditedBy = :actor
-                    WHERE fam_ID = :id";
+            $sql = "UPDATE households SET $set,
+                        deactivated_on = :deact, updated_at = NOW()
+                    WHERE id = :id";
             $params = [];
             foreach ($values as $k => $v) { $params[":$k"] = $v; }
             $params[':deact'] = $active ? null : date('Y-m-d');
-            $params[':actor'] = $actorId;
             $params[':id'] = $id;
             $this->db->prepare($sql)->execute($params);
+            $this->audit($actorId, 'household.updated', $id);
         } else {
             $cols = array_keys($values);
             $ph = array_map(static fn ($c) => ":$c", $cols);
-            $sql = 'INSERT INTO family_fam (' . implode(', ', $cols)
-                . ', fam_DateDeactivated, fam_DateEntered, fam_EnteredBy)'
-                . ' VALUES (' . implode(', ', $ph) . ', :deact, NOW(), :actor)';
+            $sql = 'INSERT INTO households (`' . implode('`, `', $cols) . '`, deactivated_on)'
+                . ' VALUES (' . implode(', ', $ph) . ', :deact)';
             $params = [];
             foreach ($values as $k => $v) { $params[":$k"] = $v; }
             $params[':deact'] = $active ? null : date('Y-m-d');
-            $params[':actor'] = $actorId;
             $this->db->prepare($sql)->execute($params);
             $id = (int) $this->db->lastInsertId();
+            $this->audit($actorId, 'household.created', $id);
         }
         return $id;
     }
@@ -223,11 +221,11 @@ final readonly class FamilyAdminService
     public function duplicateGroups(): array
     {
         $rows = $this->db->query(
-            'SELECT f.fam_ID AS id, f.fam_Name AS name, f.fam_City AS city, f.fam_Address1 AS addr,
-                    f.fam_Email AS email, LOWER(TRIM(f.fam_Name)) AS k,
-                    (SELECT COUNT(*) FROM person_per p WHERE p.per_fam_ID = f.fam_ID) AS members
-               FROM family_fam f WHERE f.fam_DateDeactivated IS NULL
-              ORDER BY k, members DESC, f.fam_ID'
+            'SELECT f.id, f.name, f.city, f.address_line1 AS addr,
+                    f.email, LOWER(TRIM(f.name)) AS k,
+                    (SELECT COUNT(*) FROM people p WHERE p.household_id = f.id) AS members
+               FROM households f WHERE f.deactivated_on IS NULL
+              ORDER BY k, members DESC, f.id'
         )->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $byKey = [];
         foreach ($rows as $r) {
@@ -293,12 +291,12 @@ final readonly class FamilyAdminService
         }
         $in = implode(',', array_map('intval', $familyIds));
         $rows = $this->db->query(
-            'SELECT LOWER(CONCAT(TRIM(COALESCE(per_FirstName, "")), " ", TRIM(COALESCE(per_LastName, "")))) AS who,
-                    COUNT(DISTINCT per_fam_ID) AS families,
-                    MIN(CONCAT(TRIM(COALESCE(per_FirstName, "")), " ", TRIM(COALESCE(per_LastName, "")))) AS label
-               FROM person_per
-              WHERE per_fam_ID IN (' . $in . ')
-                AND TRIM(COALESCE(per_FirstName, "")) <> ""
+            'SELECT LOWER(CONCAT(TRIM(COALESCE(first_name, "")), " ", TRIM(COALESCE(last_name, "")))) AS who,
+                    COUNT(DISTINCT household_id) AS families,
+                    MIN(CONCAT(TRIM(COALESCE(first_name, "")), " ", TRIM(COALESCE(last_name, "")))) AS label
+               FROM people
+              WHERE household_id IN (' . $in . ')
+                AND TRIM(COALESCE(first_name, "")) <> ""
               GROUP BY who
              HAVING families = ' . count($familyIds)
         )->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -321,12 +319,12 @@ final readonly class FamilyAdminService
     public function addressGroups(): array
     {
         $rows = $this->db->query(
-            'SELECT f.fam_ID AS id, f.fam_Name AS name, f.fam_City AS city, f.fam_Address1 AS addr,
-                    f.fam_Email AS email,
-                    (SELECT COUNT(*) FROM person_per p WHERE p.per_fam_ID = f.fam_ID) AS members
-               FROM family_fam f
-              WHERE f.fam_DateDeactivated IS NULL AND TRIM(f.fam_Address1) <> ""
-              ORDER BY f.fam_Name'
+            'SELECT f.id, f.name, f.city, f.address_line1 AS addr,
+                    f.email,
+                    (SELECT COUNT(*) FROM people p WHERE p.household_id = f.id) AS members
+               FROM households f
+              WHERE f.deactivated_on IS NULL AND TRIM(f.address_line1) <> ""
+              ORDER BY f.name'
         )->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $byKey = [];
         foreach ($rows as $r) {
@@ -364,7 +362,7 @@ final readonly class FamilyAdminService
 
     /**
      * Merge $mergeId into $keepId: reassign all its people to the kept family,
-     * then remove the now-empty family (and its family custom fields). Returns
+     * then remove the now-empty family (its links go with it). Returns
      * the number of people moved. Transactional; refuses same/unknown families.
      */
     public function merge(int $keepId, int $mergeId, int $actorId): int
@@ -377,11 +375,11 @@ final readonly class FamilyAdminService
         }
         $this->db->beginTransaction();
         try {
-            $st = $this->db->prepare('UPDATE person_per SET per_fam_ID = :keep, per_DateLastEdited = NOW(), per_EditedBy = :a WHERE per_fam_ID = :merge');
-            $st->execute([':keep' => $keepId, ':a' => $actorId, ':merge' => $mergeId]);
+            $st = $this->db->prepare('UPDATE people SET household_id = :keep, updated_at = NOW() WHERE household_id = :merge');
+            $st->execute([':keep' => $keepId, ':merge' => $mergeId]);
             $moved = $st->rowCount();
-            $this->db->prepare('DELETE FROM family_custom WHERE fam_ID = :m')->execute([':m' => $mergeId]);
-            $this->db->prepare('DELETE FROM family_fam WHERE fam_ID = :m')->execute([':m' => $mergeId]);
+            $this->db->prepare('DELETE FROM households WHERE id = :m')->execute([':m' => $mergeId]);
+            $this->audit($actorId, 'household.merged', $keepId, ['merged_household_id' => $mergeId, 'people_moved' => $moved]);
             $this->db->commit();
             return $moved;
         } catch (\Throwable $e) {
@@ -398,13 +396,30 @@ final readonly class FamilyAdminService
             throw new InvalidArgumentException('Unknown family.');
         }
         $count = (int) (function () use ($id) {
-            $st = $this->db->prepare('SELECT COUNT(*) FROM person_per WHERE per_fam_ID = :id');
+            $st = $this->db->prepare('SELECT COUNT(*) FROM people WHERE household_id = :id');
             $st->execute([':id' => $id]);
             return $st->fetchColumn();
         })();
         if ($count > 0) {
             throw new RuntimeException("This family still has $count member(s). Reassign them first, or deactivate the family instead.");
         }
-        $this->db->prepare('DELETE FROM family_fam WHERE fam_ID = :id')->execute([':id' => $id]);
+        $this->db->prepare('DELETE FROM households WHERE id = :id')->execute([':id' => $id]);
+    }
+
+    /**
+     * Record who changed a household. The actor id callers pass is a person id;
+     * a value that is not one is kept as no one rather than breaking the write.
+     *
+     * @param array<string,mixed>|null $details
+     */
+    private function audit(int $actorId, string $action, int $householdId, ?array $details = null): void
+    {
+        $this->db->prepare(
+            'INSERT INTO audit_log (person_id, action, target_type, target_id, details)
+             VALUES ((SELECT id FROM people WHERE id = :actor), :action, "household", :target, :details)'
+        )->execute([
+            ':actor' => $actorId, ':action' => $action, ':target' => (string) $householdId,
+            ':details' => $details === null ? null : json_encode($details),
+        ]);
     }
 }

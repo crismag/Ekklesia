@@ -9,18 +9,17 @@ use PDO;
 use RuntimeException;
 
 /**
- * Campus administration — CRUD over the shared `church_campus` table.
+ * Campus administration — CRUD over the `campuses` table.
  *
  * Direct-PDO (no adapter) and deliberately self-contained: it touches only the
- * `church_campus` table and reference counts, with NO dependency on any ChurchCRM
- * PHP so the portal keeps working after ChurchCRM is decommissioned.
+ * `campuses` table and reference counts.
  */
 final readonly class CampusAdminService
 {
     /** Columns the form is allowed to write. */
     private const FIELDS = [
-        'campus_name', 'campus_code', 'address1', 'address2', 'city', 'state',
-        'zip', 'country', 'phone', 'email', 'website', 'time_zone', 'notes',
+        'name', 'code', 'address_line1', 'address_line2', 'city', 'region',
+        'postal_code', 'country', 'phone', 'email', 'website', 'time_zone', 'notes',
     ];
 
     public function __construct(private PDO $db)
@@ -30,7 +29,7 @@ final readonly class CampusAdminService
     /** @return list<array<string,mixed>> */
     public function all(): array
     {
-        $sql = 'SELECT * FROM church_campus ORDER BY is_main DESC, is_active DESC, campus_name ASC';
+        $sql = 'SELECT * FROM campuses ORDER BY is_main DESC, is_active DESC, name ASC';
         return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
@@ -40,7 +39,7 @@ final readonly class CampusAdminService
         if ($id <= 0) {
             return null;
         }
-        $stmt = $this->db->prepare('SELECT * FROM church_campus WHERE campus_id = :id');
+        $stmt = $this->db->prepare('SELECT * FROM campuses WHERE id = :id');
         $stmt->execute([':id' => $id]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
@@ -49,19 +48,19 @@ final readonly class CampusAdminService
     public function blank(): array
     {
         return [
-            'campus_id' => 0, 'campus_name' => '', 'campus_code' => '', 'address1' => '',
-            'address2' => '', 'city' => '', 'state' => 'Ontario', 'zip' => '', 'country' => 'CA',
+            'id' => 0, 'name' => '', 'code' => '', 'address_line1' => '',
+            'address_line2' => '', 'city' => '', 'region' => 'Ontario', 'postal_code' => '', 'country' => 'CA',
             'phone' => '', 'email' => '', 'website' => '', 'time_zone' => 'America/Toronto',
             'is_active' => 1, 'is_main' => 0, 'notes' => '',
-            'default_assignment_event_id' => null,
+            'default_scheduling_event_id' => null,
         ];
     }
 
     /** @return array{count:int,main:?string} */
     public function stats(): array
     {
-        $count = (int) $this->db->query('SELECT COUNT(*) FROM church_campus')->fetchColumn();
-        $main = $this->db->query('SELECT campus_name FROM church_campus WHERE is_main = 1 LIMIT 1')->fetchColumn();
+        $count = (int) $this->db->query('SELECT COUNT(*) FROM campuses')->fetchColumn();
+        $main = $this->db->query('SELECT name FROM campuses WHERE is_main = 1 LIMIT 1')->fetchColumn();
         return ['count' => $count, 'main' => $main !== false ? (string) $main : null];
     }
 
@@ -72,7 +71,7 @@ final readonly class CampusAdminService
      */
     public function save(array $in, int $actorId): int
     {
-        $name = trim((string) ($in['campus_name'] ?? ''));
+        $name = trim((string) ($in['name'] ?? ''));
         if ($name === '') {
             throw new InvalidArgumentException('Campus name is required.');
         }
@@ -87,43 +86,45 @@ final readonly class CampusAdminService
             $v = trim((string) ($in[$f] ?? ''));
             $values[$f] = $v === '' ? null : $v;
         }
-        $values['campus_name'] = $name; // required, non-null
+        $values['name'] = $name; // required, non-null
+        // time_zone is NOT NULL; a blank field keeps the schema default.
+        $values['time_zone'] = $values['time_zone'] ?? 'America/Toronto';
         $isActive = (int) (($in['is_active'] ?? 0)) === 1 ? 1 : 0;
         $wantMain = (int) (($in['is_main'] ?? 0)) === 1;
-        $id = (int) ($in['campus_id'] ?? 0);
-        $defaultEventId = (int) ($in['default_assignment_event_id'] ?? 0);
+        $id = (int) ($in['id'] ?? 0);
+        $defaultEventId = (int) ($in['default_scheduling_event_id'] ?? 0);
         $defaultEventId = $defaultEventId > 0 ? $defaultEventId : null;
 
         if ($id > 0) {
-            $set = implode(', ', array_map(static fn ($f) => "$f = :$f", self::FIELDS));
-            $sql = "UPDATE church_campus SET $set, is_active = :is_active,
-                        default_assignment_event_id = :default_assignment_event_id,
-                        date_last_edited = NOW(), edited_by = :actor WHERE campus_id = :id";
+            $set = implode(', ', array_map(static fn ($f) => "`$f` = :$f", self::FIELDS));
+            $sql = "UPDATE campuses SET $set, is_active = :is_active,
+                        default_scheduling_event_id = :default_scheduling_event_id,
+                        updated_at = NOW() WHERE id = :id";
             $params = array_merge(
                 array_combine(array_map(static fn ($f) => ":$f", self::FIELDS), array_values($values)),
                 [
                     ':is_active' => $isActive,
-                    ':default_assignment_event_id' => $defaultEventId,
-                    ':actor' => $actorId,
+                    ':default_scheduling_event_id' => $defaultEventId,
                     ':id' => $id,
                 ]
             );
             $this->db->prepare($sql)->execute($params);
+            $this->audit($actorId, 'campus.updated', $id);
         } else {
-            $cols = implode(', ', self::FIELDS);
+            $cols = implode(', ', array_map(static fn ($f) => "`$f`", self::FIELDS));
             $ph   = implode(', ', array_map(static fn ($f) => ":$f", self::FIELDS));
-            $sql = "INSERT INTO church_campus ($cols, is_active, is_main, default_assignment_event_id, date_entered, entered_by)
-                    VALUES ($ph, :is_active, 0, :default_assignment_event_id, NOW(), :actor)";
+            $sql = "INSERT INTO campuses ($cols, is_active, is_main, default_scheduling_event_id)
+                    VALUES ($ph, :is_active, 0, :default_scheduling_event_id)";
             $params = array_merge(
                 array_combine(array_map(static fn ($f) => ":$f", self::FIELDS), array_values($values)),
                 [
                     ':is_active' => $isActive,
-                    ':default_assignment_event_id' => $defaultEventId,
-                    ':actor' => $actorId,
+                    ':default_scheduling_event_id' => $defaultEventId,
                 ]
             );
             $this->db->prepare($sql)->execute($params);
             $id = (int) $this->db->lastInsertId();
+            $this->audit($actorId, 'campus.created', $id);
         }
 
         if ($wantMain) {
@@ -141,8 +142,8 @@ final readonly class CampusAdminService
         }
         $this->db->beginTransaction();
         try {
-            $this->db->exec('UPDATE church_campus SET is_main = 0 WHERE is_main = 1');
-            $stmt = $this->db->prepare('UPDATE church_campus SET is_main = 1, is_active = 1 WHERE campus_id = :id');
+            $this->db->exec('UPDATE campuses SET is_main = 0 WHERE is_main = 1');
+            $stmt = $this->db->prepare('UPDATE campuses SET is_main = 1, is_active = 1 WHERE id = :id');
             $stmt->execute([':id' => $id]);
             $this->db->commit();
         } catch (\Throwable $e) {
@@ -155,7 +156,7 @@ final readonly class CampusAdminService
     public function references(int $id): int
     {
         $n = 0;
-        foreach (['person_campus_affiliation', 'events_event_campus'] as $tbl) {
+        foreach (['people', 'event_campuses'] as $tbl) {
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM `$tbl` WHERE campus_id = :id");
             $stmt->execute([':id' => $id]);
             $n += (int) $stmt->fetchColumn();
@@ -176,7 +177,7 @@ final readonly class CampusAdminService
         if ($this->references($id) > 0) {
             throw new RuntimeException('This campus is still assigned to people or events. Deactivate it instead.');
         }
-        $this->db->prepare('DELETE FROM church_campus WHERE campus_id = :id')->execute([':id' => $id]);
+        $this->db->prepare('DELETE FROM campuses WHERE id = :id')->execute([':id' => $id]);
     }
 
     /**
@@ -191,19 +192,19 @@ final readonly class CampusAdminService
         }
 
         $stmt = $this->db->prepare(
-            'SELECT e.event_id AS id, e.event_title AS title
-               FROM events_event e
-              WHERE COALESCE(e.assignment_scheduling_enabled, 0) = 1
+            'SELECT e.id, e.title
+               FROM events e
+              WHERE e.uses_serving_schedule = 1
                 AND (
                         NOT EXISTS (
-                            SELECT 1 FROM events_event_campus x WHERE x.event_id = e.event_id
+                            SELECT 1 FROM event_campuses x WHERE x.event_id = e.id
                         )
                         OR EXISTS (
-                            SELECT 1 FROM events_event_campus x
-                             WHERE x.event_id = e.event_id AND x.campus_id = :campus_id
+                            SELECT 1 FROM event_campuses x
+                             WHERE x.event_id = e.id AND x.campus_id = :campus_id
                         )
                     )
-              ORDER BY e.event_title ASC, e.event_id ASC'
+              ORDER BY e.title ASC, e.id ASC'
         );
         $stmt->execute([':campus_id' => $campusId]);
         $rows = [];
@@ -215,5 +216,17 @@ final readonly class CampusAdminService
         }
 
         return $rows;
+    }
+
+    /**
+     * Record who changed a campus. The actor id callers pass is a person id; a
+     * value that is not one is kept as no one rather than breaking the write.
+     */
+    private function audit(int $actorId, string $action, int $campusId): void
+    {
+        $this->db->prepare(
+            'INSERT INTO audit_log (person_id, action, target_type, target_id)
+             VALUES ((SELECT id FROM people WHERE id = :actor), :action, "campus", :target)'
+        )->execute([':actor' => $actorId, ':action' => $action, ':target' => (string) $campusId]);
     }
 }

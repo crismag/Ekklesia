@@ -1,8 +1,8 @@
 <?php
 /**
- * Admin · Person Editor — add/edit a person. Mirrors ChurchCRM PersonEditor.php
- * (last name required, birth month+day together, valid emails). Posts to
- * /admin/people/save. Data via PersonAdminService. No ChurchCRM dependency.
+ * Admin · Person Editor — add/edit a person (last name required, birth
+ * month+day together, valid email). Posts to /admin/people/save. Data via
+ * PersonAdminService.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -11,7 +11,7 @@
  * @var list<array{id:int,name:string}> $classifications
  * @var list<array{id:int,name:string}> $memberTypes
  * @var list<array{id:int,name:string}> $familyRoles
- * @var list<array{campus_id:int,campus_name:string}> $campuses
+ * @var list<array{id:int,name:string}> $campuses
  * @var list<array{id:int,name:string}> $families
  * @var string $notice
  * @var string $flash
@@ -23,7 +23,7 @@ $base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
 $h = static fn ($v): string => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 $p = $person;
 $v = static fn (string $k) => htmlspecialchars((string) ($p[$k] ?? ''), ENT_QUOTES, 'UTF-8');
-$pid = (int) ($p['per_ID'] ?? 0);
+$pid = (int) ($p['id'] ?? 0);
 $editing = $pid > 0;
 $sel = static fn ($a, $b): string => (string) $a === (string) $b && (string) $a !== '' ? ' selected' : '';
 $months = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -56,82 +56,73 @@ ob_start();
 <?php else: ?>
 <article class="admin-card">
   <div class="admin-card-head"><div><h2><?= $editing ? 'Edit person' : 'Add person' ?></h2>
-    <p><?= $editing ? $h(trim(($p['per_FirstName'] ?? '') . ' ' . ($p['per_LastName'] ?? ''))) . ' · #' . $pid : 'Only last name is required.' ?></p></div></div>
+    <p><?= $editing ? $h(trim(($p['first_name'] ?? '') . ' ' . ($p['last_name'] ?? ''))) . ' · #' . $pid : 'Only last name is required.' ?></p></div></div>
   <div class="admin-card-body">
     <form method="post" action="<?= $base ?>/admin/people/save">
-      <input type="hidden" name="per_ID" value="<?= $pid ?>">
+      <input type="hidden" name="id" value="<?= $pid ?>">
 
       <div class="pe-sub">Name &amp; identity</div>
       <div class="pe-grid">
-        <div class="pe-field"><label>Title</label><input type="text" name="per_Title" maxlength="50" value="<?= $v('per_Title') ?>" placeholder="Mr., Mrs., Dr."></div>
-        <div class="pe-field"><label>First name</label><input type="text" name="per_FirstName" maxlength="50" value="<?= $v('per_FirstName') ?>"></div>
-        <div class="pe-field"><label>Middle</label><input type="text" name="per_MiddleName" maxlength="50" value="<?= $v('per_MiddleName') ?>"></div>
-        <div class="pe-field"><label>Last name <span class="pe-req">*</span></label><input type="text" name="per_LastName" maxlength="50" required value="<?= $v('per_LastName') ?>"></div>
-        <div class="pe-field"><label>Suffix</label><input type="text" name="per_Suffix" maxlength="50" value="<?= $v('per_Suffix') ?>" placeholder="Jr., Sr."></div>
-        <div class="pe-field"><label>Gender</label><select name="per_Gender">
-          <option value="0">—</option>
-          <option value="1"<?= (int) ($p['per_Gender'] ?? 0) === 1 ? ' selected' : '' ?>>Male</option>
-          <option value="2"<?= (int) ($p['per_Gender'] ?? 0) === 2 ? ' selected' : '' ?>>Female</option>
+        <div class="pe-field"><label>First name</label><input type="text" name="first_name" maxlength="60" value="<?= $v('first_name') ?>"></div>
+        <div class="pe-field"><label>Middle</label><input type="text" name="middle_name" maxlength="60" value="<?= $v('middle_name') ?>"></div>
+        <div class="pe-field"><label>Last name <span class="pe-req">*</span></label><input type="text" name="last_name" maxlength="60" required value="<?= $v('last_name') ?>"></div>
+        <div class="pe-field"><label>Preferred name</label><input type="text" name="preferred_name" maxlength="60" value="<?= $v('preferred_name') ?>"></div>
+        <div class="pe-field"><label>Suffix</label><input type="text" name="suffix" maxlength="20" value="<?= $v('suffix') ?>" placeholder="Jr., Sr."></div>
+        <div class="pe-field"><label>Gender</label><select name="gender">
+          <option value="">—</option>
+          <option value="male"<?= ($p['gender'] ?? null) === 'male' ? ' selected' : '' ?>>Male</option>
+          <option value="female"<?= ($p['gender'] ?? null) === 'female' ? ' selected' : '' ?>>Female</option>
         </select></div>
       </div>
 
       <div class="pe-sub">Birth date <span style="text-transform:none;font-weight:400">(month &amp; day together, or leave blank)</span></div>
       <div class="pe-grid">
-        <div class="pe-field"><label>Month</label><select name="per_BirthMonth"><option value="0">—</option>
-          <?php for ($i = 1; $i <= 12; $i++): ?><option value="<?= $i ?>"<?= (int) ($p['per_BirthMonth'] ?? 0) === $i ? ' selected' : '' ?>><?= $months[$i] ?></option><?php endfor; ?>
+        <div class="pe-field"><label>Month</label><select name="birth_month"><option value="0">—</option>
+          <?php for ($i = 1; $i <= 12; $i++): ?><option value="<?= $i ?>"<?= (int) ($p['birth_month'] ?? 0) === $i ? ' selected' : '' ?>><?= $months[$i] ?></option><?php endfor; ?>
         </select></div>
-        <div class="pe-field"><label>Day</label><input type="number" name="per_BirthDay" min="1" max="31" value="<?= (int) ($p['per_BirthDay'] ?? 0) ?: '' ?>"></div>
-        <div class="pe-field"><label>Year</label><input type="number" name="per_BirthYear" min="1900" max="<?= $thisYear ?>" value="<?= $p['per_BirthYear'] !== null && (int) $p['per_BirthYear'] > 0 ? (int) $p['per_BirthYear'] : '' ?>"></div>
+        <div class="pe-field"><label>Day</label><input type="number" name="birth_day" min="1" max="31" value="<?= (int) ($p['birth_day'] ?? 0) ?: '' ?>"></div>
+        <div class="pe-field"><label>Year</label><input type="number" name="birth_year" min="1900" max="<?= $thisYear ?>" value="<?= ($p['birth_year'] ?? null) !== null && (int) $p['birth_year'] > 0 ? (int) $p['birth_year'] : '' ?>"></div>
       </div>
 
       <div class="pe-sub">Membership</div>
       <div class="pe-grid">
-        <div class="pe-field"><label>Classification</label><select name="per_cls_ID"><option value="0">—</option>
-          <?php foreach ($classifications as $c): ?><option value="<?= (int) $c['id'] ?>"<?= (int) ($p['per_cls_ID'] ?? 0) === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option><?php endforeach; ?>
+        <div class="pe-field"><label>Classification</label><select name="membership_status_id"><option value="0">—</option>
+          <?php foreach ($classifications as $c): ?><option value="<?= (int) $c['id'] ?>"<?= (int) ($p['membership_status_id'] ?? 0) === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option><?php endforeach; ?>
         </select></div>
         <div class="pe-field"><label>Member type</label><select name="member_type_id"><option value="">—</option>
           <?php foreach ($memberTypes as $m): ?><option value="<?= (int) $m['id'] ?>"<?= (int) ($p['member_type_id'] ?? 0) === (int) $m['id'] ? ' selected' : '' ?>><?= $h($m['name']) ?></option><?php endforeach; ?>
         </select></div>
-        <div class="pe-field"><label>Membership date</label><input type="date" name="per_MembershipDate" value="<?= $p['per_MembershipDate'] ? $h(substr((string) $p['per_MembershipDate'], 0, 10)) : '' ?>"></div>
+        <div class="pe-field"><label>Membership date</label><input type="date" name="member_since" value="<?= !empty($p['member_since']) ? $h(substr((string) $p['member_since'], 0, 10)) : '' ?>"></div>
       </div>
 
       <div class="pe-sub">Family &amp; campus</div>
       <div class="pe-grid">
-        <div class="pe-field"><label>Family</label><select name="per_fam_ID"><option value="0">— none —</option>
-          <?php foreach ($families as $f): ?><option value="<?= (int) $f['id'] ?>"<?= (int) ($p['per_fam_ID'] ?? 0) === (int) $f['id'] ? ' selected' : '' ?>><?= $h($f['name']) ?></option><?php endforeach; ?>
+        <div class="pe-field"><label>Family</label><select name="household_id"><option value="0">— none —</option>
+          <?php foreach ($families as $f): ?><option value="<?= (int) $f['id'] ?>"<?= (int) ($p['household_id'] ?? 0) === (int) $f['id'] ? ' selected' : '' ?>><?= $h($f['name']) ?></option><?php endforeach; ?>
         </select></div>
-        <div class="pe-field"><label>Family role</label><select name="per_fmr_ID"><option value="0">—</option>
-          <?php foreach ($familyRoles as $r): ?><option value="<?= (int) $r['id'] ?>"<?= (int) ($p['per_fmr_ID'] ?? 0) === (int) $r['id'] ? ' selected' : '' ?>><?= $h($r['name']) ?></option><?php endforeach; ?>
+        <div class="pe-field"><label>Family role</label><select name="household_role_id"><option value="0">—</option>
+          <?php foreach ($familyRoles as $r): ?><option value="<?= (int) $r['id'] ?>"<?= (int) ($p['household_role_id'] ?? 0) === (int) $r['id'] ? ' selected' : '' ?>><?= $h($r['name']) ?></option><?php endforeach; ?>
         </select></div>
-        <div class="pe-field"><label>Primary campus</label><select name="primary_campus_id"><option value="0">— none —</option>
-          <?php foreach ($campuses as $c): ?><option value="<?= (int) $c['campus_id'] ?>"<?= (int) ($p['primary_campus_id'] ?? 0) === (int) $c['campus_id'] ? ' selected' : '' ?>><?= $h($c['campus_name']) ?></option><?php endforeach; ?>
+        <div class="pe-field"><label>Primary campus</label><select name="campus_id"><option value="0">— none —</option>
+          <?php foreach ($campuses as $c): ?><option value="<?= (int) $c['id'] ?>"<?= (int) ($p['campus_id'] ?? 0) === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option><?php endforeach; ?>
         </select></div>
       </div>
 
       <div class="pe-sub">Contact</div>
       <div class="pe-grid">
-        <div class="pe-field"><label>Email</label><input type="email" name="per_Email" maxlength="50" value="<?= $v('per_Email') ?>"></div>
-        <div class="pe-field"><label>Work email</label><input type="email" name="per_WorkEmail" maxlength="50" value="<?= $v('per_WorkEmail') ?>"></div>
-        <div class="pe-field"><label>Cell phone</label><input type="tel" name="per_CellPhone" maxlength="30" value="<?= $v('per_CellPhone') ?>"></div>
-        <div class="pe-field"><label>Home phone</label><input type="tel" name="per_HomePhone" maxlength="30" value="<?= $v('per_HomePhone') ?>"></div>
-        <div class="pe-field"><label>Work phone</label><input type="tel" name="per_WorkPhone" maxlength="30" value="<?= $v('per_WorkPhone') ?>"></div>
+        <div class="pe-field"><label>Email</label><input type="email" name="email" maxlength="120" value="<?= $v('email') ?>"></div>
+        <div class="pe-field"><label>Cell phone</label><input type="tel" name="mobile_phone" maxlength="40" value="<?= $v('mobile_phone') ?>"></div>
+        <div class="pe-field"><label>Home phone</label><input type="tel" name="home_phone" maxlength="40" value="<?= $v('home_phone') ?>"></div>
       </div>
 
       <div class="pe-sub">Location</div>
       <div class="pe-grid">
-        <div class="pe-field two"><label>Address line 1</label><input type="text" name="per_Address1" maxlength="50" value="<?= $v('per_Address1') ?>"></div>
-        <div class="pe-field"><label>Address line 2</label><input type="text" name="per_Address2" maxlength="50" value="<?= $v('per_Address2') ?>"></div>
-        <div class="pe-field"><label>City</label><input type="text" name="per_City" maxlength="50" value="<?= $v('per_City') ?>"></div>
-        <div class="pe-field"><label>Province / State</label><input type="text" name="per_State" maxlength="50" value="<?= $v('per_State') ?>"></div>
-        <div class="pe-field"><label>Postal code</label><input type="text" name="per_Zip" maxlength="50" value="<?= $v('per_Zip') ?>"></div>
-        <div class="pe-field"><label>Country</label><input type="text" name="per_Country" maxlength="50" value="<?= $v('per_Country') ?>"></div>
-      </div>
-
-      <div class="pe-sub">Social</div>
-      <div class="pe-grid">
-        <div class="pe-field"><label>Facebook</label><input type="text" name="per_Facebook" maxlength="50" value="<?= $v('per_Facebook') ?>"></div>
-        <div class="pe-field"><label>LinkedIn</label><input type="text" name="per_LinkedIn" maxlength="50" value="<?= $v('per_LinkedIn') ?>"></div>
-        <div class="pe-field"><label>X (Twitter)</label><input type="text" name="per_Twitter" maxlength="50" value="<?= $v('per_Twitter') ?>"></div>
+        <div class="pe-field two"><label>Address line 1</label><input type="text" name="address_line1" maxlength="150" value="<?= $v('address_line1') ?>"></div>
+        <div class="pe-field"><label>Address line 2</label><input type="text" name="address_line2" maxlength="150" value="<?= $v('address_line2') ?>"></div>
+        <div class="pe-field"><label>City</label><input type="text" name="city" maxlength="100" value="<?= $v('city') ?>"></div>
+        <div class="pe-field"><label>Province / State</label><input type="text" name="region" maxlength="50" value="<?= $v('region') ?>"></div>
+        <div class="pe-field"><label>Postal code</label><input type="text" name="postal_code" maxlength="20" value="<?= $v('postal_code') ?>"></div>
+        <div class="pe-field"><label>Country</label><input type="text" name="country" maxlength="60" value="<?= $v('country') ?>"></div>
       </div>
 
       <div style="margin-top:18px;display:flex;gap:10px">

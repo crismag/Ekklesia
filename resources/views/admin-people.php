@@ -1,7 +1,7 @@
 <?php
 /**
  * Admin · People — dashboard + searchable/filterable people list.
- * Data via PersonAdminService (shared DB, direct-PDO). No ChurchCRM dependency.
+ * Data via PersonAdminService (member DB, direct-PDO).
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -13,7 +13,7 @@
  * @var int $perPage
  * @var array<string,mixed> $filters
  * @var list<array{id:int,name:string}> $classifications
- * @var list<array{campus_id:int,campus_name:string}> $campuses
+ * @var list<array{id:int,name:string}> $campuses
  * @var string $notice
  * @var string $flash
  */
@@ -319,8 +319,8 @@ ob_start();
             <td class="col-code"><?= $clsDot((string) ($p['classification'] ?? ''), $clsCodes) ?></td>
             <td class="col-code"><?= $typeCell((string) ($p['member_type'] ?? ''), $typeCodes) ?></td>
             <td class="col-campus"><?= $p['campus'] ? $h($p['campus']) : '<span class="muted">—</span>' ?></td>
-            <td><?= (int) $p['bm'] > 0 ? $h($months[(int) $p['bm']] . ' ' . (int) $p['bd']) : '<span class="muted">—</span>' ?></td>
-            <td class="muted"><?= $h($p['email'] ?: $p['cell'] ?: '') ?></td>
+            <td><?= (int) $p['birth_month'] > 0 ? $h($months[(int) $p['birth_month']] . ' ' . (int) $p['birth_day']) : '<span class="muted">—</span>' ?></td>
+            <td class="muted"><?= $h($p['email'] ?: $p['mobile_phone'] ?: '') ?></td>
             <?php if ($isAdmin): ?><td><a class="pp-btn" href="<?= $base ?>/admin/people/edit?id=<?= (int) $p['id'] ?>">Edit</a></td><?php endif; ?>
           </tr>
         <?php endforeach; ?>

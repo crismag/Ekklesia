@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PDO;
+use RuntimeException;
 
 /**
- * People administration — read/write over person_per (+ family_fam, person_custom,
- * list_lst, person_campus_affiliation) in the shared database.
+ * People administration — read/write over `people` (+ `households`,
+ * `membership_statuses`, `household_roles`, `member_types`, `campuses`) in the
+ * member database.
  *
- * Direct-PDO, self-contained: NO dependency on any ChurchCRM PHP, so it keeps
- * working after ChurchCRM is decommissioned. Phase 1 provides the dashboard
- * stats, option loaders, and the filtered/paged people list; later phases add
- * the person editor, photos, and family management on the same connection.
+ * Direct-PDO and self-contained. Provides the dashboard stats, option loaders,
+ * the filtered/paged people list, the person editor, photos and the lookups the
+ * member import matches against.
  */
 final readonly class PersonAdminService
 {
@@ -21,46 +22,46 @@ final readonly class PersonAdminService
     {
     }
 
-    // ---- Option loaders (list_lst) ------------------------------------------
+    // ---- Option loaders -----------------------------------------------------
 
-    /** @return list<array{id:int,name:string}> */
+    /** @return list<array{id:int,name:string}> Membership statuses. */
     public function classifications(): array
     {
-        return $this->listOptions(1);
+        return $this->listOptions('membership_statuses');
     }
 
-    /** @return list<array{id:int,name:string}> Member Type (person_custom.c1). */
+    /** @return list<array{id:int,name:string}> Member types. */
     public function memberTypes(): array
     {
-        return $this->listOptions(13);
+        return $this->listOptions('member_types');
     }
 
-    /** @return list<array{id:int,name:string}> Family roles. */
+    /** @return list<array{id:int,name:string}> Household roles. */
     public function familyRoles(): array
     {
-        return $this->listOptions(2);
+        return $this->listOptions('household_roles');
+    }
+
+    /**
+     * @param 'membership_statuses'|'household_roles'|'member_types' $table
+     * @return list<array{id:int,name:string}>
+     */
+    private function listOptions(string $table): array
+    {
+        $rows = $this->db->query("SELECT id, name FROM `$table` ORDER BY sort_order, name")
+            ->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(
+            static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name']],
+            $rows
+        );
     }
 
     /** @return list<array{id:int,name:string}> */
-    private function listOptions(int $listId): array
-    {
-        $stmt = $this->db->prepare(
-            'SELECT lst_OptionID AS id, lst_OptionName AS name
-               FROM list_lst WHERE lst_ID = :lid ORDER BY lst_OptionSequence, lst_OptionName'
-        );
-        $stmt->execute([':lid' => $listId]);
-        return array_map(
-            static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name']],
-            $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []
-        );
-    }
-
-    /** @return list<array{campus_id:int,campus_name:string}> */
     public function campuses(): array
     {
-        $rows = $this->db->query('SELECT campus_id, campus_name FROM church_campus WHERE is_active = 1 ORDER BY campus_name')
+        $rows = $this->db->query('SELECT id, name FROM campuses WHERE is_active = 1 ORDER BY name')
             ->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        return array_map(static fn (array $r): array => ['campus_id' => (int) $r['campus_id'], 'campus_name' => (string) $r['campus_name']], $rows);
+        return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name']], $rows);
     }
 
     // ---- Dashboard stats ----------------------------------------------------
@@ -68,26 +69,26 @@ final readonly class PersonAdminService
     /** @return array{people:int,families:int,activeFamilies:int,classifications:list<array<string,mixed>>,memberTypes:list<array<string,mixed>>} */
     public function stats(): array
     {
-        $people = (int) $this->db->query('SELECT COUNT(*) FROM person_per')->fetchColumn();
-        $families = (int) $this->db->query('SELECT COUNT(*) FROM family_fam')->fetchColumn();
-        $activeFamilies = (int) $this->db->query('SELECT COUNT(*) FROM family_fam WHERE fam_DateDeactivated IS NULL')->fetchColumn();
+        $people = (int) $this->db->query('SELECT COUNT(*) FROM people')->fetchColumn();
+        $families = (int) $this->db->query('SELECT COUNT(*) FROM households')->fetchColumn();
+        $activeFamilies = (int) $this->db->query('SELECT COUNT(*) FROM households WHERE deactivated_on IS NULL')->fetchColumn();
 
         $clsCounts = [];
-        foreach ($this->db->query('SELECT per_cls_ID AS id, COUNT(*) c FROM person_per GROUP BY per_cls_ID') as $r) {
+        foreach ($this->db->query('SELECT membership_status_id AS id, COUNT(*) c FROM people WHERE membership_status_id IS NOT NULL GROUP BY membership_status_id') as $r) {
             $clsCounts[(int) $r['id']] = (int) $r['c'];
         }
         $classifications = [];
         foreach ($this->classifications() as $opt) {
             $classifications[] = ['id' => $opt['id'], 'name' => $opt['name'], 'count' => $clsCounts[$opt['id']] ?? 0];
         }
-        // Unclassified (per_cls_ID = 0 / not in list)
+        // Unclassified (no membership status)
         $classified = array_sum(array_map(static fn ($c) => $c['count'], $classifications));
         if ($people - $classified > 0) {
             $classifications[] = ['id' => 0, 'name' => 'Unclassified', 'count' => $people - $classified];
         }
 
         $mtCounts = [];
-        foreach ($this->db->query('SELECT c1 AS id, COUNT(*) c FROM person_custom WHERE c1 IS NOT NULL GROUP BY c1') as $r) {
+        foreach ($this->db->query('SELECT member_type_id AS id, COUNT(*) c FROM people WHERE member_type_id IS NOT NULL GROUP BY member_type_id') as $r) {
             $mtCounts[(int) $r['id']] = (int) $r['c'];
         }
         $memberTypes = [];
@@ -104,7 +105,7 @@ final readonly class PersonAdminService
     // ---- People list --------------------------------------------------------
 
     /**
-     * @param array{search?:string,classification?:int,campus?:int} $filters
+     * @param array{search?:string,classification?:int,campus?:int,member_type?:int} $filters
      * @return array{where:string,params:array<string,mixed>}
      */
     private function buildWhere(array $filters): array
@@ -113,28 +114,27 @@ final readonly class PersonAdminService
         $params = [];
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
-            $where[] = 'CONCAT(p.per_FirstName, " ", p.per_LastName, " ", COALESCE(p.per_Email, "")) LIKE :s';
+            $where[] = 'CONCAT(p.first_name, " ", p.last_name, " ", COALESCE(p.email, "")) LIKE :s';
             $params[':s'] = '%' . $search . '%';
         }
         $cls = (int) ($filters['classification'] ?? 0);
         if ($cls > 0) {
-            $where[] = 'p.per_cls_ID = :cls';
+            $where[] = 'p.membership_status_id = :cls';
             $params[':cls'] = $cls;
         }
         $campus = (int) ($filters['campus'] ?? 0);
         if ($campus > 0) {
-            $where[] = 'EXISTS (SELECT 1 FROM person_campus_affiliation pca2 WHERE pca2.person_id = p.per_ID AND pca2.campus_id = :campus AND pca2.is_primary = 1)';
+            $where[] = 'p.campus_id = :campus';
             $params[':campus'] = $campus;
         }
-        // Member type lives in person_custom.c1, the same column the directory
-        // reads it from. -1 means "has none", which is the one an administrator
-        // filling gaps actually wants; there is no member type with that id.
+        // -1 means "has none", which is the one an administrator filling gaps
+        // actually wants; there is no member type with that id.
         $memberType = (int) ($filters['member_type'] ?? 0);
         if ($memberType > 0) {
-            $where[] = 'EXISTS (SELECT 1 FROM person_custom pcf WHERE pcf.per_ID = p.per_ID AND pcf.c1 = :mt)';
+            $where[] = 'p.member_type_id = :mt';
             $params[':mt'] = $memberType;
         } elseif ($memberType === -1) {
-            $where[] = 'NOT EXISTS (SELECT 1 FROM person_custom pcf WHERE pcf.per_ID = p.per_ID AND COALESCE(pcf.c1, 0) > 0)';
+            $where[] = 'p.member_type_id IS NULL';
         }
         return ['where' => $where === [] ? '' : (' WHERE ' . implode(' AND ', $where)), 'params' => $params];
     }
@@ -142,13 +142,13 @@ final readonly class PersonAdminService
     public function count(array $filters): int
     {
         ['where' => $where, 'params' => $params] = $this->buildWhere($filters);
-        $stmt = $this->db->prepare('SELECT COUNT(*) FROM person_per p' . $where);
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM people p' . $where);
         $stmt->execute($params);
         return (int) $stmt->fetchColumn();
     }
 
     /**
-     * @param array{search?:string,classification?:int,campus?:int} $filters
+     * @param array{search?:string,classification?:int,campus?:int,member_type?:int} $filters
      * @return list<array<string,mixed>>
      */
     public function list(array $filters, int $page = 1, int $perPage = 25): array
@@ -157,22 +157,19 @@ final readonly class PersonAdminService
         $perPage = max(1, min(200, $perPage));
         $offset = max(0, ($page - 1) * $perPage);
 
-        $sql = 'SELECT p.per_ID AS id, p.per_FirstName AS first_name, p.per_LastName AS last_name,
-                       p.per_Email AS email, p.per_CellPhone AS cell,
-                       p.per_BirthMonth AS bm, p.per_BirthDay AS bd, p.per_BirthYear AS by2,
-                       p.per_cls_ID AS cls_id, cls.lst_OptionName AS classification,
-                       pc.c1 AS member_type_id, mt.lst_OptionName AS member_type,
-                       p.per_fam_ID AS fam_id, f.fam_Name AS family, f.fam_DateDeactivated AS fam_deactivated,
-                       cc.campus_id AS campus_id, cc.campus_name AS campus
-                  FROM person_per p
-                  LEFT JOIN family_fam f ON f.fam_ID = p.per_fam_ID
-                  LEFT JOIN list_lst cls ON cls.lst_ID = 1 AND cls.lst_OptionID = p.per_cls_ID
-                  LEFT JOIN person_custom pc ON pc.per_ID = p.per_ID
-                  LEFT JOIN list_lst mt ON mt.lst_ID = 13 AND mt.lst_OptionID = pc.c1
-                  LEFT JOIN person_campus_affiliation pca ON pca.person_id = p.per_ID AND pca.is_primary = 1
-                  LEFT JOIN church_campus cc ON cc.campus_id = pca.campus_id'
+        $sql = 'SELECT p.id, p.first_name, p.last_name, p.email, p.mobile_phone,
+                       p.birth_month, p.birth_day, p.birth_year,
+                       p.membership_status_id, ms.name AS classification,
+                       p.member_type_id, mt.name AS member_type,
+                       p.household_id, h.name AS household, h.deactivated_on AS household_deactivated_on,
+                       p.campus_id, c.name AS campus
+                  FROM people p
+                  LEFT JOIN households h ON h.id = p.household_id
+                  LEFT JOIN membership_statuses ms ON ms.id = p.membership_status_id
+                  LEFT JOIN member_types mt ON mt.id = p.member_type_id
+                  LEFT JOIN campuses c ON c.id = p.campus_id'
              . $where
-             . ' ORDER BY p.per_LastName ASC, p.per_FirstName ASC LIMIT :limit OFFSET :offset';
+             . ' ORDER BY p.last_name ASC, p.first_name ASC LIMIT :limit OFFSET :offset';
 
         $stmt = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
@@ -184,22 +181,13 @@ final readonly class PersonAdminService
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    /** @return array<string,mixed>|null Full person row + member_type_id + primary campus. */
+    /** @return array<string,mixed>|null The full `people` row (campus_id and member_type_id included). */
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare('SELECT * FROM person_per WHERE per_ID = :id');
+        $stmt = $this->db->prepare('SELECT * FROM people WHERE id = :id');
         $stmt->execute([':id' => $id]);
         $p = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$p) {
-            return null;
-        }
-        $c = $this->db->prepare('SELECT c1 FROM person_custom WHERE per_ID = :id');
-        $c->execute([':id' => $id]);
-        $p['member_type_id'] = ($row = $c->fetch(PDO::FETCH_ASSOC)) ? $row['c1'] : null;
-        $ca = $this->db->prepare('SELECT campus_id FROM person_campus_affiliation WHERE person_id = :id AND is_primary = 1 LIMIT 1');
-        $ca->execute([':id' => $id]);
-        $p['primary_campus_id'] = ($row = $ca->fetch(PDO::FETCH_ASSOC)) ? (int) $row['campus_id'] : null;
-        return $p;
+        return $p ?: null;
     }
 
     /**
@@ -215,62 +203,58 @@ final readonly class PersonAdminService
         if ($p === null) {
             return null;
         }
-        $famId = (int) ($p['per_fam_ID'] ?? 0);
+        $householdId = (int) ($p['household_id'] ?? 0);
         $family = null;
         $members = [];
-        if ($famId > 0) {
-            $fs = $this->db->prepare('SELECT * FROM family_fam WHERE fam_ID = :id');
-            $fs->execute([':id' => $famId]);
+        if ($householdId > 0) {
+            $fs = $this->db->prepare('SELECT * FROM households WHERE id = :id');
+            $fs->execute([':id' => $householdId]);
             $family = $fs->fetch(PDO::FETCH_ASSOC) ?: null;
 
             $ms = $this->db->prepare(
-                'SELECT p.per_ID AS id, p.per_FirstName AS first_name, p.per_LastName AS last_name,
-                        p.per_Email AS email, fmr.lst_OptionName AS family_role
-                   FROM person_per p
-                   LEFT JOIN list_lst fmr ON fmr.lst_ID = 2 AND fmr.lst_OptionID = p.per_fmr_ID
-                  WHERE p.per_fam_ID = :fam AND p.per_ID <> :self
-                  ORDER BY p.per_fmr_ID ASC, p.per_LastName ASC, p.per_FirstName ASC'
+                'SELECT p.id, p.first_name, p.last_name, p.email, hr.name AS family_role
+                   FROM people p
+                   LEFT JOIN household_roles hr ON hr.id = p.household_role_id
+                  WHERE p.household_id = :household AND p.id <> :self
+                  ORDER BY hr.sort_order IS NULL, hr.sort_order ASC, p.last_name ASC, p.first_name ASC'
             );
-            $ms->execute([':fam' => $famId, ':self' => $id]);
+            $ms->execute([':household' => $householdId, ':self' => $id]);
             $members = $ms->fetchAll(PDO::FETCH_ASSOC) ?: [];
         }
 
         // Resolved mailing address: person's own, else the family's.
-        $addr = array_filter([
-            'address1' => $p['per_Address1'] ?? '', 'address2' => $p['per_Address2'] ?? '',
-            'city' => $p['per_City'] ?? '', 'state' => $p['per_State'] ?? '',
-            'zip' => $p['per_Zip'] ?? '', 'country' => $p['per_Country'] ?? '',
+        $addressOf = static fn (array $r): array => array_filter([
+            'address_line1' => $r['address_line1'] ?? '', 'address_line2' => $r['address_line2'] ?? '',
+            'city' => $r['city'] ?? '', 'region' => $r['region'] ?? '',
+            'postal_code' => $r['postal_code'] ?? '', 'country' => $r['country'] ?? '',
         ], static fn ($v) => trim((string) $v) !== '');
+        $addr = $addressOf($p);
         $lat = null; $lng = null;
         if ($addr === [] && $family !== null) {
-            $addr = array_filter([
-                'address1' => $family['fam_Address1'] ?? '', 'address2' => $family['fam_Address2'] ?? '',
-                'city' => $family['fam_City'] ?? '', 'state' => $family['fam_State'] ?? '',
-                'zip' => $family['fam_Zip'] ?? '', 'country' => $family['fam_Country'] ?? '',
-            ], static fn ($v) => trim((string) $v) !== '');
+            $addr = $addressOf($family);
         }
         if ($family !== null) {
-            $lat = ($family['fam_Latitude'] ?? null) !== null && (float) $family['fam_Latitude'] !== 0.0 ? (float) $family['fam_Latitude'] : null;
-            $lng = ($family['fam_Longitude'] ?? null) !== null && (float) $family['fam_Longitude'] !== 0.0 ? (float) $family['fam_Longitude'] : null;
+            $lat = ($family['latitude'] ?? null) !== null && (float) $family['latitude'] !== 0.0 ? (float) $family['latitude'] : null;
+            $lng = ($family['longitude'] ?? null) !== null && (float) $family['longitude'] !== 0.0 ? (float) $family['longitude'] : null;
         }
         $addressLine = implode(', ', $addr);
 
-        // Classification / member type / family role labels.
+        // Membership status / member type / household role labels.
         $labels = [
-            'classification' => $this->optionName(1, (int) ($p['per_cls_ID'] ?? 0)),
-            'member_type' => $this->optionName(13, (int) ($p['member_type_id'] ?? 0)),
-            'family_role' => $this->optionName(2, (int) ($p['per_fmr_ID'] ?? 0)),
+            'classification' => $this->optionName('membership_statuses', (int) ($p['membership_status_id'] ?? 0)),
+            'member_type' => $this->optionName('member_types', (int) ($p['member_type_id'] ?? 0)),
+            'family_role' => $this->optionName('household_roles', (int) ($p['household_role_id'] ?? 0)),
         ];
 
-        // Campus affiliations.
-        $ca = $this->db->prepare(
-            'SELECT cc.campus_id, cc.campus_name, pca.is_primary
-               FROM person_campus_affiliation pca
-               JOIN church_campus cc ON cc.campus_id = pca.campus_id
-              WHERE pca.person_id = :id ORDER BY pca.is_primary DESC, cc.campus_name ASC'
-        );
-        $ca->execute([':id' => $id]);
-        $affiliations = $ca->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        // Campus: one per person now, shown as the primary affiliation.
+        $affiliations = [];
+        if ((int) ($p['campus_id'] ?? 0) > 0) {
+            $ca = $this->db->prepare('SELECT id, name FROM campuses WHERE id = :id');
+            $ca->execute([':id' => (int) $p['campus_id']]);
+            if ($row = $ca->fetch(PDO::FETCH_ASSOC)) {
+                $affiliations[] = ['id' => (int) $row['id'], 'name' => (string) $row['name'], 'is_primary' => 1];
+            }
+        }
 
         return [
             'person' => $p, 'family' => $family, 'members' => $members,
@@ -279,20 +263,20 @@ final readonly class PersonAdminService
         ];
     }
 
-    private function optionName(int $listId, int $optionId): string
+    /** @param 'membership_statuses'|'household_roles'|'member_types' $table */
+    private function optionName(string $table, int $optionId): string
     {
         if ($optionId <= 0) {
             return '';
         }
-        $stmt = $this->db->prepare('SELECT lst_OptionName FROM list_lst WHERE lst_ID = :l AND lst_OptionID = :o LIMIT 1');
-        $stmt->execute([':l' => $listId, ':o' => $optionId]);
+        $stmt = $this->db->prepare("SELECT name FROM `$table` WHERE id = :o LIMIT 1");
+        $stmt->execute([':o' => $optionId]);
         return (string) ($stmt->fetchColumn() ?: '');
     }
 
     /**
-     * Refresh a family's coordinates from its address via OpenStreetMap Nominatim
-     * (free, no API key), storing fam_Latitude/fam_Longitude. Mirrors ChurchCRM's
-     * "refresh coordinates" action, portal-native.
+     * Refresh a household's coordinates from its address via OpenStreetMap
+     * Nominatim (free, no API key), storing latitude/longitude.
      *
      * @return array{success:bool,lat?:float,lng?:float,error?:string}
      */
@@ -301,18 +285,18 @@ final readonly class PersonAdminService
         if ($famId <= 0) {
             return ['success' => false, 'error' => 'No family to geocode.'];
         }
-        $fs = $this->db->prepare('SELECT fam_Address1, fam_City, fam_State, fam_Zip, fam_Country FROM family_fam WHERE fam_ID = :id');
+        $fs = $this->db->prepare('SELECT address_line1, city, region, postal_code, country FROM households WHERE id = :id');
         $fs->execute([':id' => $famId]);
         $f = $fs->fetch(PDO::FETCH_ASSOC);
         if (!$f) {
             return ['success' => false, 'error' => 'Family not found.'];
         }
         // Drop apartment/unit tokens (#1008, Unit 5, Apt 3…) — they defeat geocoders.
-        $street = trim((string) preg_replace('/\s*(#|unit|apt\.?|suite|ste\.?)\s*\S+/i', '', (string) $f['fam_Address1']));
-        $city = trim((string) $f['fam_City']);
-        $state = trim((string) $f['fam_State']);
-        $zip = trim((string) $f['fam_Zip']);
-        $country = trim((string) $f['fam_Country']);
+        $street = trim((string) preg_replace('/\s*(#|unit|apt\.?|suite|ste\.?)\s*\S+/i', '', (string) $f['address_line1']));
+        $city = trim((string) $f['city']);
+        $state = trim((string) $f['region']);
+        $zip = trim((string) $f['postal_code']);
+        $country = trim((string) $f['country']);
         if ($street === '' && $zip === '' && $city === '') {
             return ['success' => false, 'error' => 'This family has no address to look up.'];
         }
@@ -331,7 +315,7 @@ final readonly class PersonAdminService
         }
         $lat = (float) $hit['lat'];
         $lng = (float) $hit['lon'];
-        $this->db->prepare('UPDATE family_fam SET fam_Latitude = :lat, fam_Longitude = :lng, fam_DateLastEdited = NOW() WHERE fam_ID = :id')
+        $this->db->prepare('UPDATE households SET latitude = :lat, longitude = :lng, updated_at = NOW() WHERE id = :id')
             ->execute([':lat' => $lat, ':lng' => $lng, ':id' => $famId]);
         return ['success' => true, 'lat' => $lat, 'lng' => $lng];
     }
@@ -358,7 +342,7 @@ final readonly class PersonAdminService
 
     // ---- Photos & self-service ---------------------------------------------
 
-    /** Portal-owned photo directory (separate folder, ChurchCRM-style). */
+    /** Portal-owned photo directory. */
     private function photoDir(): string
     {
         return dirname(__DIR__, 2) . '/Images/Person/';
@@ -366,7 +350,7 @@ final readonly class PersonAdminService
 
     public function personFamilyId(int $id): int
     {
-        $s = $this->db->prepare('SELECT per_fam_ID FROM person_per WHERE per_ID = :id');
+        $s = $this->db->prepare('SELECT household_id FROM people WHERE id = :id');
         $s->execute([':id' => $id]);
         return (int) ($s->fetchColumn() ?: 0);
     }
@@ -420,7 +404,7 @@ final readonly class PersonAdminService
         }
     }
 
-    /** Remove the portal-owned photo for a person (leaves any legacy copy alone). */
+    /** Remove the photo for a person. */
     public function deletePhoto(int $id): void
     {
         $dir = $this->photoDir();
@@ -429,43 +413,38 @@ final readonly class PersonAdminService
         }
     }
 
-    /** Set (or clear when null/0) a person's single primary campus affiliation. */
+    /** Set (or clear when null/0) a person's campus. */
     public function setPrimaryCampus(int $personId, ?int $campusId, int $actorId): void
     {
         if ($this->find($personId) === null) {
             throw new \InvalidArgumentException('Unknown person.');
         }
-        $this->db->prepare('DELETE FROM person_campus_affiliation WHERE person_id = :id')->execute([':id' => $personId]);
-        if ($campusId !== null && $campusId > 0) {
-            $this->db->prepare(
-                'INSERT INTO person_campus_affiliation (person_id, campus_id, is_primary, date_entered, entered_by)
-                 VALUES (:id, :c, 1, NOW(), :a)'
-            )->execute([':id' => $personId, ':c' => $campusId, ':a' => $actorId]);
-        }
+        $this->db->prepare('UPDATE people SET campus_id = :c, updated_at = NOW() WHERE id = :id')
+            ->execute([':c' => $campusId !== null && $campusId > 0 ? $campusId : null, ':id' => $personId]);
+        $this->audit($actorId, 'person.campus_changed', $personId);
     }
 
-    /** Delete a person and their custom/affiliation rows. */
+    /** Delete a person. */
     public function delete(int $id): void
     {
         if ($this->find($id) === null) {
             throw new \InvalidArgumentException('Unknown person.');
         }
-        $this->db->beginTransaction();
-        try {
-            $this->db->prepare('DELETE FROM person_custom WHERE per_ID = :id')->execute([':id' => $id]);
-            $this->db->prepare('DELETE FROM person_campus_affiliation WHERE person_id = :id')->execute([':id' => $id]);
-            $this->db->prepare('DELETE FROM person_per WHERE per_ID = :id')->execute([':id' => $id]);
-            $this->db->commit();
-        } catch (\Throwable $e) {
-            $this->db->rollBack();
-            throw $e;
+        // Ministry memberships are kept, not cascaded: removing someone from a
+        // ministry is its own decision.
+        $mm = $this->db->prepare('SELECT COUNT(*) FROM ministry_members WHERE person_id = :id');
+        $mm->execute([':id' => $id]);
+        $memberships = (int) $mm->fetchColumn();
+        if ($memberships > 0) {
+            throw new RuntimeException("This person still belongs to $memberships ministr" . ($memberships === 1 ? 'y' : 'ies') . '. Remove them from it first.');
         }
+        $this->db->prepare('DELETE FROM people WHERE id = :id')->execute([':id' => $id]);
     }
 
     /** @return list<array{id:int,name:string}> active families for the family dropdown. */
     public function families(): array
     {
-        $rows = $this->db->query('SELECT fam_ID AS id, fam_Name AS name FROM family_fam WHERE fam_DateDeactivated IS NULL ORDER BY fam_Name')
+        $rows = $this->db->query('SELECT id, name FROM households WHERE deactivated_on IS NULL ORDER BY name')
             ->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'name' => (string) $r['name']], $rows);
     }
@@ -474,49 +453,54 @@ final readonly class PersonAdminService
     public function blank(): array
     {
         return [
-            'per_ID' => 0, 'per_Title' => '', 'per_FirstName' => '', 'per_MiddleName' => '', 'per_LastName' => '',
-            'per_Suffix' => '', 'per_Gender' => 0, 'per_BirthMonth' => 0, 'per_BirthDay' => 0, 'per_BirthYear' => null,
-            'per_Email' => '', 'per_WorkEmail' => '', 'per_CellPhone' => '', 'per_HomePhone' => '', 'per_WorkPhone' => '',
-            'per_Address1' => '', 'per_Address2' => '', 'per_City' => '', 'per_State' => 'Ontario', 'per_Zip' => '',
-            'per_Country' => 'CA', 'per_Facebook' => '', 'per_Twitter' => '', 'per_LinkedIn' => '',
-            'per_cls_ID' => 0, 'per_fam_ID' => 0, 'per_fmr_ID' => 0, 'per_MembershipDate' => null,
-            'member_type_id' => null, 'primary_campus_id' => null,
+            'id' => 0, 'first_name' => '', 'middle_name' => '', 'last_name' => '', 'preferred_name' => '',
+            'suffix' => '', 'gender' => null, 'birth_month' => null, 'birth_day' => null, 'birth_year' => null,
+            'email' => '', 'mobile_phone' => '', 'home_phone' => '',
+            'address_line1' => '', 'address_line2' => '', 'city' => '', 'region' => 'Ontario', 'postal_code' => '',
+            'country' => 'CA',
+            'membership_status_id' => null, 'household_id' => null, 'household_role_id' => null, 'member_since' => null,
+            'member_type_id' => null, 'campus_id' => null,
         ];
     }
 
     // ---- Person write (editor) ----------------------------------------------
 
     private const STR_FIELDS = [
-        'per_Title', 'per_FirstName', 'per_MiddleName', 'per_LastName', 'per_Suffix',
-        'per_Address1', 'per_Address2', 'per_City', 'per_State', 'per_Zip', 'per_Country',
-        'per_HomePhone', 'per_WorkPhone', 'per_CellPhone', 'per_Email', 'per_WorkEmail',
-        'per_Facebook', 'per_Twitter', 'per_LinkedIn',
+        'first_name', 'middle_name', 'last_name', 'preferred_name', 'suffix',
+        'address_line1', 'address_line2', 'city', 'region', 'postal_code', 'country',
+        'home_phone', 'mobile_phone', 'email',
     ];
-    private const INT_FIELDS = ['per_Gender', 'per_BirthMonth', 'per_BirthDay', 'per_cls_ID', 'per_fam_ID', 'per_fmr_ID'];
+
+    /** Option and household references: 0 or blank means none. */
+    private const REF_FIELDS = ['membership_status_id', 'household_id', 'household_role_id', 'member_type_id'];
+
+    /** 'male' / 'female', anything else is not recorded. */
+    private static function gender(mixed $value): ?string
+    {
+        $g = strtolower(trim((string) $value));
+        return in_array($g, ['male', 'female'], true) ? $g : null;
+    }
 
     /**
-     * Create or update a person. Mirrors ChurchCRM PersonEditor validation:
-     * last name required; birth month & day must be given together; emails valid.
-     * Returns the person id.
+     * Create or update a person. Last name required; birth month & day must be
+     * given together; emails valid. Returns the person id.
      *
      * @param array<string,mixed> $in
      */
     public function save(array $in, int $actorId): int
     {
-        $last = trim((string) ($in['per_LastName'] ?? ''));
+        $last = trim((string) ($in['last_name'] ?? ''));
         if ($last === '') {
             throw new \InvalidArgumentException('Last name is required.');
         }
-        $bm = (int) ($in['per_BirthMonth'] ?? 0);
-        $bd = (int) ($in['per_BirthDay'] ?? 0);
+        $bm = (int) ($in['birth_month'] ?? 0);
+        $bd = (int) ($in['birth_day'] ?? 0);
         if (($bm > 0) !== ($bd > 0)) {
             throw new \InvalidArgumentException('Birth date needs both a month and a day (or leave both blank).');
         }
-        foreach (['per_Email', 'per_WorkEmail'] as $ef) {
-            $e = trim((string) ($in[$ef] ?? ''));
-            if ($e !== '' && !filter_var($e, FILTER_VALIDATE_EMAIL)) {
-                throw new \InvalidArgumentException('An email address looks invalid.');
-            }
+        $e = trim((string) ($in['email'] ?? ''));
+        if ($e !== '' && !filter_var($e, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('An email address looks invalid.');
         }
 
         $values = [];
@@ -524,60 +508,45 @@ final readonly class PersonAdminService
             $v = trim((string) ($in[$f] ?? ''));
             $values[$f] = $v === '' ? null : $v;
         }
-        $values['per_LastName'] = $last;
-        foreach (self::INT_FIELDS as $f) {
-            $values[$f] = (int) ($in[$f] ?? 0);
+        $values['last_name'] = $last;
+        // first_name is NOT NULL in the schema; blank is how "not given" is kept.
+        $values['first_name'] = $values['first_name'] ?? '';
+        foreach (self::REF_FIELDS as $f) {
+            $n = (int) ($in[$f] ?? 0);
+            $values[$f] = $n > 0 ? $n : null;
         }
-        if (!in_array($values['per_Gender'], [1, 2], true)) { $values['per_Gender'] = 0; }
-        $by = trim((string) ($in['per_BirthYear'] ?? ''));
-        $values['per_BirthYear'] = ($by !== '' && (int) $by >= 1900 && (int) $by <= (int) date('Y')) ? (int) $by : null;
-        $md = trim((string) ($in['per_MembershipDate'] ?? ''));
-        $values['per_MembershipDate'] = $md !== '' && strtotime($md) ? date('Y-m-d', (int) strtotime($md)) : null;
+        $values['gender'] = self::gender($in['gender'] ?? null);
+        $values['birth_month'] = $bm > 0 ? $bm : null;
+        $values['birth_day'] = $bd > 0 ? $bd : null;
+        $by = trim((string) ($in['birth_year'] ?? ''));
+        $values['birth_year'] = ($by !== '' && (int) $by >= 1900 && (int) $by <= (int) date('Y')) ? (int) $by : null;
+        $md = trim((string) ($in['member_since'] ?? ''));
+        $values['member_since'] = $md !== '' && strtotime($md) ? date('Y-m-d', (int) strtotime($md)) : null;
+        if (array_key_exists('campus_id', $in)) {
+            $campus = (int) $in['campus_id'];
+            $values['campus_id'] = $campus > 0 ? $campus : null;
+        }
 
-        $id = (int) ($in['per_ID'] ?? 0);
+        $id = (int) ($in['id'] ?? 0);
         $ownTx = !$this->db->inTransaction();
         if ($ownTx) {
             $this->db->beginTransaction();
         }
         try {
+            $params = [];
+            foreach ($values as $k => $v) { $params[":$k"] = $v; }
             if ($id > 0) {
                 $set = implode(', ', array_map(static fn ($c) => "`$c` = :$c", array_keys($values)));
-                $sql = "UPDATE person_per SET $set, per_DateLastEdited = NOW(), per_EditedBy = :actor WHERE per_ID = :id";
-                $params = [];
-                foreach ($values as $k => $v) { $params[":$k"] = $v; }
-                $params[':actor'] = $actorId;
                 $params[':id'] = $id;
-                $this->db->prepare($sql)->execute($params);
+                $this->db->prepare("UPDATE people SET $set, updated_at = NOW() WHERE id = :id")->execute($params);
+                $this->audit($actorId, 'person.updated', $id);
             } else {
                 $cols = array_keys($values);
                 $ph = array_map(static fn ($c) => ":$c", $cols);
-                $sql = 'INSERT INTO person_per (' . implode(', ', $cols)
-                    . ', per_DateEntered, per_EnteredBy, per_DateLastEdited, per_EditedBy, per_Flags)'
-                    . ' VALUES (' . implode(', ', $ph) . ', NOW(), :actor, NOW(), :actor2, 0)';
-                $params = [];
-                foreach ($values as $k => $v) { $params[":$k"] = $v; }
-                $params[':actor'] = $actorId;
-                $params[':actor2'] = $actorId;
+                $sql = 'INSERT INTO people (`' . implode('`, `', $cols) . '`) VALUES (' . implode(', ', $ph) . ')';
                 $this->db->prepare($sql)->execute($params);
                 $id = (int) $this->db->lastInsertId();
-            }
-
-            // Member Type custom field.
-            $mt = trim((string) ($in['member_type_id'] ?? ''));
-            $mtVal = ($mt !== '' && (int) $mt > 0) ? (int) $mt : null;
-            $this->db->prepare('INSERT INTO person_custom (per_ID, c1) VALUES (:id, :mt) ON DUPLICATE KEY UPDATE c1 = VALUES(c1)')
-                ->execute([':id' => $id, ':mt' => $mtVal]);
-
-            // Primary campus affiliation.
-            if (array_key_exists('primary_campus_id', $in)) {
-                $campus = (int) $in['primary_campus_id'];
-                $this->db->prepare('DELETE FROM person_campus_affiliation WHERE person_id = :id')->execute([':id' => $id]);
-                if ($campus > 0) {
-                    $this->db->prepare(
-                        'INSERT INTO person_campus_affiliation (person_id, campus_id, is_primary, date_entered, entered_by)
-                         VALUES (:id, :c, 1, NOW(), :actor)'
-                    )->execute([':id' => $id, ':c' => $campus, ':actor' => $actorId]);
-                }
+                $this->audit($actorId, 'person.created', $id);
             }
 
             if ($ownTx) {
@@ -593,26 +562,20 @@ final readonly class PersonAdminService
     }
 
     /**
-     * Compact directory used to match an import against existing people.
-     *
-     * @return list<array{id:int,first_name:string,last_name:string,email:string,campus_id:?int}>
-     */
-    /**
      * Columns a person may change about themselves.
      *
      * Deliberately narrower than save(): it is how they are reached and how
      * they describe themselves, and nothing about their standing in the church.
-     * Classification, member type, membership date, family membership and
-     * family role are records the church keeps ABOUT a person, not fields the
-     * person authors -- and per_fam_ID in particular is an access decision,
-     * because a family's shared address and household list come with it. Those
-     * stay with the admin editor.
+     * Membership status, member type, member since, household and household
+     * role are records the church keeps ABOUT a person, not fields the person
+     * authors -- and household_id in particular is an access decision, because
+     * a household's shared address and member list come with it. Those stay
+     * with the admin editor.
      */
     private const OWN_STR_FIELDS = [
-        'per_Title', 'per_FirstName', 'per_MiddleName', 'per_LastName', 'per_Suffix',
-        'per_Address1', 'per_Address2', 'per_City', 'per_State', 'per_Zip', 'per_Country',
-        'per_HomePhone', 'per_WorkPhone', 'per_CellPhone', 'per_Email', 'per_WorkEmail',
-        'per_Facebook', 'per_Twitter', 'per_LinkedIn',
+        'first_name', 'middle_name', 'last_name', 'preferred_name', 'suffix',
+        'address_line1', 'address_line2', 'city', 'region', 'postal_code', 'country',
+        'home_phone', 'mobile_phone', 'email',
     ];
 
     /**
@@ -644,39 +607,39 @@ final readonly class PersonAdminService
             $values[$f] = $v === '' ? null : $v;
         }
 
-        if (array_key_exists('per_LastName', $values) && $values['per_LastName'] === null) {
+        if (array_key_exists('last_name', $values) && $values['last_name'] === null) {
             throw new \InvalidArgumentException('Last name is required.');
         }
-        foreach (['per_Email', 'per_WorkEmail'] as $ef) {
-            if (($values[$ef] ?? null) !== null && !filter_var((string) $values[$ef], FILTER_VALIDATE_EMAIL)) {
-                throw new \InvalidArgumentException('That email address looks invalid.');
-            }
+        if (array_key_exists('first_name', $values) && $values['first_name'] === null) {
+            $values['first_name'] = '';
+        }
+        if (($values['email'] ?? null) !== null && !filter_var((string) $values['email'], FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('That email address looks invalid.');
         }
 
         // Birthday: month and day travel together, exactly as save() requires.
-        $hasBm = array_key_exists('per_BirthMonth', $in);
-        $hasBd = array_key_exists('per_BirthDay', $in);
+        $hasBm = array_key_exists('birth_month', $in);
+        $hasBd = array_key_exists('birth_day', $in);
         if ($hasBm || $hasBd) {
-            $bm = (int) ($in['per_BirthMonth'] ?? $current['per_BirthMonth'] ?? 0);
-            $bd = (int) ($in['per_BirthDay'] ?? $current['per_BirthDay'] ?? 0);
+            $bm = (int) ($in['birth_month'] ?? $current['birth_month'] ?? 0);
+            $bd = (int) ($in['birth_day'] ?? $current['birth_day'] ?? 0);
             if (($bm > 0) !== ($bd > 0)) {
                 throw new \InvalidArgumentException('A birthday needs both a month and a day, or neither.');
             }
             if ($bm < 0 || $bm > 12 || $bd < 0 || $bd > 31) {
                 throw new \InvalidArgumentException('That birthday is not a real date.');
             }
-            $values['per_BirthMonth'] = $bm;
-            $values['per_BirthDay'] = $bd;
+            $values['birth_month'] = $bm > 0 ? $bm : null;
+            $values['birth_day'] = $bd > 0 ? $bd : null;
         }
-        if (array_key_exists('per_BirthYear', $in)) {
-            $by = trim((string) $in['per_BirthYear']);
-            $values['per_BirthYear'] = ($by !== '' && (int) $by >= 1900 && (int) $by <= (int) date('Y'))
+        if (array_key_exists('birth_year', $in)) {
+            $by = trim((string) $in['birth_year']);
+            $values['birth_year'] = ($by !== '' && (int) $by >= 1900 && (int) $by <= (int) date('Y'))
                 ? (int) $by
                 : null;
         }
-        if (array_key_exists('per_Gender', $in)) {
-            $g = (int) $in['per_Gender'];
-            $values['per_Gender'] = in_array($g, [1, 2], true) ? $g : 0;
+        if (array_key_exists('gender', $in)) {
+            $values['gender'] = self::gender($in['gender']);
         }
 
         if ($values === []) {
@@ -688,11 +651,11 @@ final readonly class PersonAdminService
         foreach ($values as $k => $v) {
             $params[":$k"] = $v;
         }
-        $params[':actor'] = $actorId;
         $params[':id'] = $personId;
         $this->db
-            ->prepare("UPDATE person_per SET $set, per_DateLastEdited = NOW(), per_EditedBy = :actor WHERE per_ID = :id")
+            ->prepare("UPDATE people SET $set, updated_at = NOW() WHERE id = :id")
             ->execute($params);
+        $this->audit($actorId, 'person.profile_updated', $personId);
     }
 
     /**
@@ -707,28 +670,19 @@ final readonly class PersonAdminService
         if ($personId <= 0) {
             return [];
         }
-        // Role names have two homes: the portal's own `roles` table and the
-        // ChurchCRM option list the group points at with grp_RoleListID. The
-        // ministry adapter coalesces both, and a query that reads only one of
-        // them returns a person's ministries with every role blank.
+        // What a member does inside a ministry lives in ministry_member_positions;
+        // leading is the membership's role.
         $stmt = $this->db->prepare(
-            'SELECT g.grp_ID AS ministry_id,
-                    g.grp_Name AS name,
-                    COALESCE(lst.lst_OptionName, r.role_name, "") AS role_name,
-                    ml.person_id IS NOT NULL AS is_leader
-               FROM person2group2role_p2g2r p2g
-               INNER JOIN group_grp g ON g.grp_ID = p2g.p2g2r_grp_ID
-               LEFT JOIN roles r
-                      ON r.role_id = p2g.p2g2r_rle_ID
-                     AND r.ministry_group_id = g.grp_ID
-               LEFT JOIN list_lst lst
-                      ON lst.lst_ID = g.grp_RoleListID
-                     AND lst.lst_OptionID = p2g.p2g2r_rle_ID
-               LEFT JOIN ministry_leaders ml
-                      ON ml.ministry_group_id = g.grp_ID
-                     AND ml.person_id = p2g.p2g2r_per_ID
-              WHERE p2g.p2g2r_per_ID = :id
-              ORDER BY g.grp_Name ASC'
+            'SELECT m.id AS ministry_id,
+                    m.name,
+                    COALESCE(pos.name, "") AS role_name,
+                    mm.role = "leader" AS is_leader
+               FROM ministry_members mm
+               INNER JOIN ministries m ON m.id = mm.ministry_id
+               LEFT JOIN ministry_member_positions pos ON pos.ministry_member_id = mm.id
+              WHERE mm.person_id = :id
+                AND mm.status <> "ended"
+              ORDER BY m.name ASC'
         );
         $stmt->execute([':id' => $personId]);
 
@@ -757,14 +711,18 @@ final readonly class PersonAdminService
         }, $out));
     }
 
+    /**
+     * Compact directory used to match an import against existing people.
+     *
+     * @return list<array{id:int,first_name:string,last_name:string,email:string,campus_id:?int}>
+     */
     public function matchIndex(): array
     {
-        $sql = 'SELECT p.per_ID AS id, p.per_FirstName AS first_name, p.per_LastName AS last_name,
-                       LOWER(TRIM(COALESCE(p.per_Email, ""))) AS email,
-                       pca.campus_id AS campus_id
-                  FROM person_per p
-                  LEFT JOIN person_campus_affiliation pca ON pca.person_id = p.per_ID AND pca.is_primary = 1
-              ORDER BY p.per_LastName, p.per_FirstName';
+        $sql = 'SELECT p.id, p.first_name, p.last_name,
+                       LOWER(TRIM(COALESCE(p.email, ""))) AS email,
+                       p.campus_id
+                  FROM people p
+              ORDER BY p.last_name, p.first_name';
         $rows = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map(static fn (array $r): array => [
             'id' => (int) $r['id'],
@@ -776,27 +734,37 @@ final readonly class PersonAdminService
     }
 
     /**
-     * People whose primary campus is $campusId, with fields needed for CSV export.
+     * People whose campus is $campusId, with fields needed for CSV export.
      *
      * @return list<array<string,mixed>>
      */
     public function exportCampus(int $campusId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT p.per_ID AS id, p.per_FirstName AS first_name, p.per_MiddleName AS middle_name,
-                    p.per_LastName AS last_name, p.per_Email AS email, p.per_CellPhone AS cell,
-                    p.per_Address1 AS address1, p.per_City AS city, p.per_State AS state, p.per_Zip AS zip,
-                    p.per_BirthMonth AS bm, p.per_BirthDay AS bd, p.per_BirthYear AS by2,
-                    p.per_MembershipDate AS member_since,
-                    mt.lst_OptionName AS member_type
-               FROM person_per p
-               INNER JOIN person_campus_affiliation pca ON pca.person_id = p.per_ID AND pca.is_primary = 1
-               LEFT JOIN person_custom pc ON pc.per_ID = p.per_ID
-               LEFT JOIN list_lst mt ON mt.lst_ID = 13 AND mt.lst_OptionID = pc.c1
-              WHERE pca.campus_id = :c
-              ORDER BY p.per_LastName ASC, p.per_FirstName ASC'
+            'SELECT p.id, p.first_name, p.middle_name, p.last_name, p.email, p.mobile_phone,
+                    p.address_line1, p.city, p.region, p.postal_code,
+                    p.birth_month, p.birth_day, p.birth_year,
+                    p.member_since,
+                    mt.name AS member_type
+               FROM people p
+               LEFT JOIN member_types mt ON mt.id = p.member_type_id
+              WHERE p.campus_id = :c
+              ORDER BY p.last_name ASC, p.first_name ASC'
         );
         $stmt->execute([':c' => $campusId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Record who changed a person. The actor id callers pass is a person id; a
+     * value that is not one (a login with no person) is kept as no one rather
+     * than breaking the write.
+     */
+    private function audit(int $actorId, string $action, int $personId): void
+    {
+        $this->db->prepare(
+            'INSERT INTO audit_log (person_id, action, target_type, target_id)
+             VALUES ((SELECT id FROM people WHERE id = :actor), :action, "person", :target)'
+        )->execute([':actor' => $actorId, ':action' => $action, ':target' => (string) $personId]);
     }
 }

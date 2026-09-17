@@ -187,7 +187,7 @@ ok(acctRoutes.includes("'POST /account/profile'"), 'account has a self-service p
   const handler = next === -1 ? rest : rest.slice(0, next);
   ok(handler.includes("(int) ($actor['personId'] ?? 0)"),
     'the profile save takes its person from the session actor');
-  ok(!/\$req\[.(id|person_id|per_ID).\]/.test(handler),
+  ok(!/\$req\[.(id|person_id).\]/.test(handler),
     'the profile save never reads a person id out of the request');
 }
 // Field scope. These columns are the church's record of a person's standing and
@@ -196,7 +196,7 @@ ok(acctRoutes.includes("'POST /account/profile'"), 'account has a self-service p
 ok(personSvc.includes('OWN_STR_FIELDS'), 'self-service writes go through their own field whitelist');
 {
   const list = /OWN_STR_FIELDS = \[([\s\S]*?)\];/.exec(personSvc)?.[1] ?? '';
-  for (const forbidden of ['per_cls_ID', 'per_fam_ID', 'per_fmr_ID', 'member_type_id', 'per_MembershipDate']) {
+  for (const forbidden of ['membership_status_id', 'household_id', 'household_role_id', 'member_type_id', 'member_since', 'campus_id']) {
     ok(!list.includes(forbidden), `self-service cannot write ${forbidden}`);
   }
 }

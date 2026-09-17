@@ -73,7 +73,7 @@ require_once __DIR__ . '/_portal-shell.php';
         <select id="ownerCampus" style="min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;width:100%">
           <option value="0">— none —</option>
           <?php foreach ($ownerCampuses as $c): ?>
-            <option value="<?= (int) $c['campus_id'] ?>"<?= $ownerPrimaryCampus === (int) $c['campus_id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $c['campus_name'], ENT_QUOTES, 'UTF-8') ?></option>
+            <option value="<?= (int) $c['id'] ?>"<?= $ownerPrimaryCampus === (int) $c['id'] ? ' selected' : '' ?>><?= htmlspecialchars((string) $c['name'], ENT_QUOTES, 'UTF-8') ?></option>
           <?php endforeach; ?>
         </select>
         <div style="margin-top:8px"><button class="button" id="ownerCampusSave" type="button">Save campus</button></div>
@@ -105,7 +105,6 @@ function initials(p){const name=String(p.displayName||'').trim();return name.spl
 function detail(label,value){return `<div class="detail-row"><strong>${escapeHtml(label)}</strong><span>${value}</span></div>`;}
 function campusName(person){return person.primaryCampusName||Array.from(campusSelect?.options||[]).find(option=>String(option.value)===String(person.primaryCampusId))?.textContent||'Campus not set';}
 function photoUrl(id){return `${basePath}/people/photo?id=${encodeURIComponent(id)}`;}
-function noteLink(id){return `/churchcrm/NoteEditor.php?PersonID=${encodeURIComponent(id)}`;}
 async function load(){
     document.getElementById('peopleLink').href=withCampus(`${basePath}/people`);
     profile.innerHTML='<div class="section muted">Loading person profile...</div>';
@@ -178,7 +177,6 @@ async function load(){
             <div class="detail-list">
                 ${detail('Created',escapeHtml(formatDate(person.dateEntered)))}
                 ${detail('Last updated',escapeHtml(formatDate(person.dateLastEdited)))}
-                ${detail('Notes',isOwnProfile?`<a class="button secondary" href="${escapeHtml(noteLink(person.personId))}">Add note</a>`:'<span class="muted">Notes are available to the person and authorized users.</span>')}
             </div>
         </div>`;
         const photo=document.getElementById('profilePhoto');

@@ -1,12 +1,12 @@
 <?php
 /**
- * Admin · Option manager — edit list_lst option lists (classifications, family
- * roles, member types). Data via OptionAdminService. No ChurchCRM dependency.
+ * Admin · Option manager — edit the classification (membership status), family
+ * role (household role) and member type lists. Data via OptionAdminService.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
  * @var array<string,mixed> $campusSelector
- * @var array<int,array{label:string,desc:string,options:list<array<string,mixed>>}> $lists
+ * @var array<string,array{label:string,desc:string,options:list<array<string,mixed>>}> $lists
  * @var string $notice
  * @var string $flash
  */
@@ -42,7 +42,7 @@ ob_start();
 <?php if (!$isAdmin): ?>
   <article class="admin-card"><div class="admin-card-body" style="color:var(--muted)">Only a portal-wide admin can manage options.</div></article>
 <?php else: ?>
-  <?php foreach ($lists as $listId => $list): ?>
+  <?php foreach ($lists as $listKey => $list): ?>
     <article class="admin-card">
       <div class="admin-card-head"><div><h2><?= $h($list['label']) ?></h2><p><?= $h($list['desc']) ?></p></div></div>
       <div class="admin-card-body">
@@ -51,7 +51,7 @@ ob_start();
             <!-- rename -->
             <form method="post" action="<?= $base ?>/admin/options">
               <input type="hidden" name="action" value="rename">
-              <input type="hidden" name="list_id" value="<?= (int) $listId ?>">
+              <input type="hidden" name="list" value="<?= $h($listKey) ?>">
               <input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>">
               <input type="text" name="name" value="<?= $h($o['name']) ?>" maxlength="50"
                      aria-label="Rename &quot;<?= $h($o['name']) ?>&quot;">
@@ -60,16 +60,16 @@ ob_start();
             <span class="op-usage"><?= (int) $o['usage'] ?> in use</span>
             <!-- reorder -->
             <form method="post" action="<?= $base ?>/admin/options">
-              <input type="hidden" name="action" value="move"><input type="hidden" name="list_id" value="<?= (int) $listId ?>"><input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>"><input type="hidden" name="dir" value="up">
+              <input type="hidden" name="action" value="move"><input type="hidden" name="list" value="<?= $h($listKey) ?>"><input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>"><input type="hidden" name="dir" value="up">
               <button class="op-btn" type="submit" title="Move up"<?= $i === 0 ? ' disabled' : '' ?>>&uarr;</button>
             </form>
             <form method="post" action="<?= $base ?>/admin/options">
-              <input type="hidden" name="action" value="move"><input type="hidden" name="list_id" value="<?= (int) $listId ?>"><input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>"><input type="hidden" name="dir" value="down">
+              <input type="hidden" name="action" value="move"><input type="hidden" name="list" value="<?= $h($listKey) ?>"><input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>"><input type="hidden" name="dir" value="down">
               <button class="op-btn" type="submit" title="Move down"<?= $i === $count - 1 ? ' disabled' : '' ?>>&darr;</button>
             </form>
             <!-- delete -->
             <form method="post" action="<?= $base ?>/admin/options" onsubmit="return confirm('Delete the option &quot;<?= $h($o['name']) ?>&quot;?\n\nIt is removed from the list and can no longer be chosen. People already using it keep it until you change them.\n\nThis cannot be undone.');">
-              <input type="hidden" name="action" value="delete"><input type="hidden" name="list_id" value="<?= (int) $listId ?>"><input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>">
+              <input type="hidden" name="action" value="delete"><input type="hidden" name="list" value="<?= $h($listKey) ?>"><input type="hidden" name="option_id" value="<?= (int) $o['id'] ?>">
               <button class="op-btn danger" type="submit"<?= (int) $o['usage'] > 0 ? ' disabled title="In use"' : '' ?>>Delete</button>
             </form>
           </div>
@@ -78,7 +78,7 @@ ob_start();
 
         <form class="op-add" method="post" action="<?= $base ?>/admin/options">
           <input type="hidden" name="action" value="add">
-          <input type="hidden" name="list_id" value="<?= (int) $listId ?>">
+          <input type="hidden" name="list" value="<?= $h($listKey) ?>">
           <input type="text" name="name" maxlength="50" placeholder="New option name"
                  aria-label="New option for <?= $h($list['label'] ?? 'this list') ?>">
           <button class="op-btn primary" type="submit">&#43; Add</button>
