@@ -809,6 +809,41 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
 
+    // Record history — who changed which person or household record, and when.
+    // Read-only, portal administrators only; the service refuses anyone else.
+    'GET /people/history' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        $isAdmin = \App\Services\RecordHistoryService::mayRead($actor);
+        $history = null;
+        $options = ['actions' => [], 'people' => []];
+        $householdName = null;
+        $personName = null;
+        $loadError = '';
+        if ($isAdmin) {
+            try {
+                $svc = \App\Providers\PortalServiceProvider::makeRecordHistoryService();
+                $history = $svc->page($actor, $req);
+                $options = $svc->filterOptions($actor);
+                if ($history['criteria']['householdId'] !== null) {
+                    $householdName = $svc->recordName($actor, 'household', (int) $history['criteria']['householdId']);
+                }
+                if ($history['criteria']['personId'] !== null) {
+                    $personName = $svc->recordName($actor, 'person', (int) $history['criteria']['personId']);
+                }
+            } catch (\Throwable $e) {
+                error_log('[people/history] ' . $e->getMessage());
+                $loadError = 'The record history could not be read just now.';
+            }
+        } else {
+            http_response_code($actor === null ? 401 : 403);
+        }
+        ob_start();
+        require __DIR__ . '/../resources/views/people-history.php';
+        return (string) ob_get_clean();
+    },
+
     'GET /docs' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);

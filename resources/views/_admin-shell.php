@@ -318,8 +318,9 @@ if (!function_exists('admin_render_page')) {
      *   sectionDescription:string,
      *   actor:?array<string,mixed>,
      *   campusSelector:array<string,mixed>,
-     *   isAdmin:bool
-     * } $args
+     *   isAdmin:bool,
+     *   headerActions?:string
+     * } $args  headerActions: escaped markup for the page header's actions
      * @param callable():string $renderBody     callable returning the inner HTML
      */
     function admin_render_page(array $args, callable $renderBody): string
@@ -401,7 +402,7 @@ if (!function_exists('admin_render_page')) {
         <?php elseif ($crumbs !== ''): /* the tabs already say where you are */ ?>
         <p class="ek-crumbs"><?= $crumbs ?></p>
         <?php endif; ?>
-        <?= ek_page_header((string) $args['sectionTitle'], (string) $args['sectionDescription']) ?>
+        <?= ek_page_header((string) $args['sectionTitle'], (string) $args['sectionDescription'], $canUseAdmin ? (string) ($args['headerActions'] ?? '') : '') ?>
         <?php if ($canUseAdmin): ?>
             <?= $renderBody() ?>
         <?php else: ?>

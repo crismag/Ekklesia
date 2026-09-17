@@ -185,10 +185,15 @@ check('an admin is offered all seven workspaces', count($adminWs) === 7, implode
 
 // Pages later phases build are placed, but never linked before they exist.
 $allHtml = ek_workspace_nav('/bp', $admin, null);
-foreach (['/bp/people/history', '/bp/visitors', '/bp/visitors/rsvps', '/bp/visitors/access', '/bp/admin/history'] as $href) {
+foreach (['/bp/visitors', '/bp/visitors/rsvps', '/bp/visitors/access', '/bp/admin/history'] as $href) {
     check('no link to an unbuilt page: ' . $href, !str_contains($allHtml, 'href="' . $href . '"'));
 }
-check('an unbuilt page is still placed in the map', Workspaces::locate('/people/history') === ['workspace' => 'people', 'page' => 'history', 'child' => null]);
+check('an unbuilt page is still placed in the map', Workspaces::locate('/admin/history') === ['workspace' => 'admin', 'page' => 'history', 'child' => null]);
+// Record history is built: offered to administrators, and to nobody else.
+check('Record history is offered to an admin', in_array('history', $adminWs['people'] ?? [], true));
+check('Record history is not offered to a member', !in_array('history', $memberNav['people'] ?? [], true));
+check('Record history wins over the directory for its own URL',
+    Workspaces::locate('/people/history') === ['workspace' => 'people', 'page' => 'history', 'child' => null]);
 
 // Locating a URL.
 check('the home page is Home', Workspaces::locate('/') === ['workspace' => 'home', 'page' => 'home', 'child' => null]);
