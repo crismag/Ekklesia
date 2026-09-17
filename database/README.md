@@ -27,6 +27,7 @@ never changed.
 | `migrate/run.sh` | Recreates the member database, copies records, runs the verification |
 | `migrate/household_links_from_json.php` | Turns the related-families file into `household_links` rows |
 | `migrate/visitors_from_legacy.php` | Builds the visitors SQLite file from the legacy sign-up tables |
+| `LEGACY_MAPPING.md` | Every legacy table and column and its new name, and the conventions code follows |
 | `verify/members.sql` | Legacy vs new counts, and a list of records to review |
 
 ## Build
