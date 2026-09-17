@@ -12,6 +12,33 @@ use ZipArchive;
 final class MemberRosterXlsxWriter
 {
     /**
+     * The Ministry cell for one person: each ministry name followed by its
+     * positions in parentheses, "Guest Services (Usher, Emcee), Psalmists".
+     *
+     * MemberMinistryAssigner::resolve() reads this form back to the same
+     * memberships and positions, so an exported roster can be re-imported.
+     *
+     * @param list<array{name:string,positions?:list<string>}> $memberships
+     */
+    public static function ministryCell(array $memberships): string
+    {
+        $parts = [];
+        foreach ($memberships as $membership) {
+            $name = trim((string) ($membership['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $positions = array_values(array_filter(
+                array_map(static fn ($p): string => trim((string) $p), $membership['positions'] ?? []),
+                static fn (string $p): bool => $p !== '',
+            ));
+            $parts[] = $positions === [] ? $name : $name . ' (' . implode(', ', $positions) . ')';
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
      * @param list<array{campus:string,rows:list<array<string,mixed>>}> $sheets
      */
     public function build(array $sheets, string $title = 'Christlikeness member export'): string
@@ -115,9 +142,9 @@ final class MemberRosterXlsxWriter
         $first = trim((string) ($p['first_name'] ?? ''));
         $name = $last . ($first !== '' ? ', ' . $first : '');
         $months = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        $bm = (int) ($p['bm'] ?? $p['birth_month'] ?? 0);
-        $bd = (int) ($p['bd'] ?? $p['birth_day'] ?? 0);
-        $by = (int) ($p['by2'] ?? $p['birth_year'] ?? 0);
+        $bm = (int) ($p['birth_month'] ?? 0);
+        $bd = (int) ($p['birth_day'] ?? 0);
+        $by = (int) ($p['birth_year'] ?? 0);
         $bday = '';
         if ($bm > 0 && $bd > 0) {
             $bday = ($months[$bm] ?? (string) $bm) . ' ' . $bd . ($by > 0 ? ', ' . $by : '');
@@ -125,9 +152,9 @@ final class MemberRosterXlsxWriter
         $addr = trim((string) ($p['address_raw'] ?? ''));
         if ($addr === '') {
             $addr = implode(', ', array_filter([
-                trim((string) ($p['address1'] ?? '')),
+                trim((string) ($p['address_line1'] ?? '')),
                 trim((string) ($p['city'] ?? '')),
-                trim(implode(' ', array_filter([(string) ($p['state'] ?? ''), (string) ($p['zip'] ?? '')]))),
+                trim(implode(' ', array_filter([(string) ($p['region'] ?? ''), (string) ($p['postal_code'] ?? '')]))),
             ]));
         }
         return [
@@ -137,7 +164,7 @@ final class MemberRosterXlsxWriter
             (string) ($p['middle_name'] ?? ''),
             $bday,
             $addr,
-            (string) ($p['cell'] ?? $p['phone'] ?? ''),
+            (string) ($p['mobile_phone'] ?? $p['phone'] ?? ''),
             (string) ($p['email'] ?? ''),
             (string) ($p['member_since'] ?? ''),
             (string) ($p['member_type'] ?? ''),

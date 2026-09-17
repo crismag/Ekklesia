@@ -105,8 +105,11 @@ final class MinistryNameMap
      * A form showing only the failures cannot answer "did Psalmist go to the
      * right place?", which is the question an administrator actually has after
      * an import surprises them.
+     *
+     * @param list<string> $positions positions the name carried ("Usher"), so
+     *                                the form can show them beside the ministry
      */
-    public function observe(string $raw, int $count, ?int $resolvedId, string $status): void
+    public function observe(string $raw, int $count, ?int $resolvedId, string $status, array $positions = []): void
     {
         $k = self::key($raw);
         if ($k === '') {
@@ -119,6 +122,7 @@ final class MinistryNameMap
             'lastCount' => max(0, $count),
             'resolvedId' => $resolvedId,
             'status' => $status,
+            'positions' => array_values(array_map('strval', $positions)),
             'lastSeen' => date('Y-m-d H:i:s'),
         ];
     }
@@ -145,7 +149,7 @@ final class MinistryNameMap
      * the ones affecting the most rows come first — the order somebody would
      * work through them in.
      *
-     * @return list<array{key:string,raw:string,count:int,status:string,decidedId:?int,needsDecision:bool}>
+     * @return list<array{key:string,raw:string,count:int,status:string,decidedId:?int,needsDecision:bool,positions:list<string>}>
      */
     public function rows(): array
     {
@@ -164,6 +168,7 @@ final class MinistryNameMap
                 'resolvedId' => isset($row['resolvedId']) ? (int) $row['resolvedId'] : null,
                 'decidedId' => $decided,
                 'needsDecision' => $needs,
+                'positions' => is_array($row['positions'] ?? null) ? array_values(array_map('strval', $row['positions'])) : [],
             ];
         }
         usort($out, static function (array $a, array $b): int {

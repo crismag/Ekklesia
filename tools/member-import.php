@@ -12,7 +12,7 @@ declare(strict_types=1);
  * The Hub / primary worksheet is enough for North York and Scarborough.
  * Secondary is optional fill-in only.
  *
- * Default is a dry parse or a DB match preview. person_per is not written
+ * Default is a dry parse or a DB match preview. people is not written
  * unless you ingest a staging batch and then --apply-batch with --confirm=APPLY.
  *
  * Usage:
@@ -86,7 +86,7 @@ $confirm = (string) ($opts['confirm'] ?? '');
 try {
     if ($applyBatch > 0) {
         if ($confirm !== 'APPLY') {
-            fwrite(STDERR, "Refusing to write person_per. Re-run with --confirm=APPLY to apply staging batch #{$applyBatch}.\n");
+            fwrite(STDERR, "Refusing to write people. Re-run with --confirm=APPLY to apply staging batch #{$applyBatch}.\n");
             exit(2);
         }
         $imp = PortalServiceProvider::makeMemberCampusImportService();
@@ -154,7 +154,7 @@ try {
     $preview = $imp->preview($source, $campusId, $primary, $secondary);
     echo json_encode($preview, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
     fwrite(STDERR, sprintf(
-        "Dry run only. Would create %d, update %d, unlink %d campus members. No person_per writes.\n",
+        "Dry run only. Would create %d, update %d, unlink %d campus members. No writes to people.\n",
         $preview['plan']['create'],
         $preview['plan']['update'],
         $preview['plan']['remove']

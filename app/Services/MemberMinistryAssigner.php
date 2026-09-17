@@ -5,35 +5,44 @@ declare(strict_types=1);
 namespace App\Services;
 
 /**
- * Turns the workbook's free-text ministry cell into ministry memberships.
+ * Turns the workbook's free-text ministry cell into ministry memberships and
+ * the positions held in them.
  *
  * The import previously parsed and staged the ministry column and then dropped
- * it: nothing between the staging table and person_per carried it, so the review
+ * it: nothing between the staging table and `people` carried it, so the review
  * screen showed ministries that were never going to be saved.
  *
- * Membership in this portal is a single row in person2group2role_p2g2r linking a
- * person, a group and a role. There is no separate membership table.
+ * Membership is one ministry_members row linking a person and a ministry with
+ * role 'member' or 'leader'. What someone does there ("Usher", "Emcee") is a
+ * position on that membership (ministry_member_positions), not a role.
  *
- * Role: members are imported with role 0. That is not a shortcut — 282 of the
- * 284 existing memberships carry role 0, and the roles that do exist are
- * per-ministry assignment roles (Porter, Runner, Create1) rather than a
- * Member/Leader convention. The sheet defines no role, so inventing one would
- * put data in the database that nobody entered.
+ * Role: people are imported as 'member'. The sheet defines no role, so
+ * inventing one would put data in the database that nobody entered, and an
+ * existing leader is never demoted to member by an import.
  *
- * Leadership is not a role either: it lives in portal_user_roles as an RBAC
- * grant scoped to a ministry, and is managed in the portal rather than in the
- * workbook. This class never writes it — it only makes sure a leader keeps the
- * membership their leadership implies.
+ * Positions come from the cell in two ways:
+ *  - a word or phrase the catalog lists as a position of a ministry
+ *    (config/ministry-catalog.json "roles"): "Usher" or "GS: Usher" or
+ *    "Guest Services Usher" is Guest Services with the position Usher;
+ *  - the export's form, a ministry followed by its positions in parentheses:
+ *    "Guest Services (Usher, Emcee)". The words in the parentheses are the
+ *    positions of the ministry just before them, taken as written (with the
+ *    catalog's spelling when the catalog knows the position), so a position
+ *    set in the portal survives an export and re-import even when the catalog
+ *    does not list it.
+ *
+ * Leadership that grants access lives in account roles and is managed in the
+ * portal rather than in the workbook. This class never writes it.
  */
 final class MemberMinistryAssigner
 {
-    /** Members are imported with no assignment role; see the class comment. */
-    public const MEMBER_ROLE_ID = 0;
+    /** People are imported with the plain membership role; see the class comment. */
+    public const MEMBER_ROLE = 'member';
 
     /** Longest ministry name in words, plus room for a compound phrase. */
     private const MAX_PHRASE_WORDS = 5;
 
-    /** @var array<string,int>|null comparison key => group id */
+    /** @var array<string,int>|null comparison key => ministry id */
     private ?array $index = null;
 
     /**
@@ -52,7 +61,7 @@ final class MemberMinistryAssigner
     }
 
     /**
-     * Resolve the ministry cell to group ids.
+     * Resolve the ministry cell to ministry ids and positions.
      *
      * The cell is not reliably delimited. One member's ministries arrive as
      * "Facilities Psalmist Victuals" — separated by nothing but spaces — while
@@ -66,40 +75,170 @@ final class MemberMinistryAssigner
      * ministry did not import, and because the workbook is authoritative it can
      * also mean an existing membership was removed.
      *
-     * @return array{ids:list<int>,unmatched:list<string>,matched:array<string,int>}
+     * positions: ministry id => the positions the cell gave it (only ministries
+     * with at least one). matchedPositions: the sheet's words => the positions
+     * they carried, for the review form.
+     *
+     * @return array{
+     *   ids:list<int>,
+     *   unmatched:list<string>,
+     *   matched:array<string,int>,
+     *   positions:array<int,list<string>>,
+     *   matchedPositions:array<string,list<string>>
+     * }
      */
     public function resolve(string $ministryCell): array
     {
+        $out = ['ids' => [], 'unmatched' => [], 'matched' => [], 'positions' => [], 'matchedPositions' => []];
         if ($this->isBlankish($ministryCell)) {
-            return ['ids' => [], 'unmatched' => [], 'matched' => []];
+            return $out;
         }
-
-        // Separators that are never part of a name. "&" is deliberately absent:
-        // it sits inside both an alias (G&A) and a compound the catalog knows
-        // how to split ("Events & Prayer Ministry").
-        $chunks = preg_split('/[,;\/|\r\n]+/', $ministryCell) ?: [];
 
         $ids = [];
         $unmatched = [];
-        $matched = [];
-        foreach ($chunks as $chunk) {
-            $chunk = trim($chunk);
-            if ($chunk === '' || $this->isBlankish($chunk)) {
-                continue;
-            }
-            [$chunkIds, $chunkUnmatched, $chunkMatched] = $this->scanPhrase($chunk);
-            foreach ($chunkIds as $id) {
-                $ids[$id] = $id;
-            }
-            foreach ($chunkUnmatched as $word) {
-                $unmatched[strtolower($word)] = $word;
-            }
-            foreach ($chunkMatched as $text => $id) {
-                $matched[$text] = $id;
+        foreach ($this->chunks($ministryCell) as $chunk) {
+            // "Guest Services (Usher, Emcee) Psalmist": each parenthesised
+            // list belongs to the ministry named just before it.
+            $rest = $chunk;
+            while ($rest !== '') {
+                $open = strpos($rest, '(');
+                $close = $open === false ? false : strpos($rest, ')', $open);
+                if ($open === false || $close === false) {
+                    $this->absorb($this->scanPhrase(str_replace(['(', ')'], ' ', $rest)), $ids, $unmatched, $out);
+                    break;
+                }
+                $before = substr($rest, 0, $open);
+                $inside = substr($rest, $open + 1, $close - $open - 1);
+                $rest = trim(substr($rest, $close + 1));
+
+                $scan = $this->scanPhrase($before);
+                $this->absorb($scan, $ids, $unmatched, $out);
+                $owner = $scan['last'];
+                if ($owner === null) {
+                    // Nothing before the parentheses to hang them on: read the
+                    // words inside as ordinary cell text.
+                    foreach ($this->splitPositions($inside) as $word) {
+                        $this->absorb($this->scanPhrase($word), $ids, $unmatched, $out);
+                    }
+                    continue;
+                }
+                foreach ($this->splitPositions($inside) as $position) {
+                    $name = $this->canonicalPosition($owner, $position);
+                    $this->addPosition($out, $owner, $name);
+                    $phrase = trim((string) $scan['lastPhrase']);
+                    if ($phrase !== '' && !in_array($name, $out['matchedPositions'][$phrase] ?? [], true)) {
+                        $out['matchedPositions'][$phrase][] = $name;
+                    }
+                }
             }
         }
 
-        return ['ids' => array_values($ids), 'unmatched' => array_values($unmatched), 'matched' => $matched];
+        foreach ($unmatched as $word) {
+            $out['unmatched'][] = $word;
+        }
+        $out['ids'] = array_values($ids);
+
+        return $out;
+    }
+
+    /**
+     * The cell split on separators that are never part of a name, except
+     * inside parentheses, where a comma separates positions.
+     *
+     * "&" is deliberately not a separator: it sits inside both an alias (G&A)
+     * and a compound the catalog knows how to split ("Events & Prayer Ministry").
+     *
+     * @return list<string>
+     */
+    private function chunks(string $cell): array
+    {
+        $chunks = [];
+        $current = '';
+        $depth = 0;
+        $length = strlen($cell);
+        for ($i = 0; $i < $length; $i++) {
+            $c = $cell[$i];
+            if ($c === '(') {
+                $depth++;
+            } elseif ($c === ')') {
+                $depth = max(0, $depth - 1);
+            }
+            if ($depth === 0 && strpbrk($c, ",;/|\r\n") !== false) {
+                $chunks[] = $current;
+                $current = '';
+                continue;
+            }
+            $current .= $c;
+        }
+        $chunks[] = $current;
+
+        $out = [];
+        foreach ($chunks as $chunk) {
+            $chunk = trim($chunk);
+            if ($chunk !== '' && !$this->isBlankish($chunk)) {
+                $out[] = $chunk;
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return list<string> */
+    private function splitPositions(string $inside): array
+    {
+        $out = [];
+        foreach (preg_split('/\s*[,;\/|&]\s*|\s+and\s+/i', $inside) ?: [] as $part) {
+            $part = trim($part);
+            if ($part !== '' && !$this->isBlankish($part)) {
+                $out[] = $part;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Fold one scan into the running result.
+     *
+     * @param array{ids:list<int>,unmatched:list<string>,matched:array<string,int>,positions:array<int,list<string>>,matchedPositions:array<string,list<string>>,last:?int,lastPhrase:?string} $scan
+     * @param array<int,int>    $ids
+     * @param array<string,string> $unmatched
+     * @param array<string,mixed>  $out
+     */
+    private function absorb(array $scan, array &$ids, array &$unmatched, array &$out): void
+    {
+        foreach ($scan['ids'] as $id) {
+            $ids[$id] = $id;
+        }
+        foreach ($scan['unmatched'] as $word) {
+            $unmatched[strtolower($word)] = $word;
+        }
+        foreach ($scan['matched'] as $text => $id) {
+            $out['matched'][$text] = $id;
+        }
+        foreach ($scan['positions'] as $id => $names) {
+            foreach ($names as $name) {
+                $this->addPosition($out, (int) $id, $name);
+            }
+        }
+        foreach ($scan['matchedPositions'] as $text => $names) {
+            foreach ($names as $name) {
+                if (!in_array($name, $out['matchedPositions'][$text] ?? [], true)) {
+                    $out['matchedPositions'][$text][] = $name;
+                }
+            }
+        }
+    }
+
+    /** @param array<string,mixed> $out */
+    private function addPosition(array &$out, int $ministryId, string $name): void
+    {
+        foreach ($out['positions'][$ministryId] ?? [] as $have) {
+            if (strcasecmp($have, $name) === 0) {
+                return;
+            }
+        }
+        $out['positions'][$ministryId][] = $name;
     }
 
     /**
@@ -108,15 +247,19 @@ final class MemberMinistryAssigner
      * Longest first so "Guest Services" wins over a bare "Guest", and so a
      * compound phrase is offered to the catalog whole before its parts are.
      *
-     * @return array{0:list<int>,1:list<string>,2:array<string,int>}
+     * @return array{ids:list<int>,unmatched:list<string>,matched:array<string,int>,positions:array<int,list<string>>,matchedPositions:array<string,list<string>>,last:?int,lastPhrase:?string}
      */
     private function scanPhrase(string $chunk): array
     {
-        $words = preg_split('/\s+/', trim($chunk)) ?: [];
+        $words = preg_split('/\s+/', trim($chunk), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $count = count($words);
         $ids = [];
         $unmatched = [];
         $matched = [];
+        $positions = [];
+        $matchedPositions = [];
+        $last = null;
+        $lastPhrase = null;
 
         // Consecutive unrecognised words are reported as one run rather than
         // one alert each: "Worship Team" is a single thing somebody meant, and
@@ -143,15 +286,23 @@ final class MemberMinistryAssigner
                     break;
                 }
                 $found = $this->phraseToIds($phrase);
-                if ($found !== []) {
+                if ($found['ids'] !== []) {
                     $flush();
-                    foreach ($found as $id) {
+                    foreach ($found['ids'] as $id) {
                         $ids[] = $id;
+                    }
+                    foreach ($found['positions'] as $id => $names) {
+                        foreach ($names as $name) {
+                            $positions[$id][] = $name;
+                            $matchedPositions[$phrase][] = $name;
+                        }
                     }
                     // Remember the words the sheet used, not only the ids they
                     // became: the review form is about the spreadsheet's
                     // vocabulary, so it has to show the spreadsheet's words.
-                    $matched[$phrase] = $found[0];
+                    $matched[$phrase] = $found['ids'][0];
+                    $last = $found['ids'][count($found['ids']) - 1];
+                    $lastPhrase = $phrase;
                     $i += $len;
                     $hit = true;
                     break;
@@ -167,46 +318,89 @@ final class MemberMinistryAssigner
         }
         $flush();
 
-        return [$ids, $unmatched, $matched];
+        return [
+            'ids' => $ids,
+            'unmatched' => $unmatched,
+            'matched' => $matched,
+            'positions' => $positions,
+            'matchedPositions' => $matchedPositions,
+            'last' => $last,
+            'lastPhrase' => $lastPhrase,
+        ];
     }
 
     /**
-     * One phrase to ministry ids, via the catalog and then the group list.
+     * One phrase to ministry ids and positions, via the catalog and then the
+     * ministry list.
      *
-     * A phrase the catalog recognises but that has no group is not silently
+     * A phrase the catalog recognises but that has no ministry is not silently
      * accepted: returning nothing lets the caller report it as unrecognised
      * instead of quietly assigning fewer ministries than the sheet named.
      *
-     * @return list<int>
+     * @return array{ids:list<int>,positions:array<int,list<string>>}
      */
     private function phraseToIds(string $phrase): array
     {
+        $none = ['ids' => [], 'positions' => []];
+
         // An administrator's decision first. They have told the portal what
         // this word means; a catalog guess must not overrule that, and a name
         // marked "not a ministry" must stop being reported for ever.
         if ($this->nameMap !== null && $this->nameMap->hasDecision($phrase)) {
             $decided = $this->nameMap->idFor($phrase);
 
-            return $decided !== null ? [$decided] : [];
+            return $decided !== null ? ['ids' => [$decided], 'positions' => []] : $none;
         }
 
-        $names = $this->catalog->parseHubCell($phrase);
-        if ($names === []) {
+        // "Victuals GS: Usher" is two things. The catalog reads a "GS:" prefix
+        // anywhere in its input and would take the whole phrase as Guest
+        // Services, so a colon is only offered to it at the start of a phrase.
+        $colon = strpos($phrase, ':');
+        if ($colon !== false && str_contains(trim(substr($phrase, 0, $colon)), ' ')) {
+            return $none;
+        }
+
+        $parsed = $this->catalog->parseHubAssignments($phrase);
+        if ($parsed['ministries'] === []) {
             $direct = $this->groupIdFor($phrase);
 
-            return $direct !== null ? [$direct] : [];
+            return $direct !== null ? ['ids' => [$direct], 'positions' => []] : $none;
         }
 
         $ids = [];
-        foreach ($names as $name) {
+        $positions = [];
+        foreach ($parsed['ministries'] as $name) {
             $id = $this->resolveCanonical((string) $name);
             if ($id === null) {
-                return [];
+                return $none;
             }
             $ids[] = $id;
+            foreach ($parsed['roles'][$name] ?? [] as $role) {
+                $positions[$id][] = (string) $role;
+            }
         }
 
-        return $ids;
+        return ['ids' => $ids, 'positions' => $positions];
+    }
+
+    /**
+     * A position as the catalog spells it for that ministry, or as written.
+     */
+    private function canonicalPosition(int $ministryId, string $position): string
+    {
+        $key = $this->catalog->key($position);
+        foreach ($this->catalog->serving() as $row) {
+            if ($row['roles'] === [] || $this->resolveCanonical((string) $row['name']) !== $ministryId) {
+                continue;
+            }
+            foreach ($row['roles'] as $role) {
+                if ($this->catalog->key($role) === $key) {
+                    return $role;
+                }
+            }
+        }
+
+        return $position;
     }
 
     /**

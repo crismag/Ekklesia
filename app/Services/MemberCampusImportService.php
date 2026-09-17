@@ -13,7 +13,7 @@ use RuntimeException;
  * Multi-step campus member import:
  *  1. Ingest the primary Hub worksheet (optional secondary fill-in) into staging.
  *  2. Admins clean/edit staged rows.
- *  3. Apply only ready rows to person_per for the chosen campus.
+ *  3. Apply only ready rows to people for the chosen campus.
  */
 final readonly class MemberCampusImportService
 {
@@ -33,7 +33,7 @@ final readonly class MemberCampusImportService
 
     private const ROW_FIELDS = [
         'last_name', 'first_name', 'middle_name', 'preferred_name', 'email', 'phone',
-        'address_raw', 'address1', 'city', 'state', 'zip', 'country',
+        'address_raw', 'address_line1', 'city', 'region', 'postal_code', 'country',
         'birth_year', 'birth_month', 'birth_day', 'member_since', 'member_type',
         'ministry', 'confirmed', 'status', 'notes', 'matched_person_id',
     ];
@@ -76,13 +76,14 @@ final readonly class MemberCampusImportService
     }
 
     /**
-     * Parse both worksheets, merge, and store a staging batch. Does not write person_per.
+     * Parse both worksheets, merge, and store a staging batch. Does not write people.
      *
      * @return array{batch:array<string,mixed>,counts:array<string,int>,warnings:list<string>}
      */
     public function ingest(
         string $path,
         int $campusId,
+        // The signed-in account id (0 from the command line).
         int $actorId,
         ?string $hubSheet = MemberWorkbookParser::HUB_SHEET,
         ?string $nySheet = '',
@@ -130,14 +131,14 @@ final readonly class MemberCampusImportService
         $batchId = $this->staging->createBatch(
             [
                 'campus_id' => $campusId,
-                'source_label' => $sourceLabel !== '' ? $sourceLabel : ($campus['campus_name'] . ' workbook'),
+                'source_label' => $sourceLabel !== '' ? $sourceLabel : ($campus['name'] . ' workbook'),
                 'hub_sheet' => $parsed['hub']['sheet'] ?? null,
                 'ny_sheet' => $parsed['ny']['sheet'] ?? null,
                 'hub_updated' => $parsed['hub']['updated'] ?? null,
                 'ny_updated' => $parsed['ny']['updated'] ?? null,
-                'warnings' => $warnings !== [] ? implode("\n", $warnings) : null,
+                'warnings' => $warnings,
                 'duplicate_report' => $dupReport,
-                'created_by' => $actorId,
+                'created_by_account_id' => $actorId,
             ],
             array_map(fn (array $row): array => $this->toStagingRow($row, $matchedByKey), $merged)
         );
@@ -176,10 +177,10 @@ final readonly class MemberCampusImportService
             'email' => $email !== '' ? $email : null,
             'phone' => $blankToNull('phone'),
             'address_raw' => $blankToNull('address_raw'),
-            'address1' => $blankToNull('address1'),
+            'address_line1' => $blankToNull('address_line1'),
             'city' => $blankToNull('city'),
-            'state' => $blankToNull('state'),
-            'zip' => $blankToNull('zip'),
+            'region' => $blankToNull('region'),
+            'postal_code' => $blankToNull('postal_code'),
             'country' => $blankToNull('country'),
             'birth_year' => $row['birth_year'] ?: null,
             'birth_month' => $row['birth_month'] ?: null,
@@ -295,7 +296,7 @@ final readonly class MemberCampusImportService
     }
 
     /**
-     * Parse worksheets and match against person_per without writing.
+     * Parse worksheets and match against people without writing.
      *
      * @return array{
      *   sheets:list<string>,
@@ -391,7 +392,7 @@ final readonly class MemberCampusImportService
                 foreach (MemberImportPayload::unusableEmails($payload) as $field => $value) {
                     $problems[] = $who . ' — ' . $field . ' is not a valid email address.';
                 }
-                if (trim((string) ($payload['per_LastName'] ?? '')) === '') {
+                if (trim((string) ($payload['last_name'] ?? '')) === '') {
                     $problems[] = $who . ' — last name is required.';
                 }
             }
@@ -471,6 +472,7 @@ final readonly class MemberCampusImportService
     {
         $campus = $this->requireCampus($campusId);
         $people = $this->people->exportCampus($campusId);
+        $ministryCells = $this->ministryCellsForCampus($campusId);
         $fh = fopen('php://temp', 'r+');
         if ($fh === false) {
             throw new RuntimeException('Could not build the export.');
@@ -493,19 +495,19 @@ final readonly class MemberCampusImportService
             $last = trim((string) $p['last_name']);
             $first = trim((string) $p['first_name']);
             $name = $last . ($first !== '' ? ', ' . $first : '');
-            $bm = (int) ($p['bm'] ?? 0);
-            $bd = (int) ($p['bd'] ?? 0);
-            $by = (int) ($p['by2'] ?? 0);
+            $bm = (int) ($p['birth_month'] ?? 0);
+            $bd = (int) ($p['birth_day'] ?? 0);
+            $by = (int) ($p['birth_year'] ?? 0);
             $bday = '';
             if ($bm > 0 && $bd > 0) {
                 $bday = ($months[$bm] ?? (string) $bm) . ' ' . $bd . ($by > 0 ? ', ' . $by : '');
             }
             $addrParts = array_filter([
-                trim((string) ($p['address1'] ?? '')),
+                trim((string) ($p['address_line1'] ?? '')),
                 trim((string) ($p['city'] ?? '')),
                 trim(implode(' ', array_filter([
-                    (string) ($p['state'] ?? ''),
-                    (string) ($p['zip'] ?? ''),
+                    (string) ($p['region'] ?? ''),
+                    (string) ($p['postal_code'] ?? ''),
                 ]))),
             ]);
             fputcsv($fh, [
@@ -515,17 +517,17 @@ final readonly class MemberCampusImportService
                 trim((string) ($p['middle_name'] ?? '')),
                 $bday,
                 implode(', ', $addrParts),
-                (string) ($p['cell'] ?? ''),
+                (string) ($p['mobile_phone'] ?? ''),
                 (string) ($p['email'] ?? ''),
                 (string) ($p['member_since'] ?? ''),
                 (string) ($p['member_type'] ?? ''),
-                '',
+                $ministryCells[(int) ($p['id'] ?? 0)] ?? '',
             ]);
         }
         rewind($fh);
         $csv = stream_get_contents($fh) ?: '';
         fclose($fh);
-        $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', (string) $campus['campus_name']));
+        $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', (string) $campus['name']));
         $slug = trim($slug, '-') ?: 'campus';
         return [
             'filename' => 'members-' . $slug . '-' . date('Y-m-d') . '.csv',
@@ -586,10 +588,10 @@ final readonly class MemberCampusImportService
             'email' => (string) ($row['email'] ?? ''),
             'phone' => (string) ($row['phone'] ?? ''),
             'address_raw' => (string) ($row['address_raw'] ?? ''),
-            'address1' => (string) ($row['address1'] ?? ''),
+            'address_line1' => (string) ($row['address_line1'] ?? ''),
             'city' => (string) ($row['city'] ?? ''),
-            'state' => (string) ($row['state'] ?? 'Ontario'),
-            'zip' => (string) ($row['zip'] ?? ''),
+            'region' => (string) ($row['region'] ?? 'Ontario'),
+            'postal_code' => (string) ($row['postal_code'] ?? ''),
             'country' => (string) ($row['country'] ?? 'CA'),
             'birthday' => [
                 'year' => $by > 0 ? $by : null,
@@ -609,7 +611,7 @@ final readonly class MemberCampusImportService
      * Fill blank member types on a staged batch from each person's age.
      *
      * Deliberately an explicit action rather than something ingest() does. It
-     * writes to the staging rows only — nothing reaches person_per until the
+     * writes to the staging rows only — nothing reaches people until the
      * batch is applied — so the suggestions stay reviewable and editable, and
      * discarding the batch discards them.
      *
@@ -625,7 +627,7 @@ final readonly class MemberCampusImportService
         $skipped = 0;
         $byType = [];
 
-        foreach ($this->rows($batchId) as $row) {
+        foreach ($this->rows($batchId)['rows'] as $row) {
             if (trim((string) ($row['member_type'] ?? '')) !== '') {
                 continue;
             }
@@ -834,17 +836,23 @@ final readonly class MemberCampusImportService
     }
 
     /**
-     * Give imported people their ministry memberships.
+     * Give imported people their ministry memberships and positions.
      *
-     * Additive by design. The sheet lists the ministries a member serves in; it
-     * does not state the ones they have left, so a name missing from the cell is
-     * not evidence of departure. Removing memberships on that basis would delete
-     * data the workbook never spoke about — a decision for an administrator, not
-     * an inference from a blank cell.
+     * The workbook is authoritative for the people this import applies: a
+     * ministry their cell does not list is removed (see the guard below for
+     * the sheet that names no ministry at all).
      *
-     * Leaders are then re-applied: someone holding leader rights over a ministry
-     * is a member of it, so their membership is restored even when the sheet
-     * omits them. Leadership itself is never written here.
+     * Leaders keep what their leadership implies. Someone who leads a ministry
+     * — a leader membership, or a leader account role scoped to it — keeps the
+     * membership even when the sheet omits it, and is never turned back into a
+     * plain member: a new membership is written with the member role, an
+     * existing one keeps its role. Leadership itself is never written here.
+     *
+     * Positions follow the same authority as memberships. For every ministry
+     * the cell lists, the person's positions there become exactly the ones the
+     * cell gave it, so a ministry listed with no positions has its positions
+     * cleared. A ministry the cell does not list keeps its positions only when
+     * the membership itself is kept (leaders); otherwise they go with it.
      *
      * @param array<string,mixed> $plan
      * @return array{warnings:list<string>}
@@ -857,6 +865,7 @@ final readonly class MemberCampusImportService
 
         // Work out what the workbook says for each person first.
         $desired = [];
+        $desiredPositions = [];
         $unmatched = [];
         $seen = [];
         $sheetMentionsAnyMinistry = false;
@@ -881,10 +890,18 @@ final readonly class MemberCampusImportService
                 // go where I think it went?" as well as "what failed?", and a
                 // record of only the failures cannot answer the first.
                 foreach ($resolved['matched'] as $name => $ministryId) {
+                    $positions = $seen[$name]['positions'] ?? [];
+                    foreach ($resolved['matchedPositions'][$name] ?? [] as $position) {
+                        if (!in_array($position, $positions, true)) {
+                            $positions[] = $position;
+                        }
+                    }
                     $seen[$name] = ['count' => (int) ($seen[$name]['count'] ?? 0) + 1,
-                                    'id' => (int) $ministryId, 'status' => 'matched'];
+                                    'id' => (int) $ministryId, 'status' => 'matched',
+                                    'positions' => $positions];
                 }
                 $desired[$personId] = $resolved['ids'];
+                $desiredPositions[$personId] = $resolved['positions'];
             }
         }
 
@@ -905,20 +922,29 @@ final readonly class MemberCampusImportService
                 }
             }
         }
+        foreach ($this->ministryRepo->listLeadersByMinistry(null) as $leader) {
+            $leaderOf[(int) $leader['person_id']][(int) $leader['ministry_id']] = true;
+        }
 
         $added = 0;
         $removed = 0;
         $keptForLeaders = 0;
+        $positionsSet = 0;
 
         foreach ($desired as $personId => $wanted) {
             $have = $current[$personId] ?? [];
             $leads = $leaderOf[$personId] ?? [];
 
             foreach ($wanted as $ministryId) {
+                // Only a new membership is written: setting the role on an
+                // existing one would turn a leader back into a member.
                 if (!in_array($ministryId, $have, true)) {
+                    $this->ministryRepo->setMemberRole($personId, $ministryId, MemberMinistryAssigner::MEMBER_ROLE);
                     $added++;
                 }
-                $this->ministryRepo->setMemberRole($personId, $ministryId, MemberMinistryAssigner::MEMBER_ROLE_ID);
+                $positions = $desiredPositions[$personId][$ministryId] ?? [];
+                $this->ministryRepo->setMemberPositions($personId, $ministryId, $positions);
+                $positionsSet += count($positions);
             }
 
             // The workbook is authoritative: a ministry it does not list is not
@@ -952,6 +978,9 @@ final readonly class MemberCampusImportService
         if ($added > 0) {
             $warnings[] = $added . ' ministry membership(s) were added from the workbook (role: member).';
         }
+        if ($positionsSet > 0) {
+            $warnings[] = $positionsSet . ' ministry position(s) were set from the workbook.';
+        }
         if ($removed > 0) {
             $warnings[] = $removed . ' ministry membership(s) were removed because the workbook no longer lists them.';
         }
@@ -970,7 +999,7 @@ final readonly class MemberCampusImportService
         // ignored again on the next import, and the one after that.
         if ($this->nameMap !== null) {
             foreach ($seen as $name => $info) {
-                $this->nameMap->observe((string) $name, (int) $info['count'], (int) $info['id'], 'matched');
+                $this->nameMap->observe((string) $name, (int) $info['count'], (int) $info['id'], 'matched', $info['positions']);
             }
             foreach ($unmatched as $name => $count) {
                 $this->nameMap->observe((string) $name, (int) $count, null, 'unmatched');
@@ -989,6 +1018,47 @@ final readonly class MemberCampusImportService
         }
 
         return ['warnings' => $warnings];
+    }
+
+    /**
+     * Each campus member's Ministry cell, as the workbook writes it.
+     *
+     * "Guest Services (Usher, Emcee), Psalmists": the ministries a person
+     * currently belongs to, by name, each followed by its positions. The import
+     * reads that form back to the same memberships and positions, which is
+     * what lets an exported roster be edited and re-imported.
+     *
+     * Empty when ministries are not wired (as in unit tests).
+     *
+     * @return array<int,string> person id => cell
+     */
+    public function ministryCellsForCampus(int $campusId): array
+    {
+        if ($this->ministryRepo === null) {
+            return [];
+        }
+
+        $byPerson = [];
+        $ministries = $this->ministryRepo->listMinistriesAdmin(null);
+        usort($ministries, static fn (array $a, array $b): int => strcasecmp((string) $a['name'], (string) $b['name']));
+        foreach ($ministries as $ministry) {
+            if (empty($ministry['active'])) {
+                continue;
+            }
+            foreach ($this->ministryRepo->listMinistryMembers((int) $ministry['ministry_id'], $campusId) as $member) {
+                $byPerson[(int) $member['person_id']][] = [
+                    'name' => (string) $ministry['name'],
+                    'positions' => $member['positions'],
+                ];
+            }
+        }
+
+        $cells = [];
+        foreach ($byPerson as $personId => $memberships) {
+            $cells[$personId] = MemberRosterXlsxWriter::ministryCell($memberships);
+        }
+
+        return $cells;
     }
 
     /** @return array<string,mixed> */
@@ -1069,10 +1139,10 @@ final readonly class MemberCampusImportService
      * @param array<string,int> $typeIds
      * @return array<string,mixed>
      */
-    private function toSavePayload(array $row, int $campusId, int $clsId, array $typeIds, int $personId): array
+    private function toSavePayload(array $row, int $campusId, int $statusId, array $typeIds, int $personId): array
     {
         $existing = $personId > 0 ? $this->people->find($personId) : null;
-        return MemberImportPayload::forSave($row, $campusId, $clsId, $typeIds, $personId, $existing);
+        return MemberImportPayload::forSave($row, $campusId, $statusId, $typeIds, $personId, $existing);
     }
 
     private function httpGet(string $url): string

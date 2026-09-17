@@ -42,36 +42,36 @@ $memberClsId = 7;   // deliberately not 1, so a fallback to id 1 would show up
 
 // A new person.
 $created = MemberImportPayload::forSave($row, 3, $memberClsId, $typeIds, 0, null);
-check('a newly imported person is classified', (int) $created['per_cls_ID'] === $memberClsId,
-    (string) ($created['per_cls_ID'] ?? 'missing'));
+check('a newly imported person is classified', (int) $created['membership_status_id'] === $memberClsId,
+    (string) ($created['membership_status_id'] ?? 'missing'));
 
 // An existing person being updated by the import. This is the case that
 // matters most: 174 of the people on the roster were classified this way.
 $existing = [
-    'per_ID' => 42, 'per_FirstName' => 'Ada', 'per_LastName' => 'Lovelace',
-    'per_cls_ID' => 0, 'per_Email' => 'ada@example.test', 'per_State' => 'ON',
+    'id' => 42, 'first_name' => 'Ada', 'last_name' => 'Lovelace',
+    'membership_status_id' => 0, 'email' => 'ada@example.test', 'region' => 'ON',
 ];
 $updated = MemberImportPayload::forSave($row, 3, $memberClsId, $typeIds, 42, $existing);
 check('an existing person picks the classification up too',
-    (int) $updated['per_cls_ID'] === $memberClsId, (string) ($updated['per_cls_ID'] ?? 'missing'));
+    (int) $updated['membership_status_id'] === $memberClsId, (string) ($updated['membership_status_id'] ?? 'missing'));
 
 // The import is the authority on this field, so a stale value is replaced
 // rather than kept.
 $stale = $existing;
-$stale['per_cls_ID'] = 99;
+$stale['membership_status_id'] = 99;
 $refreshed = MemberImportPayload::forSave($row, 3, $memberClsId, $typeIds, 42, $stale);
 check('and it replaces whatever was there before',
-    (int) $refreshed['per_cls_ID'] === $memberClsId, (string) ($refreshed['per_cls_ID'] ?? 'missing'));
+    (int) $refreshed['membership_status_id'] === $memberClsId, (string) ($refreshed['membership_status_id'] ?? 'missing'));
 
 // The classification must not depend on anything else in the row: a person
 // with no email, no birth date and no member type is still classified.
 $sparse = MemberImportPayload::forSave(['last_name' => 'Nobody'], 3, $memberClsId, $typeIds, 0, null);
-check('a sparse row is still classified', (int) $sparse['per_cls_ID'] === $memberClsId);
+check('a sparse row is still classified', (int) $sparse['membership_status_id'] === $memberClsId);
 
 // It is never left at zero, which is what the directory shows as Unclassified
 // and what 114 legacy records still carry.
 foreach ([$created, $updated, $refreshed, $sparse] as $i => $payload) {
-    check('payload ' . $i . ' is never left unclassified', (int) $payload['per_cls_ID'] !== 0);
+    check('payload ' . $i . ' is never left unclassified', (int) $payload['membership_status_id'] !== 0);
 }
 
 printf("\nPassed: %d; failed: %d\n", $passed, $failed);

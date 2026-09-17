@@ -141,7 +141,10 @@ $map2 = MinistryNameMap::fromFile($tmp);
 $map2->observe('Dance Ministry', 12, null, 'unmatched');
 $map2->observe('Victuals', 30, 4, 'matched');
 $map2->observe('Worship Team', 5, null, 'unmatched');
+$map2->observe('Usher', 7, 6, 'matched', ['Usher']);
 $rows = $map2->rows();
+$usherRow = array_values(array_filter($rows, static fn (array $r): bool => $r['raw'] === 'Usher'))[0] ?? [];
+check('a name that carried a position keeps it for the review table', ($usherRow['positions'] ?? null) === ['Usher']);
 check('names needing a decision come first', $rows[0]['needsDecision'] === true, json_encode(array_column($rows, 'raw')));
 check('and among those the widest impact leads', $rows[0]['raw'] === 'Dance Ministry');
 check('a matched name is listed too, so the mapping can be checked',
@@ -154,7 +157,7 @@ check('deciding clears the backlog', $map2->pendingCount() === 0);
 echo "\nThe import writes what it saw where somebody can act on it\n";
 $svc = (string) file_get_contents($root . '/app/Services/MemberCampusImportService.php');
 check('observations are recorded for matched and unmatched alike',
-    str_contains($svc, "\$this->nameMap->observe((string) \$name, (int) \$info['count'], (int) \$info['id'], 'matched')")
+    str_contains($svc, "\$this->nameMap->observe((string) \$name, (int) \$info['count'], (int) \$info['id'], 'matched', \$info['positions'])")
     && str_contains($svc, "\$this->nameMap->observe((string) \$name, (int) \$count, null, 'unmatched')"));
 check('and the warning points at the form rather than ending the conversation',
     str_contains($svc, 'Say what they mean under'));

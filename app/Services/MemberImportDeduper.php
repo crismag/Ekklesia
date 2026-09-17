@@ -6,12 +6,12 @@ namespace App\Services;
 
 /**
  * Collapse workbook rows that are the same person listed twice (common on Hub
- * household blocks). Happens in staging, before any person_per write.
+ * household blocks). Happens in staging, before any write to people.
  */
 final class MemberImportDeduper
 {
     private const FILL_FIELDS = [
-        'email', 'phone', 'address_raw', 'address1', 'city', 'state', 'zip',
+        'email', 'phone', 'address_raw', 'address_line1', 'city', 'region', 'postal_code',
         'country', 'member_type', 'ministry', 'middle_name', 'preferred_name',
         'confirmed',
     ];
@@ -216,7 +216,7 @@ final class MemberImportDeduper
     private function score(array $row): int
     {
         $score = 0;
-        foreach (['email', 'phone', 'address_raw', 'address1'] as $f) {
+        foreach (['email', 'phone', 'address_raw', 'address_line1'] as $f) {
             if (trim((string) ($row[$f] ?? '')) !== '') {
                 $score += 4;
             }

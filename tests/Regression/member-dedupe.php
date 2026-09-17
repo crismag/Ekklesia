@@ -35,7 +35,7 @@ function check(string $label, bool $ok): void
 
 $row = static fn (string $last, string $first, string $email = '', string $phone = '', string $addr = ''): array => [
     'last_name' => $last, 'first_name' => $first, 'email' => $email,
-    'phone' => $phone, 'address1' => $addr, 'name_raw' => trim("{$last}, {$first}"),
+    'phone' => $phone, 'address_line1' => $addr, 'name_raw' => trim("{$last}, {$first}"),
 ];
 
 $d = new MemberImportDeduper();
@@ -152,32 +152,32 @@ check('the identity key is derived from the name', str_starts_with($k1, 'n:'));
 require_once __DIR__ . '/../../app/Services/MemberImportPayload.php';
 
 $broken = [
-    'per_ID' => 1, 'per_LastName' => 'Thornbury', 'per_FirstName' => 'Cassia',
-    'per_Email' => 'not-an-address', 'per_CellPhone' => '555-0120',
+    'id' => 1, 'last_name' => 'Thornbury', 'first_name' => 'Cassia',
+    'email' => 'not-an-address', 'mobile_phone' => '555-0120',
 ];
 check('an unusable stored email is detected',
-    array_keys(App\Services\MemberImportPayload::unusableEmails($broken)) === ['per_Email']);
+    array_keys(App\Services\MemberImportPayload::unusableEmails($broken)) === ['email']);
 
 $merged = App\Services\MemberImportPayload::forSave(
     ['last_name' => 'Thornbury', 'first_name' => 'Cassia', 'email' => '', 'phone' => ''],
     1, 1, [], 1, $broken
 );
-check('it is not carried into the save payload', ($merged['per_Email'] ?? null) === '');
-check('the rest of the existing record survives', ($merged['per_CellPhone'] ?? '') === '555-0120');
+check('it is not carried into the save payload', ($merged['email'] ?? null) === '');
+check('the rest of the existing record survives', ($merged['mobile_phone'] ?? '') === '555-0120');
 
 $replaced = App\Services\MemberImportPayload::forSave(
     ['last_name' => 'Thornbury', 'first_name' => 'Cassia', 'email' => 'cassia@example.invalid'],
     1, 1, [], 1, $broken
 );
-check('a valid incoming address replaces it', ($replaced['per_Email'] ?? '') === 'cassia@example.invalid');
+check('a valid incoming address replaces it', ($replaced['email'] ?? '') === 'cassia@example.invalid');
 
-$fine = ['per_ID' => 2, 'per_LastName' => 'Oakhurst', 'per_Email' => 'oak@example.invalid'];
+$fine = ['id' => 2, 'last_name' => 'Oakhurst', 'email' => 'oak@example.invalid'];
 check('a valid stored address is left alone',
     App\Services\MemberImportPayload::unusableEmails($fine) === []);
 $keptOk = App\Services\MemberImportPayload::forSave(
     ['last_name' => 'Oakhurst', 'first_name' => 'Bram', 'email' => ''], 1, 1, [], 2, $fine
 );
-check('and is still carried forward', ($keptOk['per_Email'] ?? '') === 'oak@example.invalid');
+check('and is still carried forward', ($keptOk['email'] ?? '') === 'oak@example.invalid');
 
 printf("\nPassed: %d; failed: %d\n", $passed, $failed);
 exit($failed === 0 ? 0 : 1);

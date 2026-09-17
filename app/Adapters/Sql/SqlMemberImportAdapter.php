@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Adapters\ChurchCRM;
+namespace App\Adapters\Sql;
 
 use App\Contracts\MemberImportAdapter;
 use InvalidArgumentException;
@@ -12,15 +12,14 @@ use RuntimeException;
 /**
  * Staging persistence for the campus member import.
  *
- * The staging tables live in the same database as person_per (see
- * migrations/portal/007-member-import-staging.sql), which is why this adapter
- * sits in the ChurchCRM namespace alongside the other adapters on that
- * connection.
+ * The staging tables live in the member database beside `people` (see
+ * database/members/001_schema.sql), on the same connection as the other SQL
+ * adapters.
  */
-final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
+final class SqlMemberImportAdapter implements MemberImportAdapter
 {
-    private const BATCH_TABLE = 'member_import_batch';
-    private const ROW_TABLE = 'member_import_row';
+    private const BATCH_TABLE = 'member_import_batches';
+    private const ROW_TABLE = 'member_import_rows';
 
     public function __construct(private readonly PDO $db)
     {
@@ -31,9 +30,9 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
         foreach ([self::BATCH_TABLE, self::ROW_TABLE] as $table) {
             $stmt = $this->db->query('SHOW TABLES LIKE ' . $this->db->quote($table));
             if ($stmt === false || $stmt->fetchColumn() === false) {
-                // Name the database as well as the migration: this failed in
-                // production precisely because the migration had been applied
-                // somewhere else, and "apply 007" alone does not say where.
+                // Name the database as well as the schema: this failed in
+                // production precisely because the schema had been applied
+                // somewhere else, and naming the file alone does not say where.
                 $database = 'unknown';
                 try {
                     $database = (string) $this->db->query('SELECT DATABASE()')->fetchColumn();
@@ -44,10 +43,10 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
                 throw new RuntimeException(
                     "The member import staging table `{$table}` does not exist in database "
                     . "`{$database}`.\n\n"
-                    . "Run the portal migrations against this deployment:\n"
+                    . "Apply the member database schema to this deployment:\n"
                     . "    php tools/migrate.php --status\n"
                     . "    php tools/migrate.php --apply\n\n"
-                    . 'Migration migrations/portal/007-member-import-staging.sql creates it. '
+                    . 'database/members/001_schema.sql creates it. '
                     . 'Application code does not create schema: that is owned by migrations, '
                     . 'so imports stay refused until the database is migrated.'
                 );
@@ -62,7 +61,7 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
         try {
             $ins = $this->db->prepare(
                 'INSERT INTO ' . self::BATCH_TABLE . '
-                    (campus_id, status, source_label, hub_sheet, ny_sheet, hub_updated, ny_updated, warnings, duplicate_report, created_by)
+                    (campus_id, status, source_label, hub_sheet, ny_sheet, hub_updated, ny_updated, warnings, duplicate_report, created_by_account_id)
                  VALUES (:c, "staging", :label, :hub, :ny, :hu, :nu, :w, :dup, :by)'
             );
             $ins->execute([
@@ -72,21 +71,23 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
                 ':ny' => $batch['ny_sheet'],
                 ':hu' => $batch['hub_updated'],
                 ':nu' => $batch['ny_updated'],
-                ':w' => $batch['warnings'],
+                // A JSON list in storage; a batch with nothing to say stores NULL.
+                ':w' => ($batch['warnings'] ?? []) !== [] ? json_encode(array_values((array) $batch['warnings']), JSON_UNESCAPED_UNICODE) : null,
                 ':dup' => $batch['duplicate_report'],
-                ':by' => $batch['created_by'],
+                // An account id; a CLI run has none, and 0 is not an account.
+                ':by' => (int) ($batch['created_by_account_id'] ?? 0) > 0 ? (int) $batch['created_by_account_id'] : null,
             ]);
             $batchId = (int) $this->db->lastInsertId();
 
             $rowIns = $this->db->prepare(
                 'INSERT INTO ' . self::ROW_TABLE . '
                     (batch_id, last_name, first_name, middle_name, preferred_name, email, phone,
-                     address_raw, address1, city, state, zip, country,
+                     address_raw, address_line1, city, region, postal_code, country,
                      birth_year, birth_month, birth_day, member_since, member_type, ministry, confirmed,
                      source, filled_from, status, matched_person_id, notes)
                  VALUES
                     (:batch, :last_name, :first_name, :middle_name, :preferred_name, :email, :phone,
-                     :address_raw, :address1, :city, :state, :zip, :country,
+                     :address_raw, :address_line1, :city, :region, :postal_code, :country,
                      :birth_year, :birth_month, :birth_day, :member_since, :member_type, :ministry, :confirmed,
                      :source, :filled_from, :status, :matched, :notes)'
             );
@@ -100,10 +101,10 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
                     ':email' => $row['email'],
                     ':phone' => $row['phone'],
                     ':address_raw' => $row['address_raw'],
-                    ':address1' => $row['address1'],
+                    ':address_line1' => $row['address_line1'],
                     ':city' => $row['city'],
-                    ':state' => $row['state'],
-                    ':zip' => $row['zip'],
+                    ':region' => $row['region'],
+                    ':postal_code' => $row['postal_code'],
                     ':country' => $row['country'],
                     ':birth_year' => $row['birth_year'],
                     ':birth_month' => $row['birth_month'],
@@ -155,6 +156,9 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
             return null;
         }
         $row['duplicate_report'] = json_decode((string) ($row['duplicate_report'] ?? ''), true) ?: [];
+        // Handed back one warning per line, as the staging page reads it.
+        $warnings = json_decode((string) ($row['warnings'] ?? ''), true);
+        $row['warnings'] = is_array($warnings) ? implode("\n", array_map('strval', $warnings)) : null;
 
         return $row;
     }
@@ -212,7 +216,7 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
         // A column name cannot be bound as a parameter, so it is checked here
         // as well as in the service. Two independent checks, because the cost
         // of the identifier reaching SQL unvalidated is injection.
-        if (!in_array($field, $allowedFields, true) || preg_match('/^[a-z_]+$/', $field) !== 1) {
+        if (!in_array($field, $allowedFields, true) || preg_match('/^[a-z][a-z0-9_]*$/', $field) !== 1) {
             throw new InvalidArgumentException('That field cannot be edited.');
         }
         $upd = $this->db->prepare('UPDATE ' . self::ROW_TABLE . ' SET `' . $field . '` = :v WHERE id = :id');
@@ -248,7 +252,7 @@ final class ChurchCrmMemberImportAdapter implements MemberImportAdapter
 
     public function findCampus(int $campusId): ?array
     {
-        $stmt = $this->db->prepare('SELECT campus_id, campus_name FROM church_campus WHERE campus_id = :id');
+        $stmt = $this->db->prepare('SELECT id, name FROM campuses WHERE id = :id');
         $stmt->execute([':id' => $campusId]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;

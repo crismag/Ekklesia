@@ -16,7 +16,7 @@ interface MemberImportRepository
     /**
      * Fail loudly when the staging tables are absent.
      *
-     * The staging schema is owned by migrations/portal/007-member-import-staging.sql.
+     * The staging schema is owned by database/members/001_schema.sql.
      * Application code must not create it: a runtime CREATE TABLE is a second,
      * invisible migration system that silently diverges from the real one.
      *
