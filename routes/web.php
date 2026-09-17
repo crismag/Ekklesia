@@ -1191,8 +1191,6 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $stats = $svc->stats();
         // Campus comes from the header selector, not from a second control on
         // the page. Two campus pickers on one screen disagreed with each other.
         $filters = [
@@ -1203,11 +1201,22 @@ $webRoutes = [
         ];
         $perPage = 25;
         $page = max(1, (int) ($req['page'] ?? 1));
-        $total = $svc->count($filters);
-        $people = $svc->list($filters, $page, $perPage);
-        $classifications = $svc->classifications();
-        $memberTypes = $svc->memberTypes();
-        $campuses = $svc->campuses();
+        // Member records are for portal administrators. Other staff who reach
+        // the admin area (schedulers, leaders) used to be shown every name and
+        // contact here; nothing is read for them now.
+        $stats = ['people' => 0, 'families' => 0, 'activeFamilies' => 0, 'classifications' => [], 'memberTypes' => []];
+        $total = 0; $people = []; $classifications = []; $memberTypes = []; $campuses = [];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
+            $stats = $svc->stats();
+            $total = $svc->count($filters);
+            // A page past the end (a filter narrowed the list) shows the last page.
+            $page = min($page, max(1, (int) ceil($total / $perPage)));
+            $people = $svc->list($filters, $page, $perPage);
+            $classifications = $svc->classifications();
+            $memberTypes = $svc->memberTypes();
+            $campuses = $svc->campuses();
+        }
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['people_flash'] ?? '');
         unset($_SESSION['people_flash']);
@@ -1221,15 +1230,24 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
         $pid = (int) ($req['id'] ?? 0);
-        $person = $pid > 0 ? $svc->find($pid) : null;
-        $person = $person ?? $svc->blank();
-        $classifications = $svc->classifications();
-        $memberTypes = $svc->memberTypes();
-        $familyRoles = $svc->familyRoles();
-        $campuses = $svc->campuses();
-        $families = $svc->families();
+        $person = []; $classifications = []; $memberTypes = []; $familyRoles = []; $campuses = []; $families = [];
+        $missing = false;
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
+            $found = $pid > 0 ? $svc->find($pid) : null;
+            $missing = $pid > 0 && $found === null;
+            $person = $found ?? $svc->blank();
+            // "Add a person to this household" arrives with the household chosen.
+            if ($found === null && (int) ($req['household_id'] ?? 0) > 0) {
+                $person['household_id'] = (int) $req['household_id'];
+            }
+            $classifications = $svc->classifications();
+            $memberTypes = $svc->memberTypes();
+            $familyRoles = $svc->familyRoles();
+            $campuses = $svc->campuses();
+            $families = $svc->families();
+        }
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['people_flash'] ?? '');
         unset($_SESSION['people_flash']);
@@ -1243,8 +1261,27 @@ $webRoutes = [
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
         $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $data = $svc->viewData((int) ($req['id'] ?? 0));
+        $data = null;
+        $ministries = []; $logins = []; $recentHistory = ['entries' => [], 'total' => 0];
+        if ($isAdmin) {
+            $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
+            $data = $svc->viewData((int) ($req['id'] ?? 0));
+        }
+        if ($data !== null) {
+            $pid = (int) $data['person']['id'];
+            // Ministries and logins are shown, not edited, here: each has its
+            // own workspace (Ministries; Users & access).
+            try { $ministries = $svc->ministriesFor($pid); } catch (\Throwable) { $ministries = []; }
+            try {
+                $logins = array_values(array_filter(
+                    \App\Providers\PortalServiceProvider::makeSystemUserService()->list(),
+                    static fn (array $u): bool => $u['person_id'] === $pid,
+                ));
+            } catch (\Throwable) { $logins = []; }
+            try {
+                $recentHistory = \App\Providers\PortalServiceProvider::makeRecordHistoryService()->recent($actor, 'person', $pid, 5);
+            } catch (\Throwable) { $recentHistory = ['entries' => [], 'total' => 0]; }
+        }
         // Household context: related families (map) + shared-residence families (derived).
         $relatedLinks = []; $residenceMates = [];
         if ($data !== null && (int) ($data['person']['household_id'] ?? 0) > 0) {
@@ -1333,7 +1370,8 @@ $webRoutes = [
         $actorId = (int) ($actor['actorId'] ?? 0);
         try {
             $id = $svc->save($req, $actorId);
-            header('Location: ' . $basePath . '/admin/people/edit?id=' . $id . '&notice=saved', true, 302);
+            // Saved: back to the record, which is where the change can be seen.
+            header('Location: ' . $basePath . '/admin/people/view?id=' . $id . '&notice=saved', true, 302);
         } catch (\Throwable $e) {
             $_SESSION['people_flash'] = $e->getMessage();
             $back = (int) ($req['id'] ?? 0) > 0

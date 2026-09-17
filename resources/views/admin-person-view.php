@@ -1,242 +1,282 @@
 <?php
 /**
- * Admin · Person Profile — read view with photo, quick info, contact (call/text/
- * copy), address map, campus, family members, and an actions menu.
+ * People & Records · Person record — one person, in sections: identity,
+ * contact & address, household, membership, ministries (read-only), logins
+ * (read-only) and recent history. Editing is its own page.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
  * @var array<string,mixed> $campusSelector
  * @var array<string,mixed>|null $data
+ * @var list<array{ministry_id:int,name:string,roles:string,is_leader:bool}> $ministries
+ * @var list<array<string,mixed>> $logins
+ * @var array{entries:list<array<string,mixed>>,total:int} $recentHistory
+ * @var list<array<string,mixed>> $relatedLinks
+ * @var list<array<string,mixed>> $residenceMates
  * @var string $notice
  * @var string $flash
  */
-require_once __DIR__ . '/_admin-shell.php';
+require_once __DIR__ . '/_records-kit.php';
 
 $isAdmin = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-$base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
-$h = static fn ($v): string => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+$base = records_h($basePath);
+$h = 'records_h';
+$ministries = $ministries ?? [];
+$logins = $logins ?? [];
+$recentHistory = $recentHistory ?? ['entries' => [], 'total' => 0];
+$headerActions = '';
 
 ob_start();
+echo records_styles();
 
-if ($data === null) {
-    echo '<article class="admin-card"><div class="admin-card-body">Person not found. <a href="' . $base . '/admin/people">Back to list</a></div></article>';
-} else {
+if (!$isAdmin) { ?>
+  <section class="ek-empty">
+    <strong>Member records are for portal administrators</strong>
+    <p>You can look people up in the directory, which shows what your account is allowed to see.</p>
+    <a class="ek-btn" href="<?= $base ?>/people">Open the directory</a>
+  </section>
+<?php } elseif ($data === null) {
+    http_response_code(404); ?>
+  <section class="ek-empty">
+    <strong>This person is not on record</strong>
+    <p>The record may have been deleted or merged, or the link is incomplete.</p>
+    <a class="ek-btn" href="<?= $base ?>/admin/people">Back to member records</a>
+  </section>
+<?php } else {
     $p = $data['person'];
     $pid = (int) $p['id'];
     $name = trim(($p['first_name'] ?? '') . ' ' . ($p['last_name'] ?? ''));
+    $name = $name !== '' ? $name : 'Person #' . $pid;
     $initials = strtoupper(substr((string) ($p['first_name'] ?? ''), 0, 1) . substr((string) ($p['last_name'] ?? ''), 0, 1));
     $gender = ($p['gender'] ?? null) === 'male' ? 'Male' : (($p['gender'] ?? null) === 'female' ? 'Female' : '');
     $L = $data['labels'];
     $addr = (string) $data['address_line'];
     $lat = $data['lat']; $lng = $data['lng'];
     $mapsQ = rawurlencode($addr);
-    $noticeMap = ['saved' => ['ok', 'Person saved.'], 'error' => ['err', $flash !== '' ? $flash : 'Something went wrong.']];
+    $householdId = (int) ($p['household_id'] ?? 0);
     $membershipSince = !empty($p['member_since']) && strtotime((string) $p['member_since'])
-        ? date('M j, Y', (int) strtotime((string) $p['member_since'])) : '';
+        ? date('j M Y', (int) strtotime((string) $p['member_since'])) : '';
+    $birthday = (int) ($p['birth_month'] ?? 0) > 0
+        ? date('j M', mktime(0, 0, 0, (int) $p['birth_month'], (int) $p['birth_day'] ?: 1)) . ((int) ($p['birth_year'] ?? 0) > 0 ? ' ' . (int) $p['birth_year'] : '')
+        : '';
+    $otherNames = array_filter([
+        'Preferred' => trim((string) ($p['preferred_name'] ?? '')),
+        'Middle' => trim((string) ($p['middle_name'] ?? '')),
+        'Suffix' => trim((string) ($p['suffix'] ?? '')),
+    ], static fn (string $v): bool => $v !== '');
+    $noticeMap = ['saved' => ['ok', 'Changes saved.'], 'error' => ['error', $flash !== '' ? $flash : 'Something went wrong.']];
+    $headerActions = '<a class="ek-btn ek-btn-primary" href="' . $base . '/admin/people/edit?id=' . $pid . '">Edit record</a>'
+        . '<a class="ek-btn" href="' . $base . '/people/' . $pid . '">Directory profile</a>';
+    $phones = array_filter([
+        'Mobile' => (string) ($p['mobile_phone'] ?? ''), 'Home' => (string) ($p['home_phone'] ?? ''),
+    ], static fn (string $v): bool => trim($v) !== '');
+    $email = trim((string) ($p['email'] ?? ''));
     ?>
     <style>
-      .pv-alert{padding:10px 14px;border-radius:8px;margin:0 0 14px;font-size:14px}
-      .pv-alert.ok{background:#e6f7ec;border:1px solid #b7e3c6;color:#1a7a3a}.pv-alert.err{background:#fdecea;border:1px solid #f3c0bb;color:#b3261e}
-      .pv-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
-      .pv-btn{font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line,#c7d4cd);background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;text-decoration:none;color:var(--ink,#1b2a24)}
-      .pv-btn:hover{border-color:#137a5f}.pv-btn.primary{background:#0c5a45;border-color:#0c5a45;color:#fff}.pv-btn.danger{color:#b3261e;border-color:#f0c3bd}
-      .pv-menu{position:relative;display:inline-block}
-      .pv-menu>summary{list-style:none;cursor:pointer}.pv-menu>summary::-webkit-details-marker{display:none}
-      .pv-menu[open]>.pv-drop{display:block}
-      .pv-drop{display:none;position:absolute;right:0;top:calc(100% + 4px);z-index:20;background:#fff;border:1px solid var(--line,#dbe4ec);border-radius:10px;box-shadow:0 12px 30px rgba(15,40,30,.14);min-width:190px;padding:6px}
-      .pv-drop a,.pv-drop button{display:flex;width:100%;gap:8px;align-items:center;padding:8px 10px;border:0;background:none;font:inherit;font-size:13px;text-align:left;color:var(--ink,#1b2a24);text-decoration:none;border-radius:7px;cursor:pointer}
-      .pv-drop a:hover,.pv-drop button:hover{background:#f2f7f4}.pv-drop .danger{color:#b3261e}
-      .pv-grid{display:grid;grid-template-columns:320px 1fr;gap:14px}
-      @media (max-width:760px){.pv-grid{grid-template-columns:1fr}}
-      .pv-card{background:var(--surface,#fff);border:1px solid var(--line,#dbe4ec);border-radius:12px;overflow:hidden}
-      .pv-namecard{display:flex}
-      .pv-photo{width:120px;height:120px;flex:0 0 120px;background:var(--soft,#eef4f0);display:flex;align-items:center;justify-content:center;position:relative}
-      .pv-photo img{width:100%;height:100%;object-fit:cover}
-      .pv-photo .ini{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;color:#0c5a45}
-      .pv-nameinfo{padding:12px 14px;min-width:0}
-      .pv-nameinfo h2{margin:0 0 8px;font-size:19px}
-      .pv-info{list-style:none;margin:0;padding:0;font-size:13px}
-      .pv-info li{display:flex;gap:8px;margin:3px 0;color:var(--ink,#1b2a24)}
-      .pv-info .k{color:var(--muted,#5c6b63);min-width:96px}
-      .pv-sec{padding:12px 14px}.pv-sec+.pv-sec{border-top:1px solid var(--line,#eef2f5)}
-      .pv-sec h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#5c6b63)}
-      .pv-line{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:5px 0;flex-wrap:wrap}
-      .pv-line a{color:var(--blue-ink,#0f4e97);text-decoration:none}.pv-line a:hover{text-decoration:underline}
-      .pv-mini{border:1px solid var(--line,#c7d4cd);background:#fff;border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer;color:var(--muted)}
-      .pv-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;background:var(--soft,#eef4f0);color:#0c5a45}
-      .pv-badge.pri{background:#0c5a45;color:#fff}
-      .pv-map{width:100%;height:220px;border:0;display:block}
-      table.pv-fam{width:100%;border-collapse:collapse;font-size:13px}
-      table.pv-fam td{padding:6px 8px;border-bottom:1px solid var(--line,#eef2f5)}
-      table.pv-fam tr:last-child td{border-bottom:0}
-      .muted{color:var(--muted,#5c6b63)}
+      .pv-copy{min-height:28px;padding:0 8px;font-size:12px}
+      .pv-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+      .pv-map{width:100%;height:220px;border:0;display:block;border-radius:var(--radius,8px);margin-top:var(--sp-3,12px)}
+      .pv-roles{font-size:13px;color:var(--muted,#627169)}
+      .pv-danger{border-color:var(--line,#d9e4dd)}
+      .pv-danger .ek-card-head h2{color:var(--rose-ink,#b84957)}
     </style>
 
-    <?php if ($notice !== '' && isset($noticeMap[$notice])): [$cls, $msg] = $noticeMap[$notice]; ?>
-      <div class="pv-alert <?= $cls ?>"><?= $h($msg) ?></div>
-    <?php endif; ?>
+    <?= records_notice_for($notice, $noticeMap) ?>
 
-    <div class="pv-top">
-      <a class="pv-btn" href="<?= $base ?>/admin/people">&larr; Member records</a>
-      <span style="flex:1"></span>
-      <?php if ($isAdmin): ?>
-        <a class="pv-btn primary" href="<?= $base ?>/admin/people/edit?id=<?= $pid ?>">Edit</a>
-        <details class="pv-menu">
-          <summary class="pv-btn">Actions &#9662;</summary>
-          <div class="pv-drop">
-            <a href="<?= $base ?>/admin/people/edit?id=<?= $pid ?>">&#9998; Edit person</a>
-            <a href="<?= $base ?>/people/<?= $pid ?>" target="_blank">&#128065; View public profile</a>
-            <?php if ((int) ($p['household_id'] ?? 0) > 0): ?>
-              <a href="<?= $base ?>/admin/people/edit?id=<?= $pid ?>">&#128106; Change family / role</a>
+    <div class="rec-layout">
+      <div class="rec-main">
+        <section class="ek-card" aria-labelledby="pv-identity">
+          <div class="ek-card-head"><h2 id="pv-identity">Identity</h2></div>
+          <div class="ek-card-body">
+            <div class="rec-identity">
+              <div class="rec-avatar"><span aria-hidden="true"><?= $h($initials ?: '?') ?></span>
+                <img src="<?= $base ?>/admin/people/photo?id=<?= $pid ?>" alt="Photo of <?= $h($name) ?>" onerror="this.remove()"></div>
+              <div style="min-width:0">
+                <h2><?= $h($name) ?></h2>
+                <p class="rec-muted rec-small" style="margin:2px 0 0">Record #<?= $pid ?></p>
+              </div>
+            </div>
+            <dl class="rec-dl" style="margin-top:var(--sp-4,16px)">
+              <?php foreach ($otherNames as $label => $value): ?><dt><?= $h($label) ?> name</dt><dd><?= $h($value) ?></dd><?php endforeach; ?>
+              <dt>Gender</dt><dd><?= $gender !== '' ? $h($gender) : '<span class="rec-muted">Not recorded</span>' ?></dd>
+              <dt>Birthday</dt><dd><?= $birthday !== '' ? $h($birthday) : '<span class="rec-muted">Not recorded</span>' ?></dd>
+            </dl>
+          </div>
+        </section>
+
+        <section class="ek-card" aria-labelledby="pv-contact">
+          <div class="ek-card-head"><h2 id="pv-contact">Contact &amp; address</h2></div>
+          <div class="ek-card-body">
+            <dl class="rec-dl">
+              <?php foreach ($phones as $label => $num): $digits = preg_replace('/[^0-9+]/', '', $num); ?>
+                <dt><?= $h($label) ?> phone</dt>
+                <dd class="pv-line"><a class="rec-link" href="tel:<?= $h($digits) ?>"><?= $h($num) ?></a>
+                  <?php if ($label === 'Mobile'): ?><a class="rec-link rec-small" href="sms:<?= $h($digits) ?>">Text</a><?php endif; ?>
+                  <button class="ek-btn pv-copy" type="button" data-copy="<?= $h($num) ?>">Copy<span class="sr-only"> <?= $h(strtolower($label)) ?> phone</span></button></dd>
+              <?php endforeach; ?>
+              <dt>Email</dt>
+              <dd class="pv-line"><?php if ($email !== ''): ?><a class="rec-link" href="mailto:<?= $h($email) ?>"><?= $h($email) ?></a>
+                <button class="ek-btn pv-copy" type="button" data-copy="<?= $h($email) ?>">Copy<span class="sr-only"> email</span></button>
+                <?php else: ?><span class="rec-muted">Not recorded</span><?php endif; ?></dd>
+              <?php if ($phones === []): ?><dt>Phone</dt><dd><span class="rec-muted">Not recorded</span></dd><?php endif; ?>
+              <dt>Address</dt>
+              <dd><?php if ($addr !== ''): ?>
+                <?= $h($addr) ?>
+                <?php if (trim((string) ($p['address_line1'] ?? '')) === '' && $householdId > 0): ?><span class="rec-muted rec-small"> (household address)</span><?php endif; ?>
+                <div class="pv-line rec-small" style="margin-top:4px">
+                  <a class="rec-link" href="https://www.google.com/maps/search/?api=1&amp;query=<?= $mapsQ ?>" target="_blank" rel="noopener">Google Maps<span class="sr-only"> (opens in a new tab)</span></a>
+                  <a class="rec-link" href="https://www.openstreetmap.org/search?query=<?= $mapsQ ?>" target="_blank" rel="noopener">OpenStreetMap<span class="sr-only"> (opens in a new tab)</span></a>
+                  <?php if ($householdId > 0): ?>
+                    <button type="button" class="ek-btn pv-copy" id="refreshCoordsBtn" data-family-id="<?= $householdId ?>">Refresh map location</button>
+                    <span id="refreshCoordsMsg" class="rec-muted" role="status"></span>
+                  <?php endif; ?>
+                </div>
+              <?php else: ?><span class="rec-muted">Not recorded</span><?php endif; ?></dd>
+            </dl>
+            <?php if ($addr !== '' && $lat !== null && $lng !== null): ?>
+              <iframe class="pv-map" loading="lazy" title="Map of <?= $h($addr) ?>"
+                src="https://www.openstreetmap.org/export/embed.html?bbox=<?= ($lng - 0.008) ?>%2C<?= ($lat - 0.006) ?>%2C<?= ($lng + 0.008) ?>%2C<?= ($lat + 0.006) ?>&amp;layer=mapnik&amp;marker=<?= $lat ?>%2C<?= $lng ?>"></iframe>
             <?php endif; ?>
-            <a href="<?= $base ?>/admin/people/photo?id=<?= $pid ?>" target="_blank">&#128247; View photo</a>
-            <form method="post" action="<?= $base ?>/admin/people/delete" onsubmit="return confirm('Delete <?= $h($name) ?>? This removes the person, their member type and campus links. This cannot be undone.');">
+          </div>
+        </section>
+
+        <section class="ek-card" aria-labelledby="pv-household">
+          <div class="ek-card-head">
+            <div><h2 id="pv-household">Household</h2>
+              <p><?= $data['family'] ? $h($data['family']['name']) . ($L['family_role'] !== '' ? ' · ' . $h($L['family_role']) : '') : 'Not part of a household record.' ?></p></div>
+            <?php if ($data['family']): ?><a class="ek-btn" href="<?= $base ?>/admin/families/edit?id=<?= $householdId ?>">Open household</a><?php endif; ?>
+          </div>
+          <div class="ek-card-body">
+            <?php if (!$data['family']): ?>
+              <p class="rec-muted" style="margin:0">Choose a household when you <a class="rec-link" href="<?= $base ?>/admin/people/edit?id=<?= $pid ?>">edit this record</a>, or <a class="rec-link" href="<?= $base ?>/admin/families/edit">add a household</a> first.</p>
+            <?php else: ?>
+              <?php if ($data['members']): ?>
+                <ul class="rec-history">
+                  <?php foreach ($data['members'] as $m): ?>
+                    <li><span><a class="rec-link" href="<?= $base ?>/admin/people/view?id=<?= (int) $m['id'] ?>"><?= $h(trim($m['first_name'] . ' ' . $m['last_name'])) ?></a>
+                      <?php if (($m['family_role'] ?? '') !== ''): ?><span class="rec-muted"> · <?= $h($m['family_role']) ?></span><?php endif; ?></span></li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php else: ?>
+                <p class="rec-muted" style="margin:0">Nobody else is in this household.</p>
+              <?php endif; ?>
+              <?php if (!empty($relatedLinks)): ?>
+                <h3 class="rec-small rec-muted" style="margin:var(--sp-4,16px) 0 4px">Related households</h3>
+                <ul class="rec-history">
+                  <?php foreach ($relatedLinks as $l): ?>
+                    <li><span><a class="rec-link" href="<?= $base ?>/admin/families/edit?id=<?= (int) $l['other'] ?>"><?= $h($l['name']) ?></a> <span class="rec-muted">· <?= $h($l['label']) ?></span></span></li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php endif; ?>
+              <?php if (!empty($residenceMates)): ?>
+                <h3 class="rec-small rec-muted" style="margin:var(--sp-4,16px) 0 4px">Same address (a suggestion, not a link)</h3>
+                <ul class="rec-history">
+                  <?php foreach ($residenceMates as $m): ?>
+                    <li><span><a class="rec-link" href="<?= $base ?>/admin/families/edit?id=<?= (int) $m['id'] ?>"><?= $h($m['name']) ?></a> <span class="rec-muted">· <?= (int) $m['members'] ?> <?= (int) $m['members'] === 1 ? 'person' : 'people' ?></span></span></li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php endif; ?>
+            <?php endif; ?>
+          </div>
+        </section>
+
+        <section class="ek-card" aria-labelledby="pv-ministries">
+          <div class="ek-card-head">
+            <div><h2 id="pv-ministries">Ministries &amp; positions</h2>
+              <p>Where <?= $h($p['first_name'] ?: $name) ?> serves. Membership is managed in Ministries.</p></div>
+            <a class="ek-btn" href="<?= $base ?>/ministries/members-and-leaders">Manage members &amp; leaders</a>
+          </div>
+          <div class="ek-card-body">
+            <?php if ($ministries === []): ?>
+              <p class="rec-muted" style="margin:0">Not a member of any ministry.</p>
+            <?php else: ?>
+              <ul class="rec-history">
+                <?php foreach ($ministries as $m): ?>
+                  <li><span><a class="rec-link" href="<?= $base ?>/ministries/<?= (int) $m['ministry_id'] ?>"><?= $h($m['name']) ?></a>
+                    <?php if ($m['is_leader']): ?> <span class="ek-badge is-ok">Leader</span><?php endif; ?></span>
+                    <?php if ($m['roles'] !== ''): ?><span class="pv-roles"><?= $h($m['roles']) ?></span><?php endif; ?></li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+          </div>
+        </section>
+
+        <section class="ek-card" aria-labelledby="pv-history">
+          <div class="ek-card-head">
+            <div><h2 id="pv-history">Recent history</h2>
+              <p><?= (int) $recentHistory['total'] === 0 ? 'No recorded changes.' : 'The latest ' . min(5, (int) $recentHistory['total']) . ' of ' . (int) $recentHistory['total'] . ' recorded ' . ((int) $recentHistory['total'] === 1 ? 'change' : 'changes') . '.' ?></p></div>
+            <?php if ((int) $recentHistory['total'] > 0): ?><a class="ek-btn" href="<?= $base ?>/people/history?person=<?= $pid ?>">All history</a><?php endif; ?>
+          </div>
+          <div class="ek-card-body">
+            <?= records_history_list($recentHistory['entries'], 'Changes made in Member records will be listed here.') ?>
+          </div>
+        </section>
+      </div>
+
+      <aside class="rec-aside" aria-label="Membership and access">
+        <section class="ek-card" aria-labelledby="pv-membership">
+          <div class="ek-card-head"><h2 id="pv-membership">Membership</h2></div>
+          <div class="ek-card-body">
+            <dl class="rec-dl">
+              <dt>Status</dt><dd><?= $L['classification'] !== '' ? $h($L['classification']) : '<span class="rec-muted">Not set</span>' ?></dd>
+              <dt>Member type</dt><dd><?= $L['member_type'] !== '' ? '<span class="ek-badge">' . $h($L['member_type']) . '</span>' : '<span class="rec-muted">Not set</span>' ?></dd>
+              <dt>Campus</dt><dd><?= $data['affiliations'] ? $h($data['affiliations'][0]['name']) : '<span class="rec-muted">Not set</span>' ?></dd>
+              <dt>Member since</dt><dd><?= $membershipSince !== '' ? $h($membershipSince) : '<span class="rec-muted">Not recorded</span>' ?></dd>
+            </dl>
+          </div>
+        </section>
+
+        <section class="ek-card" aria-labelledby="pv-logins">
+          <div class="ek-card-head"><div><h2 id="pv-logins">Portal logins</h2><p>Accounts linked to this person. Managed in Users &amp; access.</p></div></div>
+          <div class="ek-card-body">
+            <?php if ($logins === []): ?>
+              <p class="rec-muted" style="margin:0 0 8px">No login is linked to this person.</p>
+              <a class="rec-link rec-small" href="<?= $base ?>/admin/users">Open Users &amp; access</a>
+            <?php else: ?>
+              <ul class="rec-history">
+                <?php foreach ($logins as $u): $roles = array_values(array_unique(array_map(static fn (array $r): string => ucfirst((string) $r['role']), $u['roles']))); ?>
+                  <li><span><a class="rec-link" href="<?= $base ?>/admin/users?user_id=<?= (int) $u['id'] ?>"><?= $h($u['email']) ?></a>
+                    <?php if (!$u['is_active']): ?> <span class="ek-badge is-warn">Inactive</span><?php endif; ?></span>
+                    <span class="rec-muted rec-small"><?= $roles !== [] ? $h(implode(', ', $roles)) : 'No role' ?> ·
+                      <?= $u['last_login_at'] ? 'last signed in ' . $h(records_when((string) $u['last_login_at'], false)) : 'never signed in' ?></span></li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+          </div>
+        </section>
+
+        <section class="ek-card pv-danger" aria-labelledby="pv-delete">
+          <div class="ek-card-head"><div><h2 id="pv-delete">Delete record</h2><p>Removes the person, their member type and campus. It cannot be undone.</p></div></div>
+          <div class="ek-card-body">
+            <form method="post" action="<?= $base ?>/admin/people/delete" onsubmit="return confirm('Delete <?= $h(addslashes($name)) ?>? This removes the person, their member type and campus links. This cannot be undone.');">
               <input type="hidden" name="id" value="<?= $pid ?>">
-              <button type="submit" class="danger">&#128465; Delete person</button>
+              <button type="submit" class="ek-btn ek-btn-danger">Delete <?= $h($name) ?></button>
             </form>
           </div>
-        </details>
-      <?php endif; ?>
-    </div>
-
-    <div class="pv-grid">
-      <!-- Left column: name card + quick info -->
-      <div>
-        <div class="pv-card pv-namecard">
-          <div class="pv-photo">
-            <span class="ini"><?= $h($initials) ?></span>
-            <img src="<?= $base ?>/admin/people/photo?id=<?= $pid ?>" alt="" onerror="this.style.display='none'">
-          </div>
-          <div class="pv-nameinfo">
-            <h2><?= $h($name) ?></h2>
-            <ul class="pv-info">
-              <?php if ($gender !== ''): ?><li><span class="k">Gender</span><span><?= $h($gender) ?></span></li><?php endif; ?>
-              <?php if ($L['classification'] !== ''): ?><li><span class="k">Classification</span><span><?= $h($L['classification']) ?></span></li><?php endif; ?>
-              <?php if ($L['member_type'] !== ''): ?><li><span class="k">Member type</span><span class="pv-badge"><?= $h($L['member_type']) ?></span></li><?php endif; ?>
-              <?php if ($L['family_role'] !== ''): ?><li><span class="k">Family role</span><span><?= $h($L['family_role']) ?></span></li><?php endif; ?>
-              <?php if ($membershipSince !== ''): ?><li><span class="k">Member since</span><span><?= $h($membershipSince) ?></span></li><?php endif; ?>
-              <?php if ((int) ($p['birth_month'] ?? 0) > 0): ?><li><span class="k">Birthday</span><span><?= $h(date('M j', mktime(0, 0, 0, (int) $p['birth_month'], (int) $p['birth_day'] ?: 1))) ?><?= (int) ($p['birth_year'] ?? 0) > 0 ? ', ' . (int) $p['birth_year'] : '' ?></span></li><?php endif; ?>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Campus affiliations -->
-        <?php if ($data['affiliations']): ?>
-          <div class="pv-card" style="margin-top:12px"><div class="pv-sec">
-            <h4>Campus</h4>
-            <?php foreach ($data['affiliations'] as $a): ?>
-              <span class="pv-badge <?= (int) $a['is_primary'] === 1 ? 'pri' : '' ?>"><?= $h($a['name']) ?><?= (int) $a['is_primary'] === 1 ? ' ★' : '' ?></span>
-            <?php endforeach; ?>
-          </div></div>
-        <?php endif; ?>
-      </div>
-
-      <!-- Right column: contact, address/map, family -->
-      <div>
-        <div class="pv-card">
-          <div class="pv-sec">
-            <h4>Contact</h4>
-            <?php
-            $phones = array_filter([
-                'Mobile' => $p['mobile_phone'] ?? '', 'Home' => $p['home_phone'] ?? '',
-            ], static fn ($v) => trim((string) $v) !== '');
-            $emails = array_filter(['' => $p['email'] ?? ''], static fn ($v) => trim((string) $v) !== '');
-            ?>
-            <?php if (!$phones && !$emails): ?><span class="muted">No contact details.</span><?php endif; ?>
-            <?php foreach ($phones as $label => $num): $digits = preg_replace('/[^0-9+]/', '', (string) $num); ?>
-              <div class="pv-line">
-                <a href="tel:<?= $h($digits) ?>"><?= $h($num) ?></a>
-                <?php if ($label === 'Mobile'): ?><a href="sms:<?= $h($digits) ?>" class="muted" title="Text">&#128172;</a><?php endif; ?>
-                <button class="pv-mini" type="button" data-copy="<?= $h($num) ?>">copy</button>
-                <span class="muted">(<?= $h($label) ?>)</span>
-              </div>
-            <?php endforeach; ?>
-            <?php foreach ($emails as $label => $em): ?>
-              <div class="pv-line">
-                <a href="mailto:<?= $h($em) ?>"><?= $h($em) ?></a>
-                <button class="pv-mini" type="button" data-copy="<?= $h($em) ?>">copy</button>
-                <?php if ($label !== ''): ?><span class="muted">(<?= $h($label) ?>)</span><?php endif; ?>
-              </div>
-            <?php endforeach; ?>
-          </div>
-
-          <?php if ($addr !== ''): ?>
-          <div class="pv-sec">
-            <h4>Address</h4>
-            <div class="pv-line"><?= $h($addr) ?></div>
-            <div class="pv-line">
-              <a href="https://www.google.com/maps/search/?api=1&query=<?= $mapsQ ?>" target="_blank" rel="noopener">Open in Google Maps</a>
-              <a href="https://www.openstreetmap.org/search?query=<?= $mapsQ ?>" target="_blank" rel="noopener">OpenStreetMap</a>
-              <?php if ($isAdmin && (int) ($p['household_id'] ?? 0) > 0): ?>
-                <button type="button" class="pv-mini" id="refreshCoordsBtn" data-family-id="<?= (int) $p['household_id'] ?>"
-                        title="Look up latitude/longitude from this address">&#10227; Refresh coordinates</button>
-                <span id="refreshCoordsMsg" class="muted"></span>
-              <?php endif; ?>
-            </div>
-            <?php if ($lat !== null && $lng !== null): ?>
-              <iframe class="pv-map" loading="lazy" title="Map"
-                src="https://www.openstreetmap.org/export/embed.html?bbox=<?= ($lng - 0.008) ?>%2C<?= ($lat - 0.006) ?>%2C<?= ($lng + 0.008) ?>%2C<?= ($lat + 0.006) ?>&layer=mapnik&marker=<?= $lat ?>%2C<?= $lng ?>"></iframe>
-            <?php endif; ?>
-          </div>
-          <?php endif; ?>
-        </div>
-
-        <?php if ($data['family']): ?>
-          <div class="pv-card" style="margin-top:12px"><div class="pv-sec">
-            <h4>Family — <?= $h($data['family']['name']) ?></h4>
-            <?php if ($data['members']): ?>
-              <table class="pv-fam"><tbody>
-                <?php foreach ($data['members'] as $m): ?>
-                  <tr>
-                    <td><a href="<?= $base ?>/admin/people/view?id=<?= (int) $m['id'] ?>"><?= $h(trim($m['first_name'] . ' ' . $m['last_name'])) ?></a></td>
-                    <td class="muted"><?= $h($m['family_role'] ?? '') ?></td>
-                    <td class="muted"><?= $m['email'] ? '<a href="mailto:' . $h($m['email']) . '">' . $h($m['email']) . '</a>' : '' ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody></table>
-            <?php else: ?><span class="muted">No other family members.</span><?php endif; ?>
-
-            <?php if (!empty($relatedLinks)): ?>
-              <div style="margin-top:12px"><b style="font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)">Related families</b>
-                <?php foreach ($relatedLinks as $l): ?>
-                  <div class="pv-line"><a href="<?= $base ?>/admin/families/edit?id=<?= (int) $l['other'] ?>"><?= $h($l['name']) ?></a> <span class="muted">— <?= $h($l['label']) ?></span></div>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
-
-            <?php if (!empty($residenceMates)): ?>
-              <div style="margin-top:12px"><b style="font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)">Same residence <span style="font-weight:400;text-transform:none">(suggested)</span></b>
-                <?php foreach ($residenceMates as $m): ?>
-                  <div class="pv-line"><a href="<?= $base ?>/admin/families/edit?id=<?= (int) $m['id'] ?>"><?= $h($m['name']) ?></a> <span class="muted">— <?= (int) $m['members'] ?> member<?= (int) $m['members'] === 1 ? '' : 's' ?></span></div>
-                <?php endforeach; ?>
-              </div>
-            <?php endif; ?>
-          </div></div>
-        <?php endif; ?>
-      </div>
+        </section>
+      </aside>
     </div>
 
     <script>
     document.addEventListener('click', function (e) {
       var b = e.target.closest('[data-copy]');
-      if (b) { navigator.clipboard && navigator.clipboard.writeText(b.getAttribute('data-copy')); var t = b.textContent; b.textContent = 'copied'; setTimeout(function () { b.textContent = t; }, 1200); return; }
-      var m = document.querySelector('details.pv-menu[open]');
-      if (m && !e.target.closest('details.pv-menu')) m.removeAttribute('open');
+      if (!b) return;
+      if (navigator.clipboard) navigator.clipboard.writeText(b.getAttribute('data-copy'));
+      var t = b.innerHTML; b.textContent = 'Copied'; setTimeout(function () { b.innerHTML = t; }, 1200);
     });
 
-    // Refresh coordinates: geocode the family address and reload to show the map.
+    // Refresh the household's map location from its address, then reload to show the map.
     (function () {
       var btn = document.getElementById('refreshCoordsBtn');
       if (!btn) return;
       var msg = document.getElementById('refreshCoordsMsg');
-      var base = <?= json_encode($base) ?>;
+      var base = <?= json_encode($basePath) ?>;
       btn.addEventListener('click', function () {
-        var famId = btn.getAttribute('data-family-id');
         btn.disabled = true;
         var label = btn.innerHTML;
-        btn.textContent = 'Refreshing…';
-        if (msg) { msg.style.color = ''; msg.textContent = ''; }
-        var body = new URLSearchParams(); body.set('family_id', famId);
+        btn.textContent = 'Looking up…';
+        if (msg) { msg.textContent = ''; }
+        var body = new URLSearchParams(); body.set('family_id', btn.getAttribute('data-family-id'));
         fetch(base + '/admin/people/geocode-family', {
           method: 'POST', credentials: 'same-origin',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -244,28 +284,31 @@ if ($data === null) {
         }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
           .then(function (res) {
             if (res.ok && res.j && res.j.success) {
-              btn.textContent = '✓ Updated';
-              if (msg) { msg.style.color = '#1a7a3a'; msg.textContent = 'Coordinates updated.'; }
+              if (msg) { msg.textContent = 'Location updated.'; }
               setTimeout(function () { location.reload(); }, 900);
             } else {
               btn.disabled = false; btn.innerHTML = label;
-              if (msg) { msg.style.color = '#b3261e'; msg.textContent = (res.j && res.j.error) || 'Could not geocode.'; }
+              if (msg) { msg.textContent = (res.j && res.j.error) || 'Could not find that address on the map.'; }
             }
           }).catch(function () {
             btn.disabled = false; btn.innerHTML = label;
-            if (msg) { msg.style.color = '#b3261e'; msg.textContent = 'Network error.'; }
+            if (msg) { msg.textContent = 'Network error. Try again.'; }
           });
       });
     })();
     </script>
     <?php
 }
-$content = ob_get_clean();
+$content = (string) ob_get_clean();
 
+$title = $isAdmin && $data !== null
+    ? (trim(($data['person']['first_name'] ?? '') . ' ' . ($data['person']['last_name'] ?? '')) ?: 'Person #' . (int) $data['person']['id'])
+    : 'Person record';
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'people',
-    'pageTitle' => 'Person · Admin', 'pageSubtitle' => 'Profile.',
-    'sectionTitle' => $data !== null ? trim(($data['person']['first_name'] ?? '') . ' ' . ($data['person']['last_name'] ?? '')) : 'Person',
-    'sectionDescription' => 'Profile, contact, campus, and family.',
+    'pageTitle' => $title . ' · Member records', 'pageSubtitle' => 'Person record.',
+    'sectionTitle' => $title,
+    'sectionDescription' => $isAdmin && $data !== null ? 'Member record: identity, contact, household, membership, ministries and history.' : '',
+    'headerActions' => $headerActions,
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);
