@@ -50,32 +50,22 @@ ob_start();
      page. Padded to a 24px target so they satisfy WCAG 2.5.8 as standalone
      controls in a table cell rather than links inside a sentence. */
   .dash-rowhead a{display:inline-block;padding:4px 2px;min-height:24px;line-height:16px}
+  .ek-table th.dash-rowhead{background:none;color:var(--ink);font-weight:600;font-size:13px}
 </style>
 
 <?php if (!$isAdmin): ?>
-    <section class="admin-card">
-        <div class="admin-card-head"><div><h2>Not available</h2>
-            <p>System information is limited to portal administrators.</p></div></div>
-    </section>
+    <div class="ek-card"><div class="ek-card-body">System information is limited to portal-wide administrators.</div></div>
 <?php else: ?>
 
-    <section class="admin-card">
-        <div class="admin-card-head"><div>
-            <h2>What this page is for</h2>
-            <p>Technical information used when troubleshooting the portal, or when
-               someone is helping you remotely. Nothing here can be changed from this
-               page, and no passwords or keys are ever shown.</p>
-        </div></div>
-    </section>
+    <div class="ek-alert" role="note">For troubleshooting, or when someone is helping you remotely. Nothing here can be changed from this page, and no passwords or keys are shown.</div>
 
-    <section class="admin-card">
-        <div class="admin-card-head"><div>
+    <section class="ek-card">
+        <div class="ek-card-head"><div>
             <h2>Portal environment</h2>
             <p>How this copy of the portal is configured.</p>
         </div></div>
-        <div class="admin-card-body">
-            <div class="admin-tablewrap">
-                <table class="dash-files">
+        <div class="ek-table-wrap">
+                <table class="ek-table">
                     <caption class="sr-only">Portal environment settings</caption>
                     <thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead>
                     <tbody>
@@ -83,23 +73,21 @@ ob_start();
                         <tr><th scope="row" class="dash-rowhead"><?= $e($k) ?></th><td><code class="code"><?= $e($v) ?></code></td></tr>
                     <?php endforeach; ?>
                         <tr><th scope="row" class="dash-rowhead">Active theme</th><td><code class="code"><?= $e($dashboard['settings']['theme'] ?? '—') ?></code></td></tr>
-                        <tr><th scope="row" class="dash-rowhead">Home page banner slides</th><td><code class="code"><?= $e((string) ($dashboard['settings']['heroSlides'] ?? '—')) ?></code></td></tr>
+                        <tr><th scope="row" class="dash-rowhead">Portal notices showing now</th><td><code class="code"><?= $e((string) ($dashboard['status']['noticesShowing'] ?? '—')) ?> of <?= $e((string) ($dashboard['status']['noticesTotal'] ?? '—')) ?></code></td></tr>
                     </tbody>
                 </table>
-            </div>
         </div>
     </section>
 
-    <section class="admin-card">
-        <div class="admin-card-head"><div>
+    <section class="ek-card">
+        <div class="ek-card-head"><div>
             <h2>Configuration files</h2>
             <p>Settings the portal keeps as files on the server. Each one has an
                ordinary screen for editing it — the file is shown here only so a
                problem can be diagnosed.</p>
         </div></div>
-        <div class="admin-card-body">
-            <div class="admin-tablewrap">
-                <table class="dash-files">
+        <div class="ek-table-wrap">
+                <table class="ek-table">
                     <caption class="sr-only">Configuration files and the screens that edit them</caption>
                     <thead><tr>
                         <th scope="col">Controls</th>
@@ -137,7 +125,6 @@ ob_start();
                     <?php endforeach; ?>
                     </tbody>
                 </table>
-            </div>
         </div>
     </section>
 
@@ -148,7 +135,7 @@ $content = (string) ob_get_clean();
 echo admin_render_page([
     'basePath' => $basePath,
     'activeId' => 'system',
-    'pageTitle' => 'System information · Admin',
+    'pageTitle' => 'System information',
     'pageSubtitle' => 'Technical details for troubleshooting',
     'sectionTitle' => 'System information',
     'sectionDescription' => 'Technical information used when troubleshooting the portal. Read-only.',

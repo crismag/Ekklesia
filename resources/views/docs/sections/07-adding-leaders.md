@@ -41,10 +41,10 @@ Being a **Leader** on a team (group role) is a label. To let that leader actuall
 build schedules and manage their team in the portal, give their **account** the
 matching role:
 
-1. Open **Users & access** (under *Users & Access*).
-2. Find or create the person's login (email + password).
+1. Open **Admin → Users & access**.
+2. Find the person's login and open it, or **Add a login** (email + password) and link it to their person record.
 3. **Add a role** of **leader**, scoped to their **campus** and/or **ministry**.
-4. Save. The leader can now manage schedules and people within that scope.
+4. The leader can now manage schedules and people within that scope.
 
 ## Choosing a scope
 

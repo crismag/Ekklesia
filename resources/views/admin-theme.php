@@ -14,31 +14,31 @@ $themeJson = json_encode(
 
 $content = '';
 if (!$isAdmin) {
-    $content .= '<div class="read-only-banner">Read-only — only portal admins can switch themes. You can still preview each preset locally.</div>';
+    $content .= '<div class="ek-alert" role="note">Only a portal-wide admin can change the theme. You can look at each preset here.</div>';
 }
-$content .= '<article class="admin-card" id="themePicker">'
-    . '<div class="admin-card-head"><div><h2>Theme presets</h2><p>Pick a preset — the change applies portal-wide on save.</p></div>' . admin_section_status_badge('Live') . '</div>'
-    . '<div class="theme-grid" id="themeGrid"></div>'
-    . '<div class="actions-bar"><div><button class="button" id="saveThemeBtn"' . ($isAdmin ? '' : ' aria-disabled="true"') . '>Apply selected theme</button></div><span class="toast" id="themeToast"></span></div>'
-    . '</article>'
+$content .= '<section class="ek-card" id="themePicker" aria-labelledby="themeHeading">'
+    . '<div class="ek-card-head"><div><h2 id="themeHeading">Theme</h2><p>Choose a preset, then apply it. It changes the colours and density of every page, for everyone.</p></div></div>'
+    . '<div class="theme-grid" id="themeGrid" role="radiogroup" aria-label="Theme presets"></div>'
+    . '<div class="actions-bar"><div><button class="ek-btn ek-btn-primary" type="button" id="saveThemeBtn"' . ($isAdmin ? '' : ' aria-disabled="true"') . '>Apply selected theme</button></div><span class="toast" id="themeToast" role="status"></span></div>'
+    . '</section>'
 
-    . '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>How themes work</h2><p>Each preset is a CSS-variable map applied at the document root.</p></div></div>'
-    . '<div class="admin-card-body" style="color:var(--muted);font-size:13px;line-height:1.5">'
-    . '<p>Presets live in <span class="code">config/theme.json</span>. Each one defines:</p>'
+    . '<details class="ek-card" style="padding:0">'
+    . '<summary class="ek-card-head" style="cursor:pointer;min-height:44px"><strong>Adding a preset</strong></summary>'
+    . '<div class="ek-card-body" style="color:var(--muted);font-size:13px;line-height:1.5">'
+    . '<p style="margin-top:0">Presets live in <span class="code">config/theme.json</span> on the server. Each one defines:</p>'
     . '<ul style="margin:6px 0;padding-left:18px">'
-    . '<li><b>Colors</b> — ink, muted, line, paper, deep, teal, blue, gold, rose, soft, bg</li>'
-    . '<li><b>Gradient</b> — gradient-top, gradient-mid (the deep header band)</li>'
-    . '<li><b>Density</b> — font-scale (page-wide font-size multiplier), radius, spacing</li>'
+    . '<li><b>Colours</b>: ink, muted, line, paper, deep, teal, blue, gold, rose, soft, bg</li>'
+    . '<li><b>Gradient</b>: gradient-top, gradient-mid (the sidebar and deep bands)</li>'
+    . '<li><b>Density</b>: font-scale, radius, spacing</li>'
     . '</ul>'
-    . '<p>To add a new preset, copy an existing entry in <span class="code">config/theme.json</span> and rename the key. The picker below picks them up automatically.</p>'
-    . '</div></article>';
+    . '<p style="margin-bottom:0">To add one, copy an existing entry, rename its key and change the values. It appears here on the next page load.</p>'
+    . '</div></details>';
 
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'theme',
-    'pageTitle' => 'Theme · Admin', 'pageSubtitle' => 'Color palette + density presets.',
+    'pageTitle' => 'Theme', 'pageSubtitle' => 'Colour and density presets.',
     'sectionTitle' => 'Theme',
-    'sectionDescription' => 'Pick the active preset — Forest, Facebook, Minimalist, Metallic Chic, Cool &amp; Collected, Earthy &amp; Serene, Vibrant but Calm, plus Compact and Warm — or add your own in config/theme.json.',
+    'sectionDescription' => 'The portal’s colours and density, chosen from the presets installed on this server.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);
 ?>
@@ -60,7 +60,7 @@ echo admin_render_page([
 
     function render(){
         grid.innerHTML = Object.entries(config.presets).map(([id, preset]) => `
-            <button type="button" class="theme-card${id === selected ? ' is-active' : ''}" data-id="${escapeHtml(id)}">
+            <button type="button" role="radio" aria-checked="${id === selected ? 'true' : 'false'}" class="theme-card${id === selected ? ' is-active' : ''}" data-id="${escapeHtml(id)}">
                 <div class="theme-swatch">${swatchHtml(preset.vars || {})}</div>
                 <div class="theme-info"><b>${escapeHtml(preset.name || id)}</b><small>${escapeHtml(preset.description || '')}</small></div>
             </button>

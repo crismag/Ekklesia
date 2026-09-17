@@ -19,7 +19,8 @@ final class AdminDashboardService
     /** Configuration files that are edited through the portal. */
     private const CONFIG_FILES = [
         'theme.json' => ['label' => 'Theme presets', 'route' => '/admin/theme'],
-        'hero.json' => ['label' => 'Dashboard hero', 'route' => '/admin/hero'],
+        'announcements.json' => ['label' => 'Portal notices', 'route' => '/admin/announcements'],
+        'hero.json' => ['label' => 'Former home page banner', 'route' => '/admin/announcements'],
         'chrome.json' => ['label' => 'Header & footer', 'route' => '/admin/header'],
         'church-info.json' => ['label' => 'Church information', 'route' => '/admin/church-info'],
         'ministries.json' => ['label' => 'Ministry catalog', 'route' => '/admin/ministries'],
@@ -57,17 +58,43 @@ final class AdminDashboardService
         $addressGroups = $this->attempt(static fn () => PortalServiceProvider::makeFamilyAdminService()->addressGroupCount(), null);
         $ministries = $this->attempt(static fn () => count(PortalServiceProvider::makeMinistryService()->listMinistriesPublic(null)), null);
         $store = $this->attempt(static fn () => PortalServiceProvider::makeMaintenanceBackupService()->store(), null);
-        $archives = $store !== null ? $this->attempt(static fn () => $store->listRecent(5), []) : [];
+        // Only database backups count as backups: the archive also lists Excel
+        // exports and snapshots, and a fresh export must not read as "backed up".
+        $archives = $store !== null ? $this->attempt(static fn () => array_values(array_filter(
+            $store->listRecent(),
+            static fn (array $a): bool => str_starts_with(basename((string) ($a['relative'] ?? '')), 'mysql.'),
+        )), []) : [];
         $archivesReadable = $store !== null ? $this->attempt(static fn () => $store->isReadable(), false) : false;
         $batches = $this->attempt(static fn () => PortalServiceProvider::makeMemberCampusImportService()->batches(10), []);
         $theme = $this->attempt(static fn () => PortalServiceProvider::makeThemeSettingsService()->loadActivePreset(), []);
         $hero = $this->attempt(static fn () => PortalServiceProvider::makeHeroSettingsService()->load(), []);
 
         $users = is_array($users) ? $users : [];
+        $notices = $this->attempt(static fn () => PortalServiceProvider::makeAnnouncementSettingsService(), null);
+        $noticeItems = $notices !== null ? $this->attempt(static fn () => $notices->load()['items'], []) : [];
+        $showingNow = $notices !== null ? $this->attempt(static fn () => count($notices->activeNotices(['isPortalWideAdmin' => true])), null) : null;
+        $newestBackup = 0;
+        foreach (is_array($archives) ? $archives : [] as $a) {
+            $newestBackup = max($newestBackup, (int) ($a['mtime'] ?? 0));
+        }
 
         return [
             'metrics' => $this->metrics($basePath, $person, $family, $campus, $users, $ministries),
             'attention' => $this->attention($basePath, $person, $campus, $users, $dupSignal, $archives, $batches, (bool) $archivesReadable),
+            // The overview's status tiles. null means "could not be read", which
+            // the page shows as unavailable rather than as zero.
+            'status' => [
+                'logins' => $users === [] ? null : LoginDirectory::counts($users),
+                'lastBackupAt' => $archivesReadable ? ($newestBackup > 0 ? $newestBackup : 0) : null,
+                'people' => $person['people'] ?? null,
+                'households' => $family['total'] ?? ($person['families'] ?? null),
+                'campuses' => $campus['count'] ?? null,
+                'mainCampus' => $campus['main'] ?? null,
+                'duplicateHouseholds' => $dupSignal['candidates'] ?? null,
+                'noticesShowing' => $showingNow,
+                'noticesTotal' => is_array($noticeItems) ? count($noticeItems) : null,
+                'stagedImports' => count(array_filter(is_array($batches) ? $batches : [], static fn (array $x): bool => (string) ($x['status'] ?? '') !== 'applied')),
+            ],
             'breakdown' => $this->breakdown($person),
             'configFiles' => $this->configFiles($basePath),
             'settings' => [
@@ -183,13 +210,24 @@ final class AdminDashboardService
             ];
         }
 
-        $pendingPw = count(array_filter($users, static fn (array $u): bool => (int) ($u['must_change_password'] ?? 0) === 1));
+        $portalAdmins = $users === [] ? null : LoginDirectory::counts($users)['portalAdmins'];
+        if ($portalAdmins === 1) {
+            $out[] = [
+                'level' => 'medium',
+                'title' => 'Only one login can manage the portal',
+                'body' => 'If that login is lost or its owner leaves, nobody can manage access. Consider a second portal-wide administrator.',
+                'href' => $b . '/admin/users?role=portal-admin',
+                'action' => 'Open Users & access',
+            ];
+        }
+
+        $pendingPw = count(array_filter($users, static fn (array $u): bool => !empty($u['is_active']) && (int) ($u['must_change_password'] ?? 0) === 1));
         if ($pendingPw > 0) {
             $out[] = [
                 'level' => 'low',
                 'title' => $pendingPw === 1 ? '1 account must change its password' : "{$pendingPw} accounts must change their password",
                 'body' => 'These accounts cannot use the portal until the password is changed.',
-                'href' => $b . '/admin/users',
+                'href' => $b . '/admin/users?state=must-change',
                 'action' => 'Open accounts',
             ];
         }
@@ -199,8 +237,8 @@ final class AdminDashboardService
             $out[] = [
                 'level' => 'low',
                 'title' => $neverIn === 1 ? '1 account has never signed in' : "{$neverIn} accounts have never signed in",
-                'body' => 'An account created but never used may mean the invitation never arrived.',
-                'href' => $b . '/admin/users',
+                'body' => 'An account created but never used may mean the person never received their sign-in details.',
+                'href' => $b . '/admin/users?state=never',
                 'action' => 'Open accounts',
             ];
         }

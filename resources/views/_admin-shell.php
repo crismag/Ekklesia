@@ -86,7 +86,6 @@ if (!function_exists('admin_sections')) {
             ['group' => 'Portal management', 'icon' => 'admin', 'need' => 'admin', 'children' => [
                 ['id' => 'users',         'label' => 'Users & access',  'href' => $basePath . '/admin/users',         'icon' => 'people',   'need' => 'admin'],
                 ['id' => 'announcements', 'label' => 'Announcements',   'href' => $basePath . '/admin/announcements', 'icon' => 'docs',     'need' => 'admin'],
-                ['id' => 'hero',          'label' => 'Home page banner','href' => $basePath . '/admin/hero',          'icon' => 'dashboard','need' => 'admin'],
                 ['id' => 'theme',         'label' => 'Theme & colours', 'href' => $basePath . '/admin/theme',         'icon' => 'settings', 'need' => 'admin'],
                 ['id' => 'header',        'label' => 'Header menu',     'href' => $basePath . '/admin/header',        'icon' => 'menu',     'need' => 'admin'],
                 ['id' => 'footer',        'label' => 'Footer',          'href' => $basePath . '/admin/footer',        'icon' => 'menu',     'need' => 'admin'],
@@ -318,8 +317,9 @@ if (!function_exists('admin_render_page')) {
      *   sectionDescription:string,
      *   actor:?array<string,mixed>,
      *   campusSelector:array<string,mixed>,
-     *   isAdmin:bool
-     * } $args
+     *   isAdmin:bool,
+     *   headerActions?:string
+     * } $args   headerActions: trusted HTML for the page header's action slot
      * @param callable():string $renderBody     callable returning the inner HTML
      */
     function admin_render_page(array $args, callable $renderBody): string
@@ -401,7 +401,7 @@ if (!function_exists('admin_render_page')) {
         <?php elseif ($crumbs !== ''): /* the tabs already say where you are */ ?>
         <p class="ek-crumbs"><?= $crumbs ?></p>
         <?php endif; ?>
-        <?= ek_page_header((string) $args['sectionTitle'], (string) $args['sectionDescription']) ?>
+        <?= ek_page_header((string) $args['sectionTitle'], (string) $args['sectionDescription'], $canUseAdmin ? (string) ($args['headerActions'] ?? '') : '') ?>
         <?php if ($canUseAdmin): ?>
             <?= $renderBody() ?>
         <?php else: ?>

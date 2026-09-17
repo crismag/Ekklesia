@@ -70,15 +70,11 @@ ob_start();
     .rm-item p{margin:3px 0 0;font-size:12px;color:var(--muted)}
 </style>
 <?php if (!$isAdmin): ?>
-    <div class="admin-card"><div class="admin-card-body">
-        <h2>Sign in required</h2>
-        <p>The roadmap is available to portal administrators.</p>
-        <p><a class="button" href="<?= $e($base) ?>/login">Sign in</a></p>
-    </div></div>
+    <div class="ek-card"><div class="ek-card-body">The development roadmap is for portal-wide administrators.</div></div>
 <?php else: ?>
-    <div class="admin-card">
-        <div class="admin-card-head"><div><h2>Not built yet</h2><p>Everything the admin area used to advertise as planned, in one place.</p></div></div>
-        <div class="admin-card-body">
+    <section class="ek-card">
+        <div class="ek-card-head"><div><h2>Not built yet</h2><p>Everything the admin area used to advertise as planned, in one place.</p></div></div>
+        <div class="ek-card-body">
             <div class="rm-note">
                 These are not in progress and none of them blocks anything today. They are listed so
                 the working parts of the admin area are not diluted by descriptions of future work.
@@ -96,7 +92,7 @@ ob_start();
                 </div>
             <?php endforeach; ?>
         </div>
-    </div>
+    </section>
 <?php endif; ?>
 <?php
 $content = (string) ob_get_clean();
@@ -104,9 +100,9 @@ $content = (string) ob_get_clean();
 echo admin_render_page([
     'basePath' => $basePath,
     'activeId' => 'roadmap',
-    'pageTitle' => 'Roadmap',
+    'pageTitle' => 'Development roadmap',
     'pageSubtitle' => 'Planned capabilities, gathered out of the working sections',
-    'sectionTitle' => 'Roadmap',
+    'sectionTitle' => 'Development roadmap',
     'sectionDescription' => 'What the admin area does not do yet, stated once rather than scattered.',
     'actor' => $actor,
     'campusSelector' => $campusSelector,

@@ -275,5 +275,27 @@ try {
 $peterLogin = array_values(array_filter($state['accounts'], static fn (array $a): bool => $a['email'] === 'family@gmail.com'))[0];
 check("Peter's login still belongs to Peter", $peterLogin['person_id'] === 1);
 
+echo "\nLinking a login to a person from Users & access\n";
+[$auth, $state] = service($hasher);
+$admin = new ActorContext(actorId: 1, personId: null, displayName: 'Admin', permissions: [], ministryScopeIds: [], isPortalWideAdmin: true);
+$member = new ActorContext(actorId: 2, personId: null, displayName: 'Member', permissions: [], ministryScopeIds: [], isPortalWideAdmin: false);
+$loose = $auth->createUser('loose@example.com', 'Loose-login-pass-1', 'Loose');
+$outcome = static function (callable $fn): string {
+    try { $fn(); return 'ok'; } catch (Throwable $e) { return get_class($e) . ': ' . $e->getMessage(); }
+};
+check('a member cannot link logins', str_starts_with($outcome(fn () => $auth->linkLoginToPerson($member, $loose, 3)), PermissionDenied::class));
+check('a login already belonging to someone is not moved',
+    str_contains($outcome(fn () => $auth->linkLoginToPerson($admin, 50, 3)), 'already belongs to Ana Reyes')
+    && $state['accounts'][50]['person_id'] === 5);
+check('a person who already has a login does not get a second one',
+    str_contains($outcome(fn () => $auth->linkLoginToPerson($admin, $loose, 6)), 'already signs in as ben@example.com')
+    && $state['accounts'][$loose]['person_id'] === null);
+check('a person who does not exist is refused', str_contains($outcome(fn () => $auth->linkLoginToPerson($admin, $loose, 999)), 'no longer exists'));
+$before = count($state['audit']);
+check('an unlinked login is linked to a person without one', $outcome(fn () => $auth->linkLoginToPerson($admin, $loose, 3)) === 'ok'
+    && $state['accounts'][$loose]['person_id'] === 3);
+check('and the link is recorded in the activity history', ($state['audit'][$before][2] ?? '') === 'user_account.link');
+check('linking it to the same person again changes nothing', $outcome(fn () => $auth->linkLoginToPerson($admin, $loose, 3)) === 'ok' && count($state['audit']) === $before + 1);
+
 printf("\nPassed: %d; failed: %d\n", $passed, $failed);
 exit($failed === 0 ? 0 : 1);

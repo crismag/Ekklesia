@@ -472,7 +472,7 @@ echo "Destructive admin confirmations (current intended UX)\n";
 // dialog names the destructive act and states its consequence, so that is what
 // is checked: the verb, and language describing what happens.
 $confirmFiles = [
-    'resources/views/admin-users.php' => 'delete',
+    'resources/views/admin-user-record.php' => 'delete',
     'resources/views/admin-person-view.php' => 'delete',
     'resources/views/admin-family-edit.php' => 'delete',
     'resources/views/admin-campuses.php' => 'delete',

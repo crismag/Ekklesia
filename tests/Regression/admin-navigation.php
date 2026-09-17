@@ -111,7 +111,7 @@ foreach (admin_sections('/bp') as $node) {
         $hrefs[] = (string) ($child['href'] ?? '');
     }
 }
-foreach (['/bp/admin/announcements', '/bp/admin/hero', '/bp/admin/links', '/bp/admin/maintenance/import'] as $href) {
+foreach (['/bp/admin/announcements', '/bp/admin/links', '/bp/admin/maintenance/import'] as $href) {
     check('reachable from the menu: ' . $href, in_array($href, $hrefs, true));
 }
 
@@ -193,7 +193,7 @@ check('an admin is offered all seven workspaces', count($adminWs) === 7, implode
 
 // Pages later phases build are placed, but never linked before they exist.
 $allHtml = ek_workspace_nav('/bp', $admin, null);
-foreach (['/bp/people/history', '/bp/admin/history'] as $href) {
+foreach (['/bp/people/history'] as $href) {
     check('no link to an unbuilt page: ' . $href, !str_contains($allHtml, 'href="' . $href . '"'));
 }
 
@@ -204,6 +204,11 @@ check('a member is offered only the guest sign-up there', ($memberNav['visitors'
 check('a registration record is in Visitors', (Workspaces::locate('/visitors/12')['page'] ?? '') === 'visitors');
 check('RSVPs is its own page, not a registration', (Workspaces::locate('/visitors/rsvps')['page'] ?? '') === 'rsvps');
 check('the old launcher is no longer a page', !str_contains(json_encode(Workspaces::all(), JSON_UNESCAPED_SLASHES), '/admin/outreach'));
+check('Activity history is offered to an administrator', in_array('history', offered($admin)['admin'] ?? [], true));
+check('but not to a member', !in_array('history', offered(actor(false, ['view_own_assignments']))['admin'] ?? [], true));
+check('the retired home banner address sits under Portal notices',
+    Workspaces::locate('/admin/hero') === ['workspace' => 'admin', 'page' => 'appearance', 'child' => 'announcements']);
+check('a login record is in Users & access', (Workspaces::locate('/admin/users/17')['page'] ?? '') === 'users');
 check('an unbuilt page is still placed in the map', Workspaces::locate('/people/history') === ['workspace' => 'people', 'page' => 'history', 'child' => null]);
 
 // Locating a URL.

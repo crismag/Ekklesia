@@ -318,7 +318,23 @@ final class PortalServiceProvider
     public static function makeSystemUserService(): \App\Services\SystemUserService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        return new \App\Services\SystemUserService(MembersConnection::get(), new \App\Core\Security\PasswordHasher());
+        $pdo = MembersConnection::get();
+
+        return new \App\Services\SystemUserService(
+            $pdo,
+            new \App\Core\Security\PasswordHasher(),
+            new DefaultAuthRepository(new SqlAuthAdapter($pdo)),
+        );
+    }
+
+    /** Admin · Activity history: the audit log, read-only, for portal-wide admins. */
+    public static function makeActivityHistoryService(): \App\Services\ActivityHistoryService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+
+        return new \App\Services\ActivityHistoryService(
+            new \App\Adapters\Sql\SqlActivityHistoryAdapter(MembersConnection::get()),
+        );
     }
 
     /**
