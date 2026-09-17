@@ -41,3 +41,6 @@ config/theme.json
 # by tools/deploy.sh and cleared there; syncing a local copy would either take
 # the site down or lift a gate that is still needed.
 storage/maintenance.flag
+# Server-owned site lock (password prompt) for private deployments such as the demo.
+.htaccess-site-lock
+.htaccess.locked

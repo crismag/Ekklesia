@@ -236,6 +236,13 @@ The target must be named every time with `EKKLESIA_DEPLOY_REMOTE`,
 script refuses a path ending in `church_portal`, the Church Portal's production
 folder.
 
+**A private site** (the demo at ekklesiademo.crishub.com, which runs on real
+member data) keeps a server-only `.htaccess-site-lock` beside `.htaccess`: HTTP
+Basic authentication for the whole site, with the password file outside the web
+folder (`~/.htpasswds/…`). The deploy writes it on top of the repository's
+`.htaccess` and swaps the file in with one rename, so the site is never unlocked, and `EKKLESIA_SMOKE_AUTH=user:password` lets the smoke checks
+through.
+
 ### Rollback and recovery
 
 Files roll back by deploying an earlier commit. **Schema does not.** Migrations

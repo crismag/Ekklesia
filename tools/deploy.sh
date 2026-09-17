@@ -29,6 +29,9 @@
 #   tools/deploy.sh --dry-run       show what would sync and what would migrate
 #   tools/deploy.sh --skip-tests    sync without the local gate (say why)
 #
+# A private site (the demo): keep a server-only .htaccess-site-lock beside
+# .htaccess, and set EKKLESIA_SMOKE_AUTH=user:password for the smoke checks.
+#
 set -Eeuo pipefail
 
 # No defaults on purpose. Ekklesia started as a copy of the Church Portal, whose
@@ -120,7 +123,12 @@ echo "  gate up (expires by itself within 15 minutes)"
 # ------------------------------------------------------------------ 4. sync
 # Never --delete: the server owns runtime config the repository does not.
 say "4/6 syncing files"
-rsync -az --exclude-from=.rsync-deploy-exclude ./ "$REMOTE:$REMOTE_PATH/"
+rsync -az --exclude-from=.rsync-deploy-exclude --exclude='/.htaccess' ./ "$REMOTE:$REMOTE_PATH/"
+# The root .htaccess goes up separately. A site that must stay private (a demo on
+# real data) keeps its lock in a server-only .htaccess-site-lock; the lock and the
+# repository's rules are written together and swapped in with one rename, so the
+# site is never served without its lock.
+ssh "$REMOTE" "cd '$REMOTE_PATH' && if [ -f .htaccess-site-lock ]; then cat .htaccess-site-lock - > .htaccess.locked; echo '  site lock kept'; else cat > .htaccess.locked; fi && mv .htaccess.locked .htaccess" < .htaccess
 echo "  files in place"
 
 # --------------------------------------------------------------- 5. migrate
@@ -143,8 +151,14 @@ ssh "$REMOTE" "rm -f '$REMOTE_PATH/storage/maintenance.flag'"
 GATE_UP=0
 
 FAILED=0
+# A locked site answers 401 to strangers; EKKLESIA_SMOKE_AUTH=user:password
+# lets the smoke checks through.
+SMOKE_AUTH=()
+if [ -n "${EKKLESIA_SMOKE_AUTH:-}" ]; then
+  SMOKE_AUTH=(-u "$EKKLESIA_SMOKE_AUTH")
+fi
 for path in "" "/events" "/calendar" "/api/public/events?limit=1"; do
-  code="$(curl -s -o /dev/null -w '%{http_code}' "${SMOKE_URL}${path}" || echo 000)"
+  code="$(curl -s -o /dev/null -w '%{http_code}' "${SMOKE_AUTH[@]}" "${SMOKE_URL}${path}" || echo 000)"
   printf '  %-34s %s\n' "${path:-/}" "$code"
   case "$code" in 200|301|302) ;; *) FAILED=1 ;; esac
 done
