@@ -497,7 +497,7 @@ final readonly class AuthService
         $this->audit(
             $context,
             action: 'auth.profile.update',
-            targetType: 'portal_user',
+            targetType: 'user_account',
             targetId: (string) $context->actorId,
             summary: 'Updated own display name',
             payload: [
@@ -556,7 +556,7 @@ final readonly class AuthService
         $this->audit(
             $context,
             action: 'auth.password.change',
-            targetType: 'portal_user',
+            targetType: 'user_account',
             targetId: (string) $context->actorId,
             summary: 'Changed own password',
             payload: ['otherSessionsRevoked' => $revoked],
@@ -643,7 +643,7 @@ final readonly class AuthService
         $this->audit(
             $context,
             action: $user === null ? 'portal_access.create' : 'portal_access.update',
-            targetType: 'portal_user',
+            targetType: 'user_account',
             targetId: (string) $accountId,
             summary: sprintf('%s %s as %s', $user === null ? 'Created' : 'Updated', $email, $role),
             payload: [

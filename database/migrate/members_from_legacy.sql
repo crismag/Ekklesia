@@ -230,7 +230,7 @@ FROM {{PORTAL}}.portal_user_roles r
 WHERE EXISTS (SELECT 1 FROM user_accounts a WHERE a.id = r.portal_user_id);
 
 INSERT INTO account_tokens (token_hash, account_id, purpose, created_at, expires_at, used_at, payload)
-SELECT t.token, t.portal_user_id, t.purpose, t.created_at, t.expires_at, t.consumed_at,
+SELECT SHA2(t.token, 256), t.portal_user_id, t.purpose, t.created_at, t.expires_at, t.consumed_at,
        CASE WHEN JSON_VALID(t.payload_json) THEN t.payload_json END
 FROM {{PORTAL}}.portal_tokens t
 WHERE EXISTS (SELECT 1 FROM user_accounts a WHERE a.id = t.portal_user_id);
@@ -313,7 +313,7 @@ INSERT INTO audit_log (occurred_at, account_id, person_id, action, target_type, 
 SELECT a.at,
        (SELECT u.id FROM user_accounts u WHERE u.id = a.actor_user_id),
        (SELECT p.id FROM people p WHERE p.id = a.actor_person_id),
-       a.action, a.target_type, a.target_id, a.summary,
+       a.action, CASE a.target_type WHEN 'portal_user' THEN 'user_account' ELSE a.target_type END, a.target_id, a.summary,
        CASE WHEN JSON_VALID(a.payload_json) THEN a.payload_json END, a.ip_address, a.user_agent
 FROM {{PORTAL}}.portal_audit_log a;
 
