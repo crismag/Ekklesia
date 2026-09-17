@@ -22,6 +22,15 @@ experience. It does not reimplement proven functionality.
   variables (`--deep`, `--teal`, `--ink`, `--muted`, `--line`, `--paper`,
   `--soft`, `--bg`, `--gradient-top`, `--gradient-mid`, `--radius`, `--spacing`,
   …) and the derived tokens in `portal_theme_style_block()`.
+- **Ekklesia is the church portal, not the church website.** The church's public
+  website (demo: cacdemo.crishub.com) owns identity, presentation, ministries
+  content, news and public discovery. Ekklesia owns church records and portal
+  functions: People & Records, ministries administration, Events & Calendar,
+  Serving & Scheduling, Visitors & RSVPs, member-accessible information and
+  administration. Ekklesia pages never try to present or market the church.
+- **Public and member-accessible portal functionality** (calendar and event
+  views, RSVP, guest sign-up) are functional endpoints the church website can link
+  to or consume. They do not make Ekklesia a public website.
 - **Behaviour and authorization are unchanged.** Moving a page never widens who
   may see or do it. Old URLs keep working (redirect when a page moves).
 - **Print stays clean.** Shell chrome never prints.
@@ -36,13 +45,13 @@ signed-in, `admin`, `perm:<permission>`).
 
 | Workspace | Pages (label → URL) | Who |
 |---|---|---|
-| **Home** | Home `/` · My schedule `/my-schedule` · My availability `/availability` · Account `/account` | signed in (Home is public) |
+| **Home** | Home `/` (portal dashboard) · My schedule `/my-schedule` · My availability `/availability` · Account `/account` | signed in (Home also answers anonymous visitors, as a portal entry) |
 | **People & Records** | Directory `/people` · Member records `/admin/people` · Households `/admin/families` · Import & export `/admin/maintenance/import` · Record history `/people/history` · Record settings `/admin/options` | Directory: as today; the rest admin |
 | **Ministries** | Ministries `/ministries` · each ministry `/ministries/{id}` with tabs Overview · Members & leaders · Serving roles · Schedule · Manage ministries `/admin/ministries` | as today; managing needs `perm:manage_ministry_roles` / admin |
 | **Events & Calendar** | Calendar `/calendar` · Events `/events` · New event `/events/new` · Event categories `/admin/event-types` · Calendar settings `/admin/calendar` · Print calendar `/calendar/print-setup` | as today |
 | **Serving & Scheduling** | Schedules `/schedules` · Schedule board `/schedule-board` · Rosters `/rosters` · Printables `/printables` | as today |
 | **Visitors & RSVPs** | Visitors `/visitors` (registrations: review, match, promote) · RSVPs `/visitors/rsvps` (by event, attendance) · Access codes `/visitors/access` · public links to the sign-up form and RSVP pages | admin (as the outreach pages today) |
-| **Admin** | Users & access `/admin/users` · Church information `/admin/church-info` · Campuses `/admin/campuses` · Website & appearance (announcements, home banner, theme, header, footer, quick links) · Backups & maintenance `/admin/maintenance` · Activity history `/admin/history` · System `/admin/system` | admin |
+| **Admin** | Users & access `/admin/users` · Church information `/admin/church-info` · Campuses `/admin/campuses` · Portal appearance & notices (portal notices, theme, header, footer, quick links) · Backups & maintenance `/admin/maintenance` · Activity history `/admin/history` · System `/admin/system` | admin |
 
 Decisions:
 
@@ -54,8 +63,26 @@ Decisions:
   `/admin/outreach`. The standalone module admin pages under `people_signup/`
   and `events_rsvp/` keep working for greeters who use an access code instead of
   a login.
-- Anonymous visitors see only the public items: Home, Calendar, Events,
-  Ministries, and the sign-up / RSVP links.
+- Anonymous visitors see only the portal functions open to them: Home (portal
+  entry and sign-in), Calendar, Events, and the sign-up / RSVP pages. Ministry
+  presentation for the public belongs to the church website.
+
+## Home (portal dashboard)
+
+The home page says immediately what Ekklesia is: the church's records and
+operations portal. It is a dashboard into the workspaces, never a church
+website page (no promotional hero, ministry marketing or general church
+presentation).
+
+- **Signed in:** what matters to this person, limited to what they may access —
+  upcoming events and calendar, their serving schedule and relevant ministry
+  schedules, their ministries and recent activity, people/records shortcuts,
+  new registrations and RSVP activity, portal notices, and shortcuts into each
+  workspace they can use.
+- **Not signed in:** a short statement of what the portal is, sign-in, and the
+  portal functions open to everyone (calendar, events, RSVP, guest sign-up).
+- The existing home banner ("hero") and announcements settings become portal
+  notices: short operational messages for portal users, not marketing content.
 
 ## Shell
 
@@ -86,6 +113,13 @@ pages do not carry their own copies:
   (`is-ok`, `is-error`).
 - Kit styles are scoped to `ek-` classes: they do not restyle the Calendar,
   Scheduling or printable pages.
+
+## Phases
+
+1. Shell, workspace navigation and kit.
+2. Workspaces in parallel: People & Records, Ministries, Visitors & RSVPs, Admin,
+   and the Home portal dashboard.
+3. Calendar and Serving & Scheduling fitted into the shell (no redesign).
 
 ## Checkpoints
 
