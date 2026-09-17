@@ -199,7 +199,7 @@ final class FakeAvailabilityRepository implements AvailabilityRepository
         return $this->rows[$unavailabilityId] ?? null;
     }
 
-    public function create(AvailabilityCommand $command, int $createdByPortalUserId, DateTimeImmutable $now): int
+    public function create(AvailabilityCommand $command, int $createdByAccountId, DateTimeImmutable $now): int
     {
         $id = $this->nextId++;
         $this->rows[$id] = [
@@ -208,7 +208,7 @@ final class FakeAvailabilityRepository implements AvailabilityRepository
             'starts_on' => $command->startsOn,
             'ends_on'   => $command->endsOn,
             'reason'    => $command->reason,
-            'created_by_portal_user_id' => $createdByPortalUserId,
+            'created_by_account_id' => $createdByAccountId,
             'created_at' => $now,
             'updated_at' => $now,
         ];
@@ -680,9 +680,9 @@ $sqlDebtBaseline = [
     'app/Services/MaintenanceBackupService.php',
 
     'app/Services/CampusAdminService.php',
-    'app/Services/ChurchCrmIdentityResolver.php',
     'app/Services/FamilyAdminService.php',
     'app/Services/OptionAdminService.php',
+    'app/Services/PersonIdentityResolver.php',
     'app/Services/PersonAdminService.php',
     'app/Services/RosterScheduleService.php',
     'app/Services/SystemUserService.php',
@@ -1163,7 +1163,7 @@ $entry = $availService->create($memberCtx, new AvailabilityCommand(
     reason:   'Vacation',
 ));
 assert_true(
-    $entry->personId === 42 && $entry->reason === 'Vacation' && $entry->createdByPortalUserId === 5,
+    $entry->personId === 42 && $entry->reason === 'Vacation' && $entry->createdByAccountId === 5,
     'Member may create their own unavailability; createdBy must reflect the actor.',
 );
 
@@ -1235,7 +1235,7 @@ $crossPersonEntry = $availService->create($fullLeader, new AvailabilityCommand(
     reason:   'Logged by scheduler for someone else',
 ));
 assert_true(
-    $crossPersonEntry->personId === 99 && $crossPersonEntry->createdByPortalUserId === 10,
+    $crossPersonEntry->personId === 99 && $crossPersonEntry->createdByAccountId === 10,
     'Scheduler with ManageSchedules may create entries for another person; audit field reflects actor.',
 );
 

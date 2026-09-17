@@ -6,8 +6,8 @@ declare(strict_types=1);
  * Smoke check: member-facing "My Schedule" view.
  *
  * Proves the path:
- *   PortalAuthAdapter (mdb)        →  AuthService.login          → AuthSession
- *   PortalAuthAdapter (mdb)        →  AuthService.resolveActor   → ActorContext (with personId)
+ *   SqlAuthAdapter (mdb)           →  AuthService.login          → AuthSession
+ *   SqlAuthAdapter (mdb)           →  AuthService.resolveActor   → ActorContext (with personId)
  *   ChurchCrmScheduleAdapter (cc)  ←  ScheduleService.getMySchedule
  *
  * Usage:
@@ -47,12 +47,12 @@ $reqctx   = PortalServiceProvider::makeRequestContext();
 echo "=== Login ===\n";
 $session = $auth->login($email, $password, ipAddress: '127.0.0.1', userAgent: 'smoke-my-schedule');
 printf("  user=%d  primary_person=%s  token=%s…\n",
-    $session->portalUserId,
-    $session->primaryPersonId === null ? '(none)' : (string) $session->primaryPersonId,
+    $session->accountId,
+    $session->personId === null ? '(none)' : (string) $session->personId,
     substr($session->sessionToken, 0, 12),
 );
 
-if ($session->primaryPersonId === null) {
+if ($session->personId === null) {
     fwrite(STDERR, "FAIL: portal user has no linked person record — cannot resolve a personal schedule.\n");
     $auth->logout($session->sessionToken);
     exit(1);

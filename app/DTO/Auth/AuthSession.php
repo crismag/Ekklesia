@@ -12,18 +12,14 @@ use DateTimeImmutable;
  */
 final readonly class AuthSession
 {
-    /**
-     * @param list<string> $personLinks  ChurchCRM person ids linked to this user (informational)
-     */
     public function __construct(
-        public int $portalUserId,
+        public int $accountId,
         public string $email,
         public ?string $displayName,
         public string $sessionToken,
         public DateTimeImmutable $expiresAt,
-        public ?int $primaryPersonId,
-        public array $personLinks,
-        // Set when the account was just provisioned from a ChurchCRM identity
+        public ?int $personId,
+        // Set when the account was just provisioned from a person record
         // OR an admin reset the user's password and flagged the row. The login
         // UI uses this to redirect to /password/change before continuing.
         public bool $mustChangePassword = false,

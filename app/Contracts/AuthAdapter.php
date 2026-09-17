@@ -8,8 +8,9 @@ use DateTimeImmutable;
 
 /**
  * AuthAdapter is the source-specific data-access boundary for portal auth.
- * Owns SQL against the portal-owned auth tables (portal_users,
- * portal_user_person_links, portal_user_roles, portal_sessions, portal_tokens).
+ * Owns SQL against the account tables (user_accounts, account_roles,
+ * account_sessions, account_tokens, audit_log). Session tokens are passed raw
+ * and stored hashed.
  *
  * Returned arrays are intentionally raw associative arrays — repositories
  * compose them; services map them into ActorContext / domain DTOs.
@@ -18,7 +19,7 @@ interface AuthAdapter
 {
     /**
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   password_hash:string,
      *   is_active:bool,
@@ -29,28 +30,24 @@ interface AuthAdapter
 
     /**
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
+     *   person_id:?int,
      *   email:string,
      *   is_active:bool,
      *   display_name:?string
      * }|null
      */
-    public function findUserById(int $portalUserId): ?array;
+    public function findUserById(int $accountId): ?array;
 
     /**
-     * @return list<array{role:string,scope_campus_id:?int,scope_ministry_id:?int}>
+     * @return list<array{role:string,campus_id:?int,ministry_id:?int}>
      */
-    public function listRolesForUser(int $portalUserId): array;
+    public function listRolesForUser(int $accountId): array;
 
-    /**
-     * @return list<array{person_id:int,is_primary:bool}>
-     */
-    public function listPersonLinksForUser(int $portalUserId): array;
-
-    public function recordLogin(int $portalUserId, DateTimeImmutable $at): void;
+    public function recordLogin(int $accountId, DateTimeImmutable $at): void;
 
     public function createSession(
-        int $portalUserId,
+        int $accountId,
         string $sessionToken,
         DateTimeImmutable $createdAt,
         DateTimeImmutable $expiresAt,
@@ -59,7 +56,7 @@ interface AuthAdapter
     ): void;
 
     /**
-     * @return array{portal_user_id:int,expires_at:DateTimeImmutable,revoked:bool}|null
+     * @return array{account_id:int,expires_at:DateTimeImmutable,revoked:bool}|null
      */
     public function findActiveSession(string $sessionToken): ?array;
 
@@ -73,35 +70,34 @@ interface AuthAdapter
      * number of sessions newly revoked.
      */
     public function revokeAllSessionsExcept(
-        int $portalUserId,
+        int $accountId,
         ?string $exceptToken,
         DateTimeImmutable $at,
     ): int;
 
     /**
-     * Create a new portal user account. Returns the new portal_user_id.
+     * Create a new user account. Returns the new account id.
      */
     public function createUser(string $email, string $passwordHash, ?string $displayName): int;
 
     /**
-     * Provision a portal_users row keyed by ChurchCRM identity. Sets
-     * must_change_password=1 and stores churchcrm_person_id. Returns the new
-     * portal_user_id.
+     * Provision a user_accounts row for a person. Sets
+     * must_change_password=1 and stores person_id. Returns the new account id.
      */
-    public function provisionUserFromChurchCrm(
+    public function provisionUserForPerson(
         string $email,
         string $passwordHash,
         ?string $displayName,
-        int $churchcrmPersonId,
+        int $personId,
     ): int;
 
     /**
-     * Look up an existing portal_users row by its ChurchCRM linkage. Used so
+     * Look up an existing user_accounts row by its person. Used so
      * a person who has already been provisioned (or who manually created an
      * account) is matched without going through email/phone resolution again.
      *
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   password_hash:string,
      *   is_active:bool,
@@ -109,57 +105,57 @@ interface AuthAdapter
      *   must_change_password:bool
      * }|null
      */
-    public function findUserByChurchcrmPersonId(int $churchcrmPersonId): ?array;
+    public function findUserByPersonId(int $personId): ?array;
 
-    public function setMustChangePassword(int $portalUserId, bool $value): void;
+    public function setMustChangePassword(int $accountId, bool $value): void;
 
-    public function isMustChangePassword(int $portalUserId): bool;
+    public function isMustChangePassword(int $accountId): bool;
 
     /**
      * Replace every role row for the given user. Useful when re-syncing roles
-     * from ChurchCRM (e.g. on each login the leader scope is recomputed).
+     * from the person record (e.g. on each login the leader scope is recomputed).
      */
-    public function clearRolesForUser(int $portalUserId): void;
+    public function clearRolesForUser(int $accountId): void;
 
-    public function linkUserToPerson(int $portalUserId, int $personId, bool $isPrimary): void;
+    public function linkUserToPerson(int $accountId, int $personId): void;
 
     public function assignRole(
-        int $portalUserId,
+        int $accountId,
         string $role,
-        ?int $scopeCampusId,
-        ?int $scopeMinistryId,
+        ?int $campusId,
+        ?int $ministryId,
     ): void;
 
     /**
      * @return list<array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   is_active:bool,
      *   display_name:?string,
-     *   person_links:list<array{person_id:int,is_primary:bool}>,
-     *   roles:list<array{role:string,scope_campus_id:?int,scope_ministry_id:?int}>
+     *   person_id:?int,
+     *   roles:list<array{role:string,campus_id:?int,ministry_id:?int}>
      * }>
      */
     public function listUsersWithAccess(): array;
 
-    public function updateDisplayName(int $portalUserId, ?string $displayName): void;
+    public function updateDisplayName(int $accountId, ?string $displayName): void;
 
-    public function updatePasswordHash(int $portalUserId, string $passwordHash): void;
+    public function updatePasswordHash(int $accountId, string $passwordHash): void;
 
     /**
-     * Append a row to portal_audit_log. The adapter is responsible for
-     * JSON-encoding $payload.
+     * Append a row to audit_log. The adapter is responsible for
+     * JSON-encoding $details.
      *
-     * @param array<string, mixed>|null $payload
+     * @param array<string, mixed>|null $details
      */
     public function recordAudit(
-        ?int $actorUserId,
-        ?int $actorPersonId,
+        ?int $accountId,
+        ?int $personId,
         string $action,
         ?string $targetType,
         ?string $targetId,
         ?string $summary,
-        ?array $payload,
+        ?array $details,
         ?string $ipAddress,
         ?string $userAgent,
         DateTimeImmutable $at,

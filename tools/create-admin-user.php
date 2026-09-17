@@ -10,7 +10,7 @@ declare(strict_types=1);
  *   php tools/create-admin-user.php <email> <password> [<displayName>] [<personId>]
  *
  * Creates the user, assigns the 'admin' role (no scope = portal-wide admin),
- * and optionally links to a ChurchCRM person id.
+ * and optionally links to a person id.
  */
 
 spl_autoload_register(function (string $class): void {
@@ -39,16 +39,16 @@ $personId    = isset($argv[4]) ? (int) $argv[4] : null;
 
 $auth = PortalServiceProvider::makeAuthService();
 
-$portalUserId = $auth->createUser($email, $password, $displayName);
-$auth->assignRole($portalUserId, 'admin');
+$accountId = $auth->createUser($email, $password, $displayName);
+$auth->assignRole($accountId, 'admin');
 if ($personId !== null && $personId > 0) {
-    $auth->linkPerson($portalUserId, $personId, isPrimary: true);
+    $auth->linkPerson($accountId, $personId);
 }
 
 echo "OK\n";
-echo "  portal_user_id : $portalUserId\n";
+echo "  account_id     : $accountId\n";
 echo "  email          : $email\n";
 echo "  role           : admin (portal-wide)\n";
 if ($personId !== null && $personId > 0) {
-    echo "  linked person  : $personId (primary)\n";
+    echo "  linked person  : $personId\n";
 }

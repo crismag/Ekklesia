@@ -14,7 +14,7 @@ declare(strict_types=1);
  * assignment role", which is what 282 of the 284 existing memberships carry;
  * the roles that do exist (Porter, Runner, Create1) are per-ministry scheduling
  * roles, not a Member/Leader convention. Leadership is not a role at all: it is
- * an RBAC grant in portal_user_roles scoped to a ministry.
+ * an RBAC grant in account_roles scoped to a ministry.
  */
 
 spl_autoload_register(static function (string $class): void {
@@ -140,11 +140,11 @@ check('the import keeps a leader\'s membership',
 check('removal is scoped to people in this import',
     str_contains($svc, 'foreach ($desired as $personId => $wanted)'));
 
-$auth = (string) file_get_contents(__DIR__ . '/../../app/Adapters/Portal/PortalAuthAdapter.php');
-check('leaders are read from portal_user_roles, not from a role name',
-    str_contains($auth, 'listMinistryLeaderPersonIds') && str_contains($auth, 'scope_ministry_id'));
-check('both person-link paths are considered',
-    str_contains($auth, 'churchcrm_person_id') && str_contains($auth, 'portal_user_person_links'));
+$auth = (string) file_get_contents(__DIR__ . '/../../app/Adapters/Sql/SqlAuthAdapter.php');
+check('leaders are read from account_roles, not from a role name',
+    str_contains($auth, 'listMinistryLeaderPersonIds') && str_contains($auth, 'r.ministry_id'));
+check('the leader is the person the account belongs to',
+    str_contains($auth, 'u.person_id'));
 
 // --- the workbook is authoritative ------------------------------------------
 // Only the ministries listed are current ministries, so anything else is

@@ -1,7 +1,7 @@
 <?php
 /**
- * Admin · System Users — manage portal_users and their role assignments.
- * Data + actions via SystemUserService (portal DB). No ChurchCRM dependency.
+ * Admin · System Users — manage user_accounts and their role assignments.
+ * Data + actions via SystemUserService (user_accounts, account_roles).
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -27,9 +27,9 @@ foreach ($ministries as $m) { $ministryName[(int) $m['ministryId']] = (string) $
 
 $roleLabel = static function (array $r) use ($campusName, $ministryName): string {
     $s = ucfirst($r['role']);
-    if ($r['scope_campus_id'] !== null) { $s .= ' @ ' . ($campusName[$r['scope_campus_id']] ?? ('campus ' . $r['scope_campus_id'])); }
-    if ($r['scope_ministry_id'] !== null) { $s .= ' · ' . ($ministryName[$r['scope_ministry_id']] ?? ('ministry ' . $r['scope_ministry_id'])); }
-    if ($r['role'] === 'admin' && $r['scope_campus_id'] === null && $r['scope_ministry_id'] === null) { $s .= ' (portal-wide)'; }
+    if ($r['campus_id'] !== null) { $s .= ' @ ' . ($campusName[$r['campus_id']] ?? ('campus ' . $r['campus_id'])); }
+    if ($r['ministry_id'] !== null) { $s .= ' · ' . ($ministryName[$r['ministry_id']] ?? ('ministry ' . $r['ministry_id'])); }
+    if ($r['role'] === 'admin' && $r['campus_id'] === null && $r['ministry_id'] === null) { $s .= ' (portal-wide)'; }
     return $s;
 };
 
@@ -165,7 +165,7 @@ ob_start();
   // meant scrolling past every other user to reach the form and back up again
   // to see the result.
   $eu = $editingUser;
-  $euid = $eu !== null ? (int) $eu['portal_user_id'] : 0;
+  $euid = $eu !== null ? (int) $eu['id'] : 0;
   $adding = $eu === null;
 ?>
 <div class="us-layout">
@@ -181,7 +181,7 @@ ob_start();
       <p class="us-empty">No accounts yet. Add the first one on the right.</p>
     <?php else: ?>
       <ul class="us-items">
-        <?php foreach ($users as $u): $uid = (int) $u['portal_user_id']; $on = $uid === $euid; ?>
+        <?php foreach ($users as $u): $uid = (int) $u['id']; $on = $uid === $euid; ?>
           <li>
             <a class="us-item<?= $on ? ' is-on' : '' ?>" href="<?= $base ?>/admin/users?user_id=<?= $uid ?>"
                <?= $on ? 'aria-current="true"' : '' ?>>
@@ -225,8 +225,8 @@ ob_start();
           <div class="us-field"><label for="nu_display_name">Display name</label><input id="nu_display_name" type="text" name="display_name" maxlength="100"></div>
           <div class="us-field full"><label for="nu_password">Password <span class="us-req" aria-hidden="true">*</span><span class="sr-only">(required)</span> <span class="us-hint">minimum 12 characters</span></label><input id="nu_password" type="text" name="password" minlength="12" required autocomplete="off"></div>
           <div class="us-field"><label for="nu_role">Role</label><select id="nu_role" name="role"><?= $roleOptions() ?></select></div>
-          <div class="us-field"><label for="nu_campus">Campus</label><select id="nu_campus" name="scope_campus_id"><?= $campusOptions() ?></select></div>
-          <div class="us-field full"><label for="nu_ministry">Ministry</label><select id="nu_ministry" name="scope_ministry_id"><?= $ministryOptions() ?></select></div>
+          <div class="us-field"><label for="nu_campus">Campus</label><select id="nu_campus" name="campus_id"><?= $campusOptions() ?></select></div>
+          <div class="us-field full"><label for="nu_ministry">Ministry</label><select id="nu_ministry" name="ministry_id"><?= $ministryOptions() ?></select></div>
         </div>
         <p class="us-note">Leave campus and ministry blank for church-wide. An admin with neither is a portal-wide admin.</p>
         <div class="us-checks">
@@ -261,7 +261,7 @@ ob_start();
         <?php foreach ($eu['roles'] as $r): ?>
           <span class="us-chip <?= $r['role'] === 'admin' ? 'admin' : '' ?>"><?= $h($roleLabel($r)) ?>
             <form method="post" action="<?= $base ?>/admin/users" style="display:inline">
-              <input type="hidden" name="action" value="removerole"><input type="hidden" name="role_id" value="<?= (int) $r['role_id'] ?>"><input type="hidden" name="user_id" value="<?= $euid ?>">
+              <input type="hidden" name="action" value="removerole"><input type="hidden" name="account_role_id" value="<?= (int) $r['id'] ?>"><input type="hidden" name="user_id" value="<?= $euid ?>">
               <button type="submit" class="us-chip-x" aria-label="Remove role: <?= $h($roleLabel($r)) ?>">&times;</button>
             </form>
           </span>
@@ -272,8 +272,8 @@ ob_start();
         <input type="hidden" name="action" value="addrole"><input type="hidden" name="user_id" value="<?= $euid ?>">
         <div class="us-grid">
           <div class="us-field"><label for="ar_role">Role</label><select id="ar_role" name="role" required><?= $roleOptions() ?></select></div>
-          <div class="us-field"><label for="ar_campus">Campus</label><select id="ar_campus" name="scope_campus_id"><?= $campusOptions() ?></select></div>
-          <div class="us-field full"><label for="ar_ministry">Ministry</label><select id="ar_ministry" name="scope_ministry_id"><?= $ministryOptions() ?></select></div>
+          <div class="us-field"><label for="ar_campus">Campus</label><select id="ar_campus" name="campus_id"><?= $campusOptions() ?></select></div>
+          <div class="us-field full"><label for="ar_ministry">Ministry</label><select id="ar_ministry" name="ministry_id"><?= $ministryOptions() ?></select></div>
         </div>
         <button class="us-btn" type="submit">Add role</button>
       </form>

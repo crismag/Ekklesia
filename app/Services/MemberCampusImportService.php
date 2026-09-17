@@ -50,7 +50,7 @@ final readonly class MemberCampusImportService
         // behaves exactly as before and simply does not touch memberships.
         private ?MemberMinistryAssigner $ministries = null,
         private ?\App\Contracts\MinistryRepository $ministryRepo = null,
-        private ?\App\Adapters\Portal\PortalAuthAdapter $portalAuth = null,
+        private ?\App\Adapters\Sql\SqlAuthAdapter $portalAuth = null,
         // Last, and optional: every existing positional caller keeps working.
         private ?MinistryNameMap $nameMap = null,
     ) {

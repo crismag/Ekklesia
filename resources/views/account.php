@@ -563,7 +563,7 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
                 <form id="accessForm" class="stack">
                     <div class="field-row">
                         <div>
-                            <label for="personSearch">ChurchCRM person</label>
+                            <label for="personSearch">Directory person</label>
                             <input id="personSearch" list="peopleOptions" placeholder="Search by name, ministry, or member type">
                             <datalist id="peopleOptions"></datalist>
                             <input id="personId" type="hidden">
@@ -803,8 +803,8 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
             || '<span class="chip warn">No role assigned</span>';
         const scopes = [];
         (account.roles || []).forEach((role) => {
-            if (role.scope_ministry_id) scopes.push(`Leads ${ministryName(role.scope_ministry_id)}`);
-            if (role.scope_campus_id) scopes.push(campusName(role.scope_campus_id));
+            if (role.ministry_id) scopes.push(`Leads ${ministryName(role.ministry_id)}`);
+            if (role.campus_id) scopes.push(campusName(role.campus_id));
         });
         if (account.isPortalWideAdmin) scopes.push('Portal-wide access');
         $('scopeChips').innerHTML = scopes.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join('')
@@ -816,16 +816,15 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
         const list = $('accessList');
         if (!users.length) { list.innerHTML = '<div class="mini">No portal accounts yet.</div>'; return; }
         list.innerHTML = users.map((user) => {
-            const primary = (user.personLinks || []).find((l) => l.is_primary) || (user.personLinks || [])[0] || null;
             const roles = (user.roles || []).map((role) => {
                 const pieces = [role.role];
-                if (role.scope_ministry_id) pieces.push(ministryName(role.scope_ministry_id));
-                if (role.scope_campus_id) pieces.push(campusName(role.scope_campus_id));
+                if (role.ministry_id) pieces.push(ministryName(role.ministry_id));
+                if (role.campus_id) pieces.push(campusName(role.campus_id));
                 return `<span class="chip">${escapeHtml(pieces.join(' - '))}</span>`;
             }).join('') || '<span class="chip warn">No role</span>';
             return `<article class="access-card">
                 <div class="access-top">
-                    <div><strong>${escapeHtml(user.displayName || user.email)}</strong><div class="mini">${escapeHtml(user.email)}${primary ? ` - person #${escapeHtml(primary.person_id)}` : ''}</div></div>
+                    <div><strong>${escapeHtml(user.displayName || user.email)}</strong><div class="mini">${escapeHtml(user.email)}${user.personId ? ` - person #${escapeHtml(user.personId)}` : ''}</div></div>
                     ${user.canAssignPeopleToManagedMinistries ? '<span class="chip">Can assign people</span>' : ''}
                 </div>
                 <div class="role-line">${roles}</div>

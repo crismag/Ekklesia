@@ -43,11 +43,10 @@ $auth = PortalServiceProvider::makeAuthService();
 
 echo "=== Step 1: login ===\n";
 $session = $auth->login($email, $password, ipAddress: '127.0.0.1', userAgent: 'smoke-auth');
-printf("  portal_user_id   : %d\n", $session->portalUserId);
+printf("  account_id       : %d\n", $session->accountId);
 printf("  email            : %s\n", $session->email);
 printf("  display_name     : %s\n", $session->displayName ?? '(none)');
-printf("  primary_person   : %s\n", $session->primaryPersonId === null ? '(unlinked)' : (string) $session->primaryPersonId);
-printf("  person_links     : [%s]\n", implode(', ', array_map('strval', $session->personLinks)));
+printf("  person_id        : %s\n", $session->personId === null ? '(unlinked)' : (string) $session->personId);
 printf("  session_token    : %s…\n", substr($session->sessionToken, 0, 12));
 printf("  expires_at       : %s\n", $session->expiresAt->format('Y-m-d H:i:s'));
 

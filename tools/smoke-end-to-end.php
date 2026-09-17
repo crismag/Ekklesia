@@ -6,8 +6,8 @@ declare(strict_types=1);
  * End-to-end smoke: portal auth → resolved ActorContext → schedule grid.
  *
  * Proves the full chain works:
- *   PortalAuthAdapter (mdb DB)  →  AuthService.login           → AuthSession
- *   PortalAuthAdapter (mdb DB)  →  AuthService.resolveActor    → ActorContext
+ *   SqlAuthAdapter (mdb DB)     →  AuthService.login           → AuthSession
+ *   SqlAuthAdapter (mdb DB)     →  AuthService.resolveActor    → ActorContext
  *   PortalRequestContext        →  optional currentCampusId override
  *   ChurchCrmScheduleAdapter (churchcrm DB) ← ScheduleService.getScheduleGrid
  *
@@ -49,8 +49,8 @@ $reqctx   = new PortalRequestContext($auth);
 echo "=== Login ===\n";
 $session = $auth->login($email, $password, ipAddress: '127.0.0.1', userAgent: 'smoke-end-to-end');
 printf("  user=%d  primary_person=%s  token=%s…\n",
-    $session->portalUserId,
-    $session->primaryPersonId === null ? '(none)' : (string) $session->primaryPersonId,
+    $session->accountId,
+    $session->personId === null ? '(none)' : (string) $session->personId,
     substr($session->sessionToken, 0, 12),
 );
 

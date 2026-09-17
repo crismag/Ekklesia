@@ -6,9 +6,9 @@ declare(strict_types=1);
  * Smoke check: member-facing availability CRUD.
  *
  * Path:
- *   PortalAuthAdapter (mdb)      →  AuthService.login          → AuthSession
- *   PortalAuthAdapter (mdb)      →  AuthService.resolveActor   → ActorContext
- *   PortalAvailabilityAdapter    ←  AvailabilityService.create / list / delete
+ *   SqlAuthAdapter (mdb)         →  AuthService.login          → AuthSession
+ *   SqlAuthAdapter (mdb)         →  AuthService.resolveActor   → ActorContext
+ *   SqlAvailabilityAdapter       ←  AvailabilityService.create / list / delete
  *
  * Usage:
  *   php tools/smoke-availability.php <email> <password>
@@ -45,11 +45,11 @@ $controller = new AvailabilityController($availability, $reqctx);
 echo "=== Login ===\n";
 $session = $auth->login($email, $password, ipAddress: '127.0.0.1', userAgent: 'smoke-availability');
 printf("  user=%d  primary_person=%s\n",
-    $session->portalUserId,
-    $session->primaryPersonId === null ? '(none)' : (string) $session->primaryPersonId,
+    $session->accountId,
+    $session->personId === null ? '(none)' : (string) $session->personId,
 );
 
-if ($session->primaryPersonId === null) {
+if ($session->personId === null) {
     fwrite(STDERR, "FAIL: portal user has no person link\n");
     $auth->logout($session->sessionToken);
     exit(1);

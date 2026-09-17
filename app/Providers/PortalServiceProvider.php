@@ -8,8 +8,8 @@ use App\Adapters\ChurchCRM\ChurchCrmCalendarAdapter;
 use App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter;
 use App\Adapters\ChurchCRM\ChurchCrmEventAdapter;
 use App\Adapters\ChurchCRM\ChurchCrmScheduleAdapter;
-use App\Adapters\Portal\PortalAuthAdapter;
-use App\Adapters\Portal\PortalAvailabilityAdapter;
+use App\Adapters\Sql\SqlAuthAdapter;
+use App\Adapters\Sql\SqlAvailabilityAdapter;
 use App\Contracts\AuthAdapter;
 use App\Contracts\AuthRepository;
 use App\Contracts\CalendarAdapter;
@@ -67,9 +67,9 @@ final class PortalServiceProvider
             MinistryRepository::class     => DefaultMinistryRepository::class,
             MinistryAdapter::class        => ChurchCrmMinistryAdapter::class,
             AuthRepository::class         => DefaultAuthRepository::class,
-            AuthAdapter::class            => PortalAuthAdapter::class,
+            AuthAdapter::class            => SqlAuthAdapter::class,
             AvailabilityRepository::class => DefaultAvailabilityRepository::class,
-            AvailabilityAdapter::class    => PortalAvailabilityAdapter::class,
+            AvailabilityAdapter::class    => SqlAvailabilityAdapter::class,
         ];
     }
 
@@ -119,7 +119,7 @@ final class PortalServiceProvider
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
 
         return new \App\Services\Calendar\SavedViewService(
-            new \App\Adapters\Portal\PortalSavedViewAdapter(),
+            new \App\Adapters\Sql\SqlSavedViewAdapter(),
         );
     }
 
@@ -223,7 +223,7 @@ final class PortalServiceProvider
             $ministryRepo = new \App\Repositories\DefaultMinistryRepository(
                 new \App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter($db)
             );
-            $portalAuth = new \App\Adapters\Portal\PortalAuthAdapter(\App\Core\Database\MembersConnection::get());
+            $portalAuth = new \App\Adapters\Sql\SqlAuthAdapter(\App\Core\Database\MembersConnection::get());
         } catch (\Throwable) {
             $assigner = null;
             $ministryRepo = null;
@@ -280,7 +280,7 @@ final class PortalServiceProvider
     }
 
     /**
-     * System user administration (portal_users + role assignments). Direct-PDO on
+     * System user administration (user_accounts + role assignments). Direct-PDO on
      * the portal DB, using the same PasswordHasher as login. No ChurchCRM dependency.
      */
     public static function makeSystemUserService(): \App\Services\SystemUserService
@@ -304,13 +304,13 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for AvailabilityService.
-     * Wires:  MembersConnection → PortalAvailabilityAdapter → DefaultAvailabilityRepository → AvailabilityService
+     * Wires:  MembersConnection → SqlAvailabilityAdapter → DefaultAvailabilityRepository → AvailabilityService
      */
     public static function makeAvailabilityService(): AvailabilityService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
         $pdo = MembersConnection::get();
-        $adapter = new PortalAvailabilityAdapter($pdo);
+        $adapter = new SqlAvailabilityAdapter($pdo);
         $repository = new DefaultAvailabilityRepository($adapter);
         return new AvailabilityService($repository);
     }
@@ -331,24 +331,21 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for AuthService.
-     * Wires:  MembersConnection → PortalAuthAdapter → DefaultAuthRepository → AuthService
+     * Wires:  MembersConnection → SqlAuthAdapter → DefaultAuthRepository → AuthService
      */
     public static function makeAuthService(): AuthService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $portalPdo = MembersConnection::get();
-        $authAdapter = new PortalAuthAdapter($portalPdo);
+        $membersPdo = MembersConnection::get();
+        $authAdapter = new SqlAuthAdapter($membersPdo);
         $authRepository = new DefaultAuthRepository($authAdapter);
-        $churchCrmPdo = MembersConnection::get();
-        $ministryAdapter = new ChurchCrmMinistryAdapter($churchCrmPdo);
+        $ministryAdapter = new ChurchCrmMinistryAdapter($membersPdo);
         $ministryRepository = new DefaultMinistryRepository($ministryAdapter);
-        // ChurchCRM identity resolver lets AuthService accept email or mobile
-        // as a username and provision portal_users automatically when the
+        // The person identity resolver lets AuthService accept email or mobile
+        // as a username and provision user_accounts automatically when the
         // submitted password matches the default ChristLike#<FNI><LNI>#2026!
-        // formula. Falls back to null gracefully if ChurchCRM is unavailable.
-        $identityResolver = $churchCrmPdo !== null
-            ? new \App\Services\ChurchCrmIdentityResolver($churchCrmPdo)
-            : null;
+        // formula.
+        $identityResolver = new \App\Services\PersonIdentityResolver($membersPdo);
         return new AuthService(
             $authRepository,
             $ministryRepository,
