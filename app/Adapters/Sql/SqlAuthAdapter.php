@@ -297,30 +297,25 @@ final class SqlAuthAdapter implements AuthAdapter
         return (int) $this->connection->lastInsertId();
     }
 
-    public function findUserByPersonId(int $personId): ?array
+    public function listUsersForPerson(int $personId): array
     {
-        // Several logins may share a person; the oldest one is the person's.
         $stmt = $this->connection->prepare(
             'SELECT id, email, password_hash, is_active, display_name, must_change_password
                FROM user_accounts
               WHERE person_id = :pid
-              ORDER BY id ASC
-              LIMIT 1'
+              ORDER BY id ASC'
         );
         $stmt->bindValue(':pid', $personId, PDO::PARAM_INT);
         $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
-            return null;
-        }
-        return [
+
+        return array_map(static fn (array $row): array => [
             'id'                   => (int) $row['id'],
             'email'                => (string) $row['email'],
             'password_hash'        => (string) $row['password_hash'],
             'is_active'            => (int) $row['is_active'] === 1,
             'display_name'         => $row['display_name'] !== null ? (string) $row['display_name'] : null,
             'must_change_password' => (int) $row['must_change_password'] === 1,
-        ];
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
     public function setMustChangePassword(int $accountId, bool $value): void

@@ -6,10 +6,12 @@ namespace App\Services;
 
 use App\Contracts\AuthRepository;
 use App\Contracts\MinistryRepository;
+use App\Contracts\PersonContactDirectory;
 use App\Core\ActorContext;
 use App\Core\PortalPermission;
 use App\Core\Security\PasswordHasher;
 use App\DTO\Auth\AuthSession;
+use App\Exceptions\LoginChoiceRequired;
 use App\Exceptions\PermissionDenied;
 use App\Exceptions\ValidationFailed;
 use DateTimeImmutable;
@@ -44,7 +46,7 @@ final readonly class AuthService
         private MinistryRepository $ministryRepository,
         private PasswordHasher $hasher,
         private int $sessionLifetimeSeconds = 60 * 60 * 12,   // 12 hours default
-        private ?\App\Services\PersonIdentityResolver $identityResolver = null,
+        private ?PersonContactDirectory $identityResolver = null,
     ) {
     }
 
@@ -78,19 +80,15 @@ final readonly class AuthService
             }
         }
 
-        // 2. Lookup the lowercased identifier in user_accounts. Existing flow.
-        $user = $this->repository->findUserByEmail(strtolower($identifier));
+        // 2. A login already linked to this sign-in identity: authenticate that
+        //    login and nothing else. No person matching.
+        $loginKey = self::loginKeyFor($identifier);
+        $user = $this->repository->findUserByEmail($loginKey);
         if ($user !== null) {
             if (!$user['is_active']) {
                 throw new PermissionDenied('Account is inactive.');
             }
             if (!$this->hasher->verify($plainPassword, $user['password_hash'])) {
-                // Existing portal account but wrong password — try the
-                // person-record fallback (admin may have reset their default).
-                $fallback = $this->tryPersonFallback($identifier, $plainPassword);
-                if ($fallback !== null) {
-                    return $this->finalizeLogin($fallback, $ipAddress, $userAgent);
-                }
                 throw new PermissionDenied('Invalid credentials.');
             }
             $mustChange = $this->repository->isMustChangePassword($user['id']);
@@ -102,12 +100,12 @@ final readonly class AuthService
             ], $ipAddress, $userAgent);
         }
 
-        // 3. No user_accounts row — try the person identity resolver. If the
-        //    submitted password matches the default ChristLike#<FNI><LNI>#2026!
-        //    formula, auto-provision the account.
-        $fallback = $this->tryPersonFallback($identifier, $plainPassword);
-        if ($fallback !== null) {
-            return $this->finalizeLogin($fallback, $ipAddress, $userAgent);
+        // 3. No login has this identity; it may be a contact detail on people
+        //    records. Those can be shared, so every match is considered and none
+        //    is picked for the user.
+        $session = $this->loginThroughContact($identifier, $plainPassword, $ipAddress, $userAgent);
+        if ($session !== null) {
+            return $session;
         }
 
         // Constant-time-ish dummy hash so we don't leak whether the username
@@ -117,78 +115,182 @@ final readonly class AuthService
     }
 
     /**
-     * Resolve the username against people records and (when the submitted password
-     * matches the default formula) provision a user_accounts row + roles.
-     *
-     * Returns the same partial-user shape finalizeLogin() expects, or null
-     * when no fallback path matched.
-     *
-     * @return array{
-     *   id:int,
-     *   email:string,
-     *   display_name:?string,
-     *   must_change_password:bool
-     * }|null
+     * The login key a sign-in identifier stands for: the email address, or for a
+     * phone number the phone-keyed address a phone login is stored under.
      */
-    private function tryPersonFallback(string $identifier, string $plainPassword): ?array
+    public static function loginKeyFor(string $identifier): string
+    {
+        $identifier = strtolower(trim($identifier));
+        if (PersonIdentityResolver::looksLikeEmail($identifier)) {
+            return $identifier;
+        }
+        $digits = PersonIdentityResolver::normalizePhone($identifier);
+        return strlen($digits) >= 7 ? 'phone+' . $digits . '@portal.local' : $identifier;
+    }
+
+    /**
+     * Sign in with an email or phone that is not itself a login, but is a contact
+     * detail on people records.
+     *
+     *  - The password opens one of those people's own logins: that login. More
+     *    than one: the user chooses (LoginChoiceRequired "account").
+     *  - Otherwise a first sign-in: people with this contact who have no login yet
+     *    and whose default password this is. Any at all: the user confirms or
+     *    chooses (LoginChoiceRequired "claim"). None: null.
+     *
+     * The name on the sign-in is never used to decide who someone is.
+     */
+    private function loginThroughContact(string $identifier, string $plainPassword, ?string $ipAddress, ?string $userAgent): ?AuthSession
     {
         if ($this->identityResolver === null) {
             return null;
         }
-        $identity = $this->identityResolver->resolveByIdentifier($identifier);
-        if ($identity === null) {
+        $people = $this->identityResolver->peopleWithContact($identifier);
+        if ($people === []) {
             return null;
         }
 
-        $existing = $this->repository->findUserByPersonId($identity['personId']);
-        if ($existing !== null) {
-            // Already provisioned. The default password is retired — the user
-            // may only authenticate with the password stored on their row.
-            // (Phone-login users reach this path because their user_accounts
-            // email is synthetic and never matches the raw identifier typed.)
-            if (!$existing['is_active']) {
-                return null;
+        $opened = [];
+        $unclaimed = [];
+        foreach ($people as $person) {
+            $accounts = $this->repository->listUsersForPerson($person['personId']);
+            if ($accounts === []) {
+                $unclaimed[] = $person;
+                continue;
             }
-            if (!$this->hasher->verify($plainPassword, $existing['password_hash'])) {
-                return null;
+            foreach ($accounts as $account) {
+                if ($account['is_active'] && $this->hasher->verify($plainPassword, $account['password_hash'])) {
+                    $opened[$account['id']] = ['account' => $account, 'person' => $person];
+                }
             }
-            $this->syncRolesFromPerson($existing['id'], $identity);
-            return [
-                'id'                   => $existing['id'],
-                'email'                => $existing['email'],
-                'display_name'         => $existing['display_name'],
-                'must_change_password' => $existing['must_change_password'],
-            ];
         }
 
-        // No portal row yet — first-time access requires the default password.
-        if (!hash_equals($identity['defaultPassword'], $plainPassword)) {
-            return null;
+        if (count($opened) === 1) {
+            $match = array_values($opened)[0];
+            return $this->loginAccountForPerson($match['account'], $match['person']['personId'], $ipAddress, $userAgent);
+        }
+        if (count($opened) > 1) {
+            throw new LoginChoiceRequired('account', $identifier, array_values(array_map(
+                static fn (array $m): array => ['id' => $m['account']['id'], 'name' => self::personName($m['person'])],
+                $opened,
+            )));
         }
 
-        // Pick a stable email-shaped key. Prefer real email, fall back to a
-        // synthetic phone-keyed value so we never violate the unique index.
-        $loginEmail = $identity['email'] !== null
-            ? strtolower($identity['email'])
-            : 'phone+' . \App\Services\PersonIdentityResolver::normalizePhone($identity['phone'] ?? '') . '@portal.local';
-        $displayName = trim(($identity['firstName'] ?? '') . ' ' . ($identity['lastName'] ?? ''));
-        if ($displayName === '') $displayName = null;
+        $claimable = [];
+        foreach ($unclaimed as $person) {
+            $identity = $this->identityResolver->identityFor($person['personId']);
+            if ($identity !== null && hash_equals($identity['defaultPassword'], $plainPassword)) {
+                $claimable[] = ['id' => $person['personId'], 'name' => self::personName($person)];
+            }
+        }
+        if ($claimable !== []) {
+            throw new LoginChoiceRequired('claim', $identifier, $claimable);
+        }
 
-        $hash = $this->hasher->hash($plainPassword);
-        $newId = $this->repository->provisionUserForPerson(
-            $loginEmail,
-            $hash,
-            $displayName,
-            $identity['personId'],
+        return null;
+    }
+
+    /**
+     * Finish a sign-in the user had to choose for (see LoginChoiceRequired).
+     *
+     * $offered is exactly what was offered, kept server-side by the caller; the
+     * choice must be one of them. Everything is checked again here, because time
+     * has passed: a first-time claim still needs the person to have this contact
+     * and no login, and the sign-in identity to be free.
+     *
+     * @param 'claim'|'account' $kind
+     * @param list<int> $offered
+     */
+    public function completeLoginChoice(
+        string $kind,
+        string $identifier,
+        array $offered,
+        int $chosenId,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): AuthSession {
+        if (!in_array($chosenId, $offered, true) || $this->identityResolver === null) {
+            throw new PermissionDenied('That choice is not available. Sign in again.');
+        }
+        $people = $this->identityResolver->peopleWithContact($identifier);
+
+        if ($kind === 'account') {
+            foreach ($people as $person) {
+                foreach ($this->repository->listUsersForPerson($person['personId']) as $account) {
+                    if ($account['id'] === $chosenId && $account['is_active']) {
+                        return $this->loginAccountForPerson($account, $person['personId'], $ipAddress, $userAgent);
+                    }
+                }
+            }
+            throw new PermissionDenied('That account is no longer available. Sign in again.');
+        }
+
+        if ($kind !== 'claim') {
+            throw new PermissionDenied('That choice is not available. Sign in again.');
+        }
+        $stillListed = array_filter($people, static fn (array $p): bool => $p['personId'] === $chosenId);
+        $identity = $this->identityResolver->identityFor($chosenId);
+        if ($stillListed === [] || $identity === null) {
+            throw new PermissionDenied('That person is no longer available. Sign in again.');
+        }
+        if ($this->repository->listUsersForPerson($chosenId) !== []) {
+            throw new PermissionDenied('That person already has a login. Sign in with it, or ask an administrator.');
+        }
+        $loginKey = self::loginKeyFor($identifier);
+        if ($this->repository->findUserByEmail($loginKey) !== null) {
+            throw new PermissionDenied('This email or phone is already linked to a login. Sign in again.');
+        }
+
+        $displayName = trim($identity['firstName'] . ' ' . $identity['lastName']);
+        $accountId = $this->repository->provisionUserForPerson(
+            $loginKey,
+            $this->hasher->hash($identity['defaultPassword']),
+            $displayName !== '' ? $displayName : null,
+            $chosenId,
         );
-        $this->syncRolesFromPerson($newId, $identity);
+        $this->syncRolesFromPerson($accountId, $identity);
+        $this->repository->recordAudit(
+            accountId: $accountId,
+            personId: $chosenId,
+            action: 'auth.login.claimed',
+            targetType: 'user_account',
+            targetId: (string) $accountId,
+            summary: 'First sign-in linked to the person the user chose',
+            details: ['identifier' => $loginKey, 'offered' => $offered],
+            ipAddress: $ipAddress,
+            userAgent: $userAgent,
+            at: new DateTimeImmutable(),
+        );
 
-        return [
-            'id'                   => $newId,
-            'email'                => $loginEmail,
-            'display_name'         => $displayName,
+        return $this->finalizeLogin([
+            'id'                   => $accountId,
+            'email'                => $loginKey,
+            'display_name'         => $displayName !== '' ? $displayName : null,
             'must_change_password' => true,
-        ];
+        ], $ipAddress, $userAgent);
+    }
+
+    /**
+     * @param array{id:int,email:string,display_name:?string,must_change_password:bool} $account
+     */
+    private function loginAccountForPerson(array $account, int $personId, ?string $ipAddress, ?string $userAgent): AuthSession
+    {
+        $identity = $this->identityResolver?->identityFor($personId);
+        if ($identity !== null) {
+            $this->syncRolesFromPerson($account['id'], $identity);
+        }
+        return $this->finalizeLogin([
+            'id'                   => $account['id'],
+            'email'                => $account['email'],
+            'display_name'         => $account['display_name'],
+            'must_change_password' => $account['must_change_password'],
+        ], $ipAddress, $userAgent);
+    }
+
+    /** @param array{firstName:string,lastName:string} $person */
+    private static function personName(array $person): string
+    {
+        return trim($person['firstName'] . ' ' . $person['lastName']);
     }
 
     /**
@@ -619,6 +721,19 @@ final readonly class AuthService
             $accountId = $this->createUser($email, $password, $displayName);
         } else {
             $accountId = (int) $user['id'];
+            // A login belongs to one person. Several people may share this email
+            // as contact information, but giving one of them access must not
+            // take the existing login away from the person it is linked to.
+            $linkedPersonId = (int) ($this->repository->loadUserProfile($accountId)['person_id'] ?? 0);
+            if (($personId ?? 0) > 0 && $linkedPersonId > 0 && $linkedPersonId !== (int) $personId) {
+                $owner = $this->identityResolver?->identityFor($linkedPersonId);
+                $ownerName = $owner !== null ? trim($owner['firstName'] . ' ' . $owner['lastName']) : 'person #' . $linkedPersonId;
+                throw new ValidationFailed(sprintf(
+                    'The login %s already belongs to %s. Use a different email for this person.',
+                    $email,
+                    $ownerName,
+                ));
+            }
             if ($displayName !== null && trim($displayName) !== '') {
                 $this->repository->updateDisplayName($accountId, trim($displayName));
             }

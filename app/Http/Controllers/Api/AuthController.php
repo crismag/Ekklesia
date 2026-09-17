@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\DTO\Auth\AuthSession;
+use App\Exceptions\LoginChoiceRequired;
+use App\Exceptions\PermissionDenied;
 use App\Exceptions\ValidationFailed;
 use App\Http\Requests\PortalRequestContext;
 use App\Services\AuthService;
@@ -34,13 +37,82 @@ final readonly class AuthController
             throw new ValidationFailed('Email and password are required.');
         }
 
-        $session = $this->authService->login(
-            email: $email,
-            plainPassword: $password,
+        try {
+            $session = $this->authService->login(
+                email: $email,
+                plainPassword: $password,
+                ipAddress: $request['_remote_addr'] ?? null,
+                userAgent: $request['_user_agent'] ?? null,
+            );
+        } catch (LoginChoiceRequired $choice) {
+            // The sign-in checked out but could belong to more than one person.
+            // Keep what was offered on the server, so the choice can only be one
+            // of these, and ask the user.
+            self::startSession();
+            $_SESSION[self::CHOICE_KEY] = [
+                'kind'       => $choice->kind,
+                'identifier' => $choice->identifier,
+                'offered'    => array_map(static fn (array $c): int => $c['id'], $choice->choices),
+                'expires'    => time() + self::CHOICE_LIFETIME_SECONDS,
+            ];
+            return [
+                'choiceRequired' => true,
+                'kind'           => $choice->kind,
+                'message'        => $choice->getMessage(),
+                'choices'        => $choice->choices,
+            ];
+        }
+
+        return $this->startedSession($session, $request);
+    }
+
+    /**
+     * POST /api/login/choose
+     *
+     * Body: { "id": <person id or account id from the offered choices> }
+     * Completes a sign-in that needed the user to confirm or choose who they are.
+     * The offer is single-use and expires after a few minutes.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    public function choose(array $request): array
+    {
+        self::startSession();
+        $offer = $_SESSION[self::CHOICE_KEY] ?? null;
+        unset($_SESSION[self::CHOICE_KEY]);
+        if (!is_array($offer) || (int) ($offer['expires'] ?? 0) < time()) {
+            throw new PermissionDenied('That sign-in has expired. Sign in again.');
+        }
+
+        $session = $this->authService->completeLoginChoice(
+            kind: (string) $offer['kind'],
+            identifier: (string) $offer['identifier'],
+            offered: array_map('intval', (array) $offer['offered']),
+            chosenId: (int) ($request['id'] ?? 0),
             ipAddress: $request['_remote_addr'] ?? null,
             userAgent: $request['_user_agent'] ?? null,
         );
 
+        return $this->startedSession($session, $request);
+    }
+
+    private const CHOICE_KEY = 'login_choice';
+    private const CHOICE_LIFETIME_SECONDS = 600;
+
+    private static function startSession(): void
+    {
+        if (PHP_SAPI !== 'cli' && session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    private function startedSession(AuthSession $session, array $request): array
+    {
         $expiresUnix = $session->expiresAt->getTimestamp();
         $cookiePath  = ((string) ($request['_base_path'] ?? '')) . '/';
         if (PHP_SAPI !== 'cli') {

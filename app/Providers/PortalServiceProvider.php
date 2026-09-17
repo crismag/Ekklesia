@@ -342,9 +342,8 @@ final class PortalServiceProvider
         $ministryAdapter = new SqlMinistryAdapter($membersPdo);
         $ministryRepository = new DefaultMinistryRepository($ministryAdapter);
         // The person identity resolver lets AuthService accept email or mobile
-        // as a username and provision user_accounts automatically when the
-        // submitted password matches the default ChristLike#<FNI><LNI>#2026!
-        // formula.
+        // as a username, and offer a first login (default ChristLike#<FNI><LNI>#2026!
+        // password) to the people with that contact, for the user to choose.
         $identityResolver = new \App\Services\PersonIdentityResolver($membersPdo);
         return new AuthService(
             $authRepository,

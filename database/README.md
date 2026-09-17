@@ -136,6 +136,13 @@ Tables are grouped in the schema file the way they are here.
   People can hold several roles: an admin can also lead a ministry.
 - **Several logins may belong to one person** (`user_accounts.person_id` is not
   unique): the legacy data has role-test accounts for the same person.
+- **A contact detail is not a login.** `people.email` and phone numbers are
+  contact information and may be shared by a household. A login's own sign-in
+  identity is `user_accounts.email` (an email, or `phone+<digits>@portal.local`
+  for a phone login), which is unique and belongs to one person. A first sign-in
+  through a shared contact asks the user to confirm or choose which person they
+  are (`AuthService::completeLoginChoice`); after that the identity opens that
+  login directly.
 - **Change notes become the audit log.** All 74 legacy notes were automatic
   "edited / added to group / photo" records.
 - **Dropped as unused:** donations and pledges (0 rows), volunteer

@@ -92,20 +92,19 @@ interface AuthAdapter
     ): int;
 
     /**
-     * Look up an existing user_accounts row by its person. Used so
-     * a person who has already been provisioned (or who manually created an
-     * account) is matched without going through email/phone resolution again.
+     * Every login that belongs to a person, oldest first. A person may have
+     * several (one per sign-in identity).
      *
-     * @return array{
+     * @return list<array{
      *   id:int,
      *   email:string,
      *   password_hash:string,
      *   is_active:bool,
      *   display_name:?string,
      *   must_change_password:bool
-     * }|null
+     * }>
      */
-    public function findUserByPersonId(int $personId): ?array;
+    public function listUsersForPerson(int $personId): array;
 
     public function setMustChangePassword(int $accountId, bool $value): void;
 

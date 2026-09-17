@@ -24,6 +24,7 @@ declare(strict_types=1);
 
 $root = dirname(__DIR__, 2);
 require $root . '/app/Core/Security/PasswordHasher.php';
+require $root . '/app/Contracts/PersonContactDirectory.php';
 require $root . '/app/Services/PersonIdentityResolver.php';
 
 $membersDb = $argv[1] ?? (getenv('MEMBERS_DB') ?: 'christlikeness_members');

@@ -33,6 +33,11 @@ return [
         PortalServiceProvider::makeRequestContext(),
     ))->login($req),
 
+    'POST /api/login/choose' => fn (array $req) => (new AuthController(
+        PortalServiceProvider::makeAuthService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->choose($req),
+
     'POST /api/logout' => fn (array $req) => (new AuthController(
         PortalServiceProvider::makeAuthService(),
         PortalServiceProvider::makeRequestContext(),

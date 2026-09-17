@@ -36,6 +36,12 @@ require_once __DIR__ . '/_portal-shell.php';
         button { margin-top: 16px; width: 100%; min-height: 42px; padding: 10px 12px; background: var(--deep); color: #fff; border: 0; border-radius: 8px; font-weight: 900; cursor: pointer; font: inherit; }
         .err { margin-top: 12px; padding: 8px 10px; background: #ffebe9; border: 1px solid #ffc1ba; border-radius: 8px; color: #82071e; }
         .helper { margin-top: 14px; font-size: 12px; color: var(--muted); }
+        .choice-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; border: 0; }
+        .choice { display: flex; align-items: center; gap: 10px; margin: 0; min-height: 48px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-weight: 700; cursor: pointer; }
+        .choice:has(input:checked) { border-color: var(--deep); background: var(--soft, #eef4f0); }
+        .choice input { min-height: 0; width: 18px; height: 18px; accent-color: var(--deep); }
+        .choice:focus-within { outline: 2px solid var(--deep); outline-offset: 2px; }
+        .link-btn { background: transparent; color: var(--ink); border: 1px solid var(--line); margin-top: 8px; }
         
         @media (max-width: 760px) {
             .hero { grid-template-columns: 1fr; }
@@ -92,6 +98,15 @@ require_once __DIR__ . '/_portal-shell.php';
             <input type="hidden" name="_next" value="<?= $nextEsc ?>">
             <button type="submit">Sign in</button>
         </form>
+
+        <form class="panel panel-inner" id="choiceForm" hidden>
+            <h2 id="choiceTitle">Choose your Church Portal account</h2>
+            <p class="muted" id="choiceLead"></p>
+            <div class="err" id="choiceError" role="alert" hidden></div>
+            <fieldset class="choice-list" id="choiceList"></fieldset>
+            <button type="submit" id="choiceSubmit">Continue</button>
+            <button type="button" class="link-btn" id="choiceCancel">Use a different sign-in</button>
+        </form>
     </section>
 
     </main>
@@ -113,12 +128,84 @@ document.getElementById('loginForm').addEventListener('submit', async function (
     });
     const data = await res.json().catch(() => ({}));
     const basePath = <?= json_encode($basePath) ?>;
+    if (res.ok && data && data.choiceRequired) {
+        showChoice(data, form);
+        return;
+    }
     if (!res.ok) {
         const msg = (data && data.error) || ('Login failed (' + res.status + ').');
         const next = encodeURIComponent(form._next.value || (basePath + '/'));
         window.location = basePath + '/login?error=' + encodeURIComponent(msg) + '&next=' + next;
         return;
     }
+    finishSignIn(data, form);
+});
+
+// An email or phone can be shared by a household, so the server may ask which
+// person this sign-in is. It never picks one; the user confirms or chooses.
+function showChoice(data, loginForm) {
+    const choiceForm = document.getElementById('choiceForm');
+    const list = document.getElementById('choiceList');
+    const single = data.choices.length === 1;
+    const claim = data.kind === 'claim';
+    document.getElementById('choiceTitle').textContent = claim && single ? 'Is this you?' : 'Choose your Church Portal account';
+    document.getElementById('choiceLead').textContent = claim
+        ? (single
+            ? 'This email or phone is on the record below. Confirm it is you to create your login.'
+            : 'This email or phone is shared by more than one person. Choose who you are; this login will belong to them from now on.')
+        : 'Your password opens more than one account that uses this email or phone. Choose which one to open.';
+    document.getElementById('choiceSubmit').textContent = claim && single ? 'Yes, this is me' : 'Continue';
+    list.replaceChildren();
+    data.choices.forEach(function (choice, i) {
+        const label = document.createElement('label');
+        label.className = 'choice';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'choice';
+        input.value = String(choice.id);
+        input.required = true;
+        if (single) { input.checked = true; }
+        label.append(input, document.createTextNode(choice.name));
+        list.append(label);
+    });
+    list.setAttribute('aria-label', 'People');
+    loginForm.hidden = true;
+    choiceForm.hidden = false;
+    choiceForm.dataset.next = loginForm._next.value;
+    (list.querySelector('input:checked') || list.querySelector('input')).focus();
+}
+
+document.getElementById('choiceCancel').addEventListener('click', function () {
+    document.getElementById('choiceForm').hidden = true;
+    const loginForm = document.getElementById('loginForm');
+    loginForm.hidden = false;
+    loginForm.password.value = '';
+    loginForm.email.focus();
+});
+
+document.getElementById('choiceForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const choiceForm = e.currentTarget;
+    const picked = choiceForm.querySelector('input[name=choice]:checked');
+    const errorBox = document.getElementById('choiceError');
+    if (!picked) { return; }
+    const res = await fetch(<?= json_encode($basePath . '/api/login/choose') ?>, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+        body: new URLSearchParams({ id: picked.value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        errorBox.textContent = (data && data.error) || ('Sign-in failed (' + res.status + ').');
+        errorBox.hidden = false;
+        return;
+    }
+    finishSignIn(data, { _next: { value: choiceForm.dataset.next || '' } });
+});
+
+function finishSignIn(data, form) {
+    const basePath = <?= json_encode($basePath) ?>;
     // First-login flow: account flagged as must-change-password.
     // Send the user to the password change page, preserving the intended destination.
     if (data && data.mustChangePassword) {
@@ -127,7 +214,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
         return;
     }
     window.location = form._next.value || (basePath + '/my-schedule');
-});
+}
 </script>
 </body>
 </html>

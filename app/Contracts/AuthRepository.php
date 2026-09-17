@@ -78,16 +78,19 @@ interface AuthRepository
     ): int;
 
     /**
-     * @return array{
+     * Every login that belongs to a person, oldest first. A person may have
+     * several (one per sign-in identity).
+     *
+     * @return list<array{
      *   id:int,
      *   email:string,
      *   password_hash:string,
      *   is_active:bool,
      *   display_name:?string,
      *   must_change_password:bool
-     * }|null
+     * }>
      */
-    public function findUserByPersonId(int $personId): ?array;
+    public function listUsersForPerson(int $personId): array;
 
     public function setMustChangePassword(int $accountId, bool $value): void;
 

@@ -96,9 +96,9 @@ final class DefaultAuthRepository implements AuthRepository
         return $this->adapter->provisionUserForPerson($email, $passwordHash, $displayName, $personId);
     }
 
-    public function findUserByPersonId(int $personId): ?array
+    public function listUsersForPerson(int $personId): array
     {
-        return $this->adapter->findUserByPersonId($personId);
+        return $this->adapter->listUsersForPerson($personId);
     }
 
     public function setMustChangePassword(int $accountId, bool $value): void
