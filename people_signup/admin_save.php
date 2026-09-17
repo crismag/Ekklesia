@@ -2,8 +2,8 @@
 /**
  * People Sign-Up — inline field save endpoint (standalone, token-gated).
  * Accepts one {id, field, value} edit from admin_review.php, validates against a
- * strict whitelist, updates the single column, and returns JSON. Never touches
- * the main member tables.
+ * strict whitelist, updates the single column of visitor_registrations, and
+ * returns JSON. Never touches the member database.
  */
 declare(strict_types=1);
 
@@ -28,22 +28,21 @@ if ($id <= 0) {
     sg_json(['ok' => false, 'error' => 'Bad row id'], 400);
 }
 
-$STATUSES = ['new', 'reviewed', 'duplicate', 'migrated', 'rejected'];
+$STATUSES = ['new', 'reviewed', 'duplicate', 'promoted', 'rejected'];
 // Whitelist: field => ['type', extra]. Nothing outside this can be written.
 $TEXT_REQUIRED = ['first_name' => 60, 'last_name' => 60, 'city' => 80];
 $TEXT_OPTIONAL = [
-    'middle_name' => 60, 'nick_name' => 60, 'email' => 120, 'phone' => 40,
-    'address' => 160, 'address2' => 160, 'state' => 60, 'zip' => 20, 'country' => 60,
+    'middle_name' => 60, 'preferred_name' => 60, 'email' => 120, 'phone' => 40,
+    'address_line1' => 160, 'address_line2' => 160, 'region' => 60, 'postal_code' => 20, 'country' => 60,
     'reason_for_visit' => 120, 'invited_by' => 120, 'church_background' => 255,
-    'visit_notes' => 255, 'admin_notes' => 65535,
+    'visit_notes' => 255, 'reviewer_notes' => 65535,
     'facebook' => 120, 'linkedin' => 120, 'twitter' => 120,
 ];
 $INT_RANGE = [
     'birth_year'  => [1900, (int) date('Y')],
     'birth_month' => [1, 12],
     'birth_day'   => [1, 31],
-    'matched_member_id' => [1, PHP_INT_MAX],
-    'member_type' => [1, 3],
+    'matched_person_id' => [1, PHP_INT_MAX],
     'is_married'  => [0, 1],
 ];
 $FLOAT_RANGE = ['latitude' => [-90, 90], 'longitude' => [-180, 180]];
@@ -67,7 +66,12 @@ try {
         }
         $store = $val === '' ? null : $val;
     } elseif ($field === 'gender') {
-        $store = in_array($val, ['1', '2'], true) ? (int) $val : null;
+        $store = in_array($val, ['male', 'female'], true) ? $val : null;
+    } elseif ($field === 'member_type_name') {
+        if ($val !== '' && !in_array($val, sg_member_type_names(), true)) {
+            sg_json(['ok' => false, 'error' => 'Unknown member type.'], 422);
+        }
+        $store = $val === '' ? null : $val;
     } elseif (isset($INT_RANGE[$field])) {
         if ($val === '') {
             $store = null;
@@ -89,7 +93,7 @@ try {
             if ($n < $lo || $n > $hi) { sg_json(['ok' => false, 'error' => 'Out of range.'], 422); }
             $store = $n;
         }
-    } elseif ($field === 'migration_status') {
+    } elseif ($field === 'status') {
         if (!in_array($val, $STATUSES, true)) {
             sg_json(['ok' => false, 'error' => 'Bad status.'], 422);
         }
@@ -99,8 +103,11 @@ try {
     }
 
     $db = sg_db();
-    $stmt = $db->prepare("UPDATE people_signup_temp SET `$field` = :v WHERE id = :id");
-    $stmt->execute([':v' => $store, ':id' => $id]);
+    // $field is from the whitelist above, never from the request as-is.
+    // A status change is a review decision: stamp reviewed_at.
+    $reviewed = $field === 'status' && $store !== 'new' ? ', reviewed_at = :now' : '';
+    $stmt = $db->prepare("UPDATE visitor_registrations SET \"$field\" = :v, updated_at = :now$reviewed WHERE id = :id");
+    $stmt->execute([':v' => $store, ':now' => signup_now(), ':id' => $id]);
 } catch (Throwable $ex) {
     error_log('[people_signup admin_save] ' . $ex->getMessage());
     sg_json(['ok' => false, 'error' => 'Save failed.'], 500);

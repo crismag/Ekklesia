@@ -49,17 +49,17 @@
       });
   }
 
-  var NO_IMPORT = { migrated: 1, rejected: 1, duplicate: 1 };
+  var NO_IMPORT = { promoted: 1, rejected: 1, duplicate: 1 };
   function syncRowImport(select) {
     var row = select.closest('tr');
     if (!row) return;
-    var btn = row.querySelector('[data-migrate-id]');
+    var btn = row.querySelector('[data-promote-id]');
     var chk = row.querySelector('.rowchk');
     var blocked = !!NO_IMPORT[select.value];
     if (btn && !btn.classList.contains('done')) {
       btn.disabled = blocked;
-      btn.title = blocked ? (select.value.charAt(0).toUpperCase() + select.value.slice(1) +
-        " rows can't be imported. Change status to enable.") : '';
+      btn.title = blocked ? (select.options[select.selectedIndex].text +
+        " rows can't be promoted. Change status to enable.") : '';
     }
     if (chk) { chk.disabled = blocked; if (blocked) chk.checked = false; }
   }
@@ -68,7 +68,7 @@
     var t = e.target;
     if (t && t.hasAttribute && t.hasAttribute('data-field')) {
       save(t);
-      if (t.getAttribute('data-field') === 'migration_status') syncRowImport(t);
+      if (t.getAttribute('data-field') === 'status') syncRowImport(t);
     }
   });
   // Enter commits text inputs (and moves focus out); Escape reverts.
@@ -84,18 +84,22 @@
     if (t && t.hasAttribute && t.hasAttribute('data-field') && t.tagName === 'INPUT') save(t);
   }, true);
 
-  // ---- Migration ----------------------------------------------------------
-  function clsValue() {
-    var s = document.getElementById('cls');
+  // ---- Promotion ----------------------------------------------------------
+  function statusValue() {
+    var s = document.getElementById('membership_status_id');
     return s ? s.value : '1';
   }
+  function statusText() {
+    var s = document.getElementById('membership_status_id');
+    return s ? s.selectedOptions[0].text : '';
+  }
 
-  function migrate(ids, force) {
+  function promote(ids, force) {
     if (!ids.length) return Promise.resolve();
     var body = new URLSearchParams();
     body.set('csrf', CSRF);
     body.set('ids', ids.join(','));
-    body.set('cls', clsValue());
+    body.set('membership_status_id', statusValue());
     if (force) body.set('force', '1');
     return fetch('migrate.php', {
       method: 'POST',
@@ -106,29 +110,39 @@
   }
 
   function handleResult(res) {
-    if (!res || !res.ok) { alert('Migration failed. Please reload and try again.'); return; }
+    if (!res || !res.ok) { alert('Promotion failed. Please reload and try again.'); return; }
     var blocked = (res.results || []).filter(function (x) { return !x.ok && x.needs_review; });
     if (blocked.length) {
       var ids = blocked.map(function (x) { return x.id; });
       if (confirm(blocked.length + ' row(s) look like existing members (' +
-          blocked.map(function (x) { return '#' + x.id + '→member ' + x.member_id; }).join(', ') +
-          ').\n\nOK = import anyway (creates a new person). Cancel = leave them to link manually.')) {
-        migrate(ids, true).then(function () { location.reload(); });
+          blocked.map(function (x) { return '#' + x.id + '→member ' + x.person_id; }).join(', ') +
+          ').\n\nOK = promote anyway (creates a new person). Cancel = leave them to link manually.')) {
+        promote(ids, true).then(handleErrors).then(function () { location.reload(); });
         return;
       }
     }
+    handleErrors(res);
     location.reload();
   }
 
-  var single = document.querySelectorAll('[data-migrate-id]');
+  // Failures other than a member match (e.g. the person was created but the
+  // registration could not be marked promoted) must be seen, not lost to a reload.
+  function handleErrors(res) {
+    var failed = ((res && res.results) || []).filter(function (x) { return !x.ok && !x.needs_review; });
+    if (failed.length) {
+      alert(failed.map(function (x) { return '#' + x.id + ': ' + x.error; }).join('\n'));
+    }
+    return res;
+  }
+
+  var single = document.querySelectorAll('[data-promote-id]');
   Array.prototype.forEach.call(single, function (btn) {
     btn.addEventListener('click', function () {
-      var id = parseInt(btn.getAttribute('data-migrate-id'), 10);
-      if (!confirm('Import row #' + id + ' into ChurchCRM as "' +
-          (document.getElementById('cls').selectedOptions[0].text) + '"?')) return;
-      btn.disabled = true; btn.textContent = 'Importing…';
-      migrate([id], false).then(handleResult).catch(function () {
-        btn.disabled = false; btn.textContent = 'Migrate ▸';
+      var id = parseInt(btn.getAttribute('data-promote-id'), 10);
+      if (!confirm('Promote row #' + id + ' to the member records as "' + statusText() + '"?')) return;
+      btn.disabled = true; btn.textContent = 'Promoting…';
+      promote([id], false).then(handleResult).catch(function () {
+        btn.disabled = false; btn.textContent = 'Promote ▸';
       });
     });
   });
@@ -138,15 +152,14 @@
     Array.prototype.forEach.call(document.querySelectorAll('.rowchk'), function (c) { c.checked = checkAll.checked; });
   });
 
-  var bulk = document.getElementById('bulkMigrate');
+  var bulk = document.getElementById('bulkPromote');
   if (bulk) bulk.addEventListener('click', function () {
     var ids = Array.prototype.map.call(document.querySelectorAll('.rowchk:checked'), function (c) { return parseInt(c.value, 10); });
-    if (!ids.length) { alert('Tick at least one row to migrate.'); return; }
-    if (!confirm('Import ' + ids.length + ' selected row(s) into ChurchCRM as "' +
-        document.getElementById('cls').selectedOptions[0].text + '"?')) return;
-    bulk.disabled = true; bulk.textContent = 'Importing…';
-    migrate(ids, false).then(handleResult).catch(function () {
-      bulk.disabled = false; bulk.textContent = 'Migrate selected ▸';
+    if (!ids.length) { alert('Tick at least one row to promote.'); return; }
+    if (!confirm('Promote ' + ids.length + ' selected row(s) to the member records as "' + statusText() + '"?')) return;
+    bulk.disabled = true; bulk.textContent = 'Promoting…';
+    promote(ids, false).then(handleResult).catch(function () {
+      bulk.disabled = false; bulk.textContent = 'Promote selected ▸';
     });
   });
 
@@ -156,7 +169,7 @@
     if (!b) return;
     e.preventDefault();
     var row = b.closest('tr');
-    var input = row ? row.querySelector('[data-field="matched_member_id"]') : null;
+    var input = row ? row.querySelector('[data-field="matched_person_id"]') : null;
     if (input) { input.value = b.getAttribute('data-suggest-id'); save(input); }
   });
 })();

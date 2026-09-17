@@ -1,6 +1,6 @@
 <?php
 /**
- * People Sign-Up — advanced form (standalone). Full ChurchCRM-style fields.
+ * People Sign-Up — advanced form (standalone). Full member-record fields.
  * Posts to submit_signup.php with mode=advanced. Same review-table destination.
  */
 declare(strict_types=1);
@@ -59,15 +59,15 @@ $thisYear = (int) date('Y');
         <div class="row2">
           <div class="field"><label for="middle_name">Middle name <span class="hint">(optional)</span></label>
             <input type="text" id="middle_name" name="middle_name" maxlength="60" value="<?= $ov('middle_name') ?>"></div>
-          <div class="field"><label for="nick_name">Preferred / nickname <span class="hint">(optional)</span></label>
-            <input type="text" id="nick_name" name="nick_name" maxlength="60" value="<?= $ov('nick_name') ?>"></div>
+          <div class="field"><label for="preferred_name">Preferred / nickname <span class="hint">(optional)</span></label>
+            <input type="text" id="preferred_name" name="preferred_name" maxlength="60" value="<?= $ov('preferred_name') ?>"></div>
         </div>
 
         <div class="field"><label for="gender">Gender <span class="hint">(optional)</span></label>
           <select id="gender" name="gender">
             <option value=""></option>
-            <option value="1"<?= $osel('gender', '1') ?>>Male</option>
-            <option value="2"<?= $osel('gender', '2') ?>>Female</option>
+            <option value="male"<?= $osel('gender', 'male') ?>>Male</option>
+            <option value="female"<?= $osel('gender', 'female') ?>>Female</option>
           </select></div>
 
         <div class="row2">
@@ -77,17 +77,17 @@ $thisYear = (int) date('Y');
             <input type="tel" id="phone" name="phone" autocomplete="tel" maxlength="40" value="<?= $ov('phone') ?>"></div>
         </div>
 
-        <div class="field"><label for="address">Street address <span class="hint">(optional)</span></label>
-          <input type="text" id="address" name="address" autocomplete="address-line1" maxlength="160" value="<?= $ov('address') ?>"></div>
+        <div class="field"><label for="address_line1">Street address <span class="hint">(optional)</span></label>
+          <input type="text" id="address_line1" name="address_line1" autocomplete="address-line1" maxlength="160" value="<?= $ov('address_line1') ?>"></div>
         <div class="row2">
           <div class="field"><label for="city">Town / City <span class="req">*</span></label>
             <input type="text" id="city" name="city" autocomplete="address-level2" maxlength="80" required value="<?= $ov('city') ?>"></div>
-          <div class="field"><label for="state">State / Province <span class="hint">(optional)</span></label>
-            <input type="text" id="state" name="state" autocomplete="address-level1" maxlength="60" value="<?= $ov('state') ?>"></div>
+          <div class="field"><label for="region">State / Province <span class="hint">(optional)</span></label>
+            <input type="text" id="region" name="region" autocomplete="address-level1" maxlength="60" value="<?= $ov('region') ?>"></div>
         </div>
         <div class="row2">
-          <div class="field"><label for="zip">Postal code <span class="hint">(optional)</span></label>
-            <input type="text" id="zip" name="zip" autocomplete="postal-code" maxlength="20" value="<?= $ov('zip') ?>"></div>
+          <div class="field"><label for="postal_code">Postal code <span class="hint">(optional)</span></label>
+            <input type="text" id="postal_code" name="postal_code" autocomplete="postal-code" maxlength="20" value="<?= $ov('postal_code') ?>"></div>
           <div class="field"><label for="country">Country <span class="hint">(optional)</span></label>
             <input type="text" id="country" name="country" autocomplete="country-name" maxlength="60" value="<?= $ov('country') ?>"></div>
         </div>

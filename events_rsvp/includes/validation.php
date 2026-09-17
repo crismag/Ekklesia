@@ -27,10 +27,10 @@ if (!function_exists('rv_v_required')) {
         if (!rv_v_month_opt($in['birth_month'] ?? null)) { $errors[] = 'Birth month looks invalid.'; }
         if (!rv_v_year_opt($in['birth_year'] ?? null))   { $errors[] = 'Birth year looks invalid.'; }
 
-        $party = (int) ($in['party_count'] ?? 1);
+        $party = (int) ($in['party_size'] ?? 1);
         if ($party < 1 || $party > 50) { $errors[] = 'Party count must be between 1 and 50.'; }
 
-        $status = (string) ($in['rsvp_status'] ?? 'yes');
+        $status = (string) ($in['response'] ?? 'yes');
         $allowed = rv_cfg('features.allow_maybe', true) ? ['yes', 'no', 'maybe'] : ['yes', 'no'];
         if (!in_array($status, $allowed, true)) { $errors[] = 'Invalid RSVP status.'; }
 

@@ -5,7 +5,8 @@
  * Single-record model: the first page INSERTs a staged row and remembers its id
  * in the session; later pages (advanced, extra) UPDATE that same row, touching
  * only the fields they submit. Confident existing members are turned away and
- * never staged. Nothing here writes to the main member tables.
+ * never staged. Registrations live in the visitors database; nothing here writes
+ * to the member database.
  */
 declare(strict_types=1);
 
@@ -25,10 +26,10 @@ $backTo  = $backMap[$mode] ?? 'index.php';
 
 // Field groups. Only keys actually POSTed are considered (so each page updates
 // just its own fields on an UPDATE).
-$TEXT  = ['first_name', 'last_name', 'middle_name', 'nick_name', 'city', 'address', 'address2',
-         'state', 'zip', 'country', 'email', 'phone', 'reason_for_visit', 'invited_by',
-         'church_background', 'visit_notes', 'facebook', 'linkedin', 'twitter'];
-$INT   = ['gender', 'birth_year', 'birth_month', 'birth_day', 'member_type', 'is_married'];
+$TEXT  = ['first_name', 'last_name', 'middle_name', 'preferred_name', 'city', 'address_line1', 'address_line2',
+         'region', 'postal_code', 'country', 'email', 'phone', 'reason_for_visit', 'invited_by',
+         'church_background', 'visit_notes', 'facebook', 'linkedin', 'twitter', 'gender', 'member_type_name'];
+$INT   = ['birth_year', 'birth_month', 'birth_day', 'is_married'];
 $FLOAT = ['latitude', 'longitude'];
 
 $in = [];        // normalized values, for validation + display
@@ -65,7 +66,7 @@ try {
     $db = sg_db();
     $existing = null;
     if ($rowId > 0) {
-        $q = $db->prepare('SELECT * FROM people_signup_temp WHERE id = :id AND source = "signup"');
+        $q = $db->prepare("SELECT * FROM visitor_registrations WHERE id = :id AND source = 'signup'");
         $q->execute([':id' => $rowId]);
         $existing = $q->fetch() ?: null;
     }
@@ -91,7 +92,7 @@ if ($errors) {
 // ---- Member guard (only when creating a NEW record) ----------------------
 if (!$isUpdate) {
     try {
-        $match = sg_match_members($db, $in);
+        $match = sg_match_members(sg_members_db(), $in);
     } catch (Throwable $ex) {
         error_log('[people_signup] match failed: ' . $ex->getMessage());
         $fail(['Something went wrong on our end. Please try again in a moment.']);
@@ -125,8 +126,8 @@ if (!$isUpdate) {
 }
 
 // ---- Write ---------------------------------------------------------------
-$status = $isUpdate ? (string) $existing['migration_status'] : 'new';
-$matched = $isUpdate ? ($existing['matched_member_id'] !== null ? (int) $existing['matched_member_id'] : null) : null;
+$status = $isUpdate ? (string) $existing['status'] : 'new';
+$matched = $isUpdate ? ($existing['matched_person_id'] !== null ? (int) $existing['matched_person_id'] : null) : null;
 
 try {
     if (!$isUpdate) {
@@ -137,28 +138,30 @@ try {
         if (!empty($dupes['exact'])) { $status = 'duplicate'; }
 
         // Auto-detect Member Type from birth year (+ married) when not supplied.
-        if (!array_key_exists('member_type', $posted) || $posted['member_type'] === null) {
-            $posted['member_type'] = sg_detect_member_type($in['birth_year'], (int) $in['is_married'] === 1);
+        if (!array_key_exists('member_type_name', $posted) || $posted['member_type_name'] === null) {
+            $posted['member_type_name'] = sg_detect_member_type($in['birth_year'], (int) $in['is_married'] === 1);
         }
 
         $cols = array_keys($posted);
-        $cols[] = 'source'; $cols[] = 'migration_status'; $cols[] = 'matched_member_id';
+        $cols[] = 'source'; $cols[] = 'status'; $cols[] = 'matched_person_id'; $cols[] = 'created_at'; $cols[] = 'updated_at';
         $ph = array_map(static fn ($c) => ':' . $c, $cols);
-        $sql = 'INSERT INTO people_signup_temp (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')';
+        $sql = 'INSERT INTO visitor_registrations (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')';
         $bind = [];
         foreach ($posted as $c => $v) { $bind[':' . $c] = $v; }
         $bind[':source'] = 'signup';
-        $bind[':migration_status'] = $status;
-        $bind[':matched_member_id'] = $matched;
+        $bind[':status'] = $status;
+        $bind[':matched_person_id'] = $matched;
+        $bind[':created_at'] = $bind[':updated_at'] = signup_now();
         $db->prepare($sql)->execute($bind);
         $rowId = (int) $db->lastInsertId();
     } else {
         if ($posted) {
-            $sets = implode(', ', array_map(static fn ($c) => "`$c` = :$c", array_keys($posted)));
+            $sets = implode(', ', array_map(static fn ($c) => "\"$c\" = :$c", array_keys($posted)));
             $bind = [];
             foreach ($posted as $c => $v) { $bind[':' . $c] = $v; }
             $bind[':id'] = $rowId;
-            $db->prepare("UPDATE people_signup_temp SET $sets WHERE id = :id")->execute($bind);
+            $bind[':updated_at'] = signup_now();
+            $db->prepare("UPDATE visitor_registrations SET $sets, updated_at = :updated_at WHERE id = :id")->execute($bind);
         }
     }
 } catch (Throwable $ex) {
@@ -171,7 +174,7 @@ sg_csrf_rotate();
 
 // Reload the full row so the next page pre-fills completely.
 try {
-    $r = $db->prepare('SELECT * FROM people_signup_temp WHERE id = :id');
+    $r = $db->prepare('SELECT * FROM visitor_registrations WHERE id = :id');
     $r->execute([':id' => $rowId]);
     $_SESSION['sg_prefill'] = $r->fetch() ?: [];
 } catch (Throwable $ex) {

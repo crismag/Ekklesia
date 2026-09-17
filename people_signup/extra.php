@@ -31,12 +31,12 @@ $ov = static function (string $k) use ($old): string { return e($old[$k] ?? '');
 // Member Type: use stored value, else auto-detect from birth year (+ married).
 $birthYear = isset($old['birth_year']) ? (int) $old['birth_year'] : null;
 $married   = (int) ($old['is_married'] ?? 0) === 1;
-$mtStored  = isset($old['member_type']) && $old['member_type'] !== null ? (int) $old['member_type'] : null;
+$mtStored  = isset($old['member_type_name']) && $old['member_type_name'] !== null && $old['member_type_name'] !== '' ? (string) $old['member_type_name'] : null;
 $mtDetected = sg_detect_member_type($birthYear, $married);
 $mtCurrent  = $mtStored ?? $mtDetected;
 
 $country  = ($old['country'] ?? '') !== '' ? (string) $old['country'] : $defCountry;
-$province = ($old['state'] ?? '') !== '' ? (string) $old['state'] : $defProvince;
+$province = ($old['region'] ?? '') !== '' ? (string) $old['region'] : $defProvince;
 
 $csrf = sg_csrf();
 ?><!doctype html>
@@ -62,20 +62,20 @@ $csrf = sg_csrf();
       <?php endif; ?>
 
       <form method="post" action="submit_signup.php" id="signupForm" novalidate
-            data-birth-year="<?= $birthYear ?: '' ?>" data-mt-detected="<?= $mtDetected ?: '' ?>">
+            data-birth-year="<?= $birthYear ?: '' ?>" data-mt-detected="<?= e($mtDetected ?? '') ?>">
         <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
         <input type="hidden" name="mode" value="extra">
 
         <!-- Member Type -->
         <div class="field">
-          <label for="member_type">Member type
+          <label for="member_type_name">Member type
             <span class="hint" id="mtHint"><?= $mtStored === null && $mtDetected ? '(auto-detected — adjust if needed)' : '(adjust if needed)' ?></span>
           </label>
-          <select id="member_type" name="member_type">
+          <select id="member_type_name" name="member_type_name">
             <option value="">—</option>
-            <option value="1"<?= $mtCurrent === 1 ? ' selected' : '' ?>>Radical</option>
-            <option value="2"<?= $mtCurrent === 2 ? ' selected' : '' ?>>Trailblazer</option>
-            <option value="3"<?= $mtCurrent === 3 ? ' selected' : '' ?>>G&amp;A</option>
+            <?php foreach (sg_member_type_names() as $mt): ?>
+            <option value="<?= e($mt) ?>"<?= $mtCurrent === $mt ? ' selected' : '' ?>><?= e($mt) ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
 
@@ -90,17 +90,17 @@ $csrf = sg_csrf();
 
         <!-- Address -->
         <div class="field">
-          <label for="zip">Postal code</label>
-          <input type="text" id="zip" name="zip" autocomplete="postal-code" maxlength="20" value="<?= $ov('zip') ?>">
+          <label for="postal_code">Postal code</label>
+          <input type="text" id="postal_code" name="postal_code" autocomplete="postal-code" maxlength="20" value="<?= $ov('postal_code') ?>">
         </div>
         <div class="row2">
           <div class="field">
-            <label for="address">Street address</label>
-            <input type="text" id="address" name="address" autocomplete="address-line1" maxlength="160" value="<?= $ov('address') ?>">
+            <label for="address_line1">Street address</label>
+            <input type="text" id="address_line1" name="address_line1" autocomplete="address-line1" maxlength="160" value="<?= $ov('address_line1') ?>">
           </div>
           <div class="field">
-            <label for="address2">Unit / Apt <span class="hint">(optional)</span></label>
-            <input type="text" id="address2" name="address2" autocomplete="address-line2" maxlength="160" value="<?= $ov('address2') ?>">
+            <label for="address_line2">Unit / Apt <span class="hint">(optional)</span></label>
+            <input type="text" id="address_line2" name="address_line2" autocomplete="address-line2" maxlength="160" value="<?= $ov('address_line2') ?>">
           </div>
         </div>
 
@@ -113,8 +113,8 @@ $csrf = sg_csrf();
             <input type="text" id="city" name="city" autocomplete="address-level2" maxlength="80" value="<?= $ov('city') ?>">
           </div>
           <div class="field">
-            <label for="state">Province / State</label>
-            <input type="text" id="state" name="state" autocomplete="address-level1" maxlength="60" value="<?= e($province) ?>">
+            <label for="region">Province / State</label>
+            <input type="text" id="region" name="region" autocomplete="address-level1" maxlength="60" value="<?= e($province) ?>">
           </div>
         </div>
         <div class="field">

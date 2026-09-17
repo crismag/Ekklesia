@@ -2,11 +2,11 @@
 /**
  * Events RSVP — submission handler (standalone).
  *
- * Flow: reload the event server-side (authoritative), validate, match against
- * ChurchCRM members. A strong (exact) member match is recorded as a member
- * attendance row. Anyone else is saved to the flat people_signup_temp review
- * table (source=rsvp) and recorded as a new_signup attendance row — never
- * auto-inserted into the main member tables.
+ * Flow: reload the event server-side from the member database (authoritative),
+ * validate, match against members. A strong (exact) member match is recorded
+ * as a member RSVP (person_id). Anyone else is saved as a visitor registration
+ * (source=rsvp) and the RSVP points at it (visitor_registration_id) — never
+ * auto-inserted into the member database. RSVPs live in the visitors database.
  */
 declare(strict_types=1);
 
@@ -20,8 +20,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     exit;
 }
 
-$eventId     = (int) ($_POST['event_id'] ?? 0);
-$eventSource = rv_str($_POST['event_source'] ?? 'churchcrm');
+$eventId = (int) ($_POST['event_id'] ?? 0);
 
 $in = [
     'first_name'  => rv_str($_POST['first_name'] ?? ''),
@@ -31,8 +30,8 @@ $in = [
     'city'        => rv_str($_POST['city'] ?? ''),
     'birth_month' => rv_intn($_POST['birth_month'] ?? null),
     'birth_year'  => rv_intn($_POST['birth_year'] ?? null),
-    'rsvp_status' => rv_str($_POST['rsvp_status'] ?? 'yes'),
-    'party_count' => (int) ($_POST['party_count'] ?? 1),
+    'response'    => rv_str($_POST['response'] ?? 'yes'),
+    'party_size'  => (int) ($_POST['party_size'] ?? 1),
     'notes'       => rv_str($_POST['notes'] ?? ''),
 ];
 
@@ -50,7 +49,8 @@ if (!rv_csrf_ok($_POST['csrf'] ?? null)) {
 
 try {
     $db = rv_db();
-    $event = rv_load_event($db, $eventId);
+    $members = rv_members_db();
+    $event = rv_load_event($members, $eventId);
 } catch (Throwable $ex) {
     error_log('[events_rsvp] submit event load failed: ' . $ex->getMessage());
     $fail(['We could not load this event. Please try again.']);
@@ -64,80 +64,78 @@ if ($errors) {
     $fail($errors);
 }
 
-if ($in['party_count'] < 1) { $in['party_count'] = 1; }
-if ($in['party_count'] > 50) { $in['party_count'] = 50; }
+if ($in['party_size'] < 1) { $in['party_size'] = 1; }
+if ($in['party_size'] > 50) { $in['party_size'] = 50; }
 
 try {
-    $match = rv_match_members($db, $in);
+    $match = rv_match_members($members, $in);
 
-    $personType = 'new_signup';
-    $memberId   = null;
-    $signupId   = null;
+    $personId       = null;
+    $registrationId = null;
 
     if (!empty($match['exact'])) {
         // Confident match → record against the existing member.
-        $personType = 'member';
-        $memberId   = (int) $match['exact'][0]['id'];
+        $personId = (int) $match['exact'][0]['id'];
     } else {
         // Not a confident member. If this same person already RSVP'd to this event
-        // (staged earlier), reuse that signup row instead of piling up duplicates.
+        // (registered earlier), reuse that registration instead of piling up duplicates.
         $selfDupes = rv_find_signup_dupes($db, $in, $eventId);
         if (!empty($selfDupes['exact'])) {
-            $signupId = (int) $selfDupes['exact'][0]['id'];
-            $personType = 'new_signup';
+            $registrationId = (int) $selfDupes['exact'][0]['id'];
         } else {
-            // Stage a fresh review-table row.
-            $signupStatus  = !empty($match['possible']) ? 'duplicate' : 'new';
+            // A fresh registration for review.
+            $status        = !empty($match['possible']) ? 'duplicate' : 'new';
             $possibleMatch = !empty($match['possible']) ? (int) $match['possible'][0]['id'] : null;
             $st = $db->prepare(
-                'INSERT INTO people_signup_temp
+                'INSERT INTO visitor_registrations
                     (first_name, last_name, city, email, phone, birth_year, birth_month,
-                     source, source_event_id, migration_status, matched_member_id)
+                     source, source_event_id, status, matched_person_id, created_at, updated_at)
                  VALUES
-                    (:fn, :ln, :city, :email, :phone, :by, :bm,
-                     :source, :ev, :status, :matched)'
+                    (:first_name, :last_name, :city, :email, :phone, :birth_year, :birth_month,
+                     :source, :source_event_id, :status, :matched_person_id, :now, :now)'
             );
             $st->execute([
-                ':fn'      => $in['first_name'],
-                ':ln'      => $in['last_name'],
-                ':city'    => $in['city'] !== '' ? $in['city'] : null,
-                ':email'   => $in['email'] !== '' ? $in['email'] : null,
-                ':phone'   => $in['phone'] !== '' ? $in['phone'] : null,
-                ':by'      => $in['birth_year'],
-                ':bm'      => $in['birth_month'],
-                ':source'  => 'rsvp',
-                ':ev'      => $eventId,
-                ':status'  => $signupStatus,
-                ':matched' => $possibleMatch,
+                ':first_name'        => $in['first_name'],
+                ':last_name'         => $in['last_name'],
+                ':city'              => $in['city'] !== '' ? $in['city'] : null,
+                ':email'             => $in['email'] !== '' ? $in['email'] : null,
+                ':phone'             => $in['phone'] !== '' ? $in['phone'] : null,
+                ':birth_year'        => $in['birth_year'],
+                ':birth_month'       => $in['birth_month'],
+                ':source'            => 'rsvp',
+                ':source_event_id'   => $eventId,
+                ':status'            => $status,
+                ':matched_person_id' => $possibleMatch,
+                ':now'               => rsvp_now(),
             ]);
-            $signupId = (int) $db->lastInsertId();
+            $registrationId = (int) $db->lastInsertId();
         }
     }
 
     $st = $db->prepare(
-        'INSERT INTO rsvp_attendance
-            (event_source, event_id, person_type, member_id, signup_id,
-             first_name_snapshot, last_name_snapshot, city_snapshot, email_snapshot, phone_snapshot,
-             rsvp_status, party_count, notes)
+        'INSERT INTO visitor_rsvps
+            (event_id, occurrence_id, visitor_registration_id, person_id,
+             first_name, last_name, city, email, phone,
+             response, party_size, notes, created_at, updated_at)
          VALUES
-            (:src, :ev, :ptype, :member, :signup,
-             :fn, :ln, :city, :email, :phone,
-             :status, :party, :notes)'
+            (:event_id, :occurrence_id, :visitor_registration_id, :person_id,
+             :first_name, :last_name, :city, :email, :phone,
+             :response, :party_size, :notes, :now, :now)'
     );
     $st->execute([
-        ':src'    => $event['source'],
-        ':ev'     => (int) $event['id'],
-        ':ptype'  => $personType,
-        ':member' => $memberId,
-        ':signup' => $signupId,
-        ':fn'     => $in['first_name'],
-        ':ln'     => $in['last_name'],
-        ':city'   => $in['city'] !== '' ? $in['city'] : null,
-        ':email'  => $in['email'] !== '' ? $in['email'] : null,
-        ':phone'  => $in['phone'] !== '' ? $in['phone'] : null,
-        ':status' => $in['rsvp_status'],
-        ':party'  => $in['party_count'],
-        ':notes'  => $in['notes'] !== '' ? $in['notes'] : null,
+        ':event_id'                => (int) $event['id'],
+        ':occurrence_id'           => $event['occurrence_id'],
+        ':visitor_registration_id' => $registrationId,
+        ':person_id'               => $personId,
+        ':first_name'              => $in['first_name'],
+        ':last_name'               => $in['last_name'],
+        ':city'                    => $in['city'] !== '' ? $in['city'] : null,
+        ':email'                   => $in['email'] !== '' ? $in['email'] : null,
+        ':phone'                   => $in['phone'] !== '' ? $in['phone'] : null,
+        ':response'                => $in['response'],
+        ':party_size'              => $in['party_size'],
+        ':notes'                   => $in['notes'] !== '' ? $in['notes'] : null,
+        ':now'                     => rsvp_now(),
     ]);
 } catch (Throwable $ex) {
     error_log('[events_rsvp] submit failed: ' . $ex->getMessage());
@@ -151,8 +149,8 @@ $_SESSION['rv_last'] = [
     'event_time'  => $event['time'],
     'location'    => $event['location'],
     'name'        => trim($in['first_name'] . ' ' . $in['last_name']),
-    'status'      => $in['rsvp_status'],
-    'party'       => $in['party_count'],
+    'status'      => $in['response'],
+    'party'       => $in['party_size'],
 ];
 rv_csrf_rotate();
 

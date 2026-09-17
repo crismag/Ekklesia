@@ -16,7 +16,7 @@ $eventId = (int) ($_GET['event_id'] ?? 0);
 $event   = null;
 if ($eventId > 0) {
     try {
-        $event = rv_load_event(rv_db(), $eventId);
+        $event = rv_load_event(rv_members_db(), $eventId);
     } catch (Throwable $ex) {
         error_log('[events_rsvp] event load failed: ' . $ex->getMessage());
         $event = null;
@@ -94,18 +94,17 @@ $fmtTime = static function (?string $t): string {
       <form method="post" action="submit_rsvp.php" id="rsvpForm" novalidate>
         <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
         <input type="hidden" name="event_id" value="<?= (int) $event['id'] ?>">
-        <input type="hidden" name="event_source" value="<?= e($event['source']) ?>">
 
         <div class="field">
           <label>Will you be joining us? <span class="req">*</span></label>
           <div class="seg<?= $allowMaybe ? '' : ' two' ?>">
-            <input type="radio" id="rs_yes" name="rsvp_status" value="yes"<?= $ochk('rsvp_status', 'yes', 'yes') ?>>
+            <input type="radio" id="rs_yes" name="response" value="yes"<?= $ochk('response', 'yes', 'yes') ?>>
             <label for="rs_yes">Yes, I'll be there</label>
             <?php if ($allowMaybe): ?>
-              <input type="radio" id="rs_maybe" name="rsvp_status" value="maybe"<?= $ochk('rsvp_status', 'maybe', 'yes') ?>>
+              <input type="radio" id="rs_maybe" name="response" value="maybe"<?= $ochk('response', 'maybe', 'yes') ?>>
               <label for="rs_maybe">Maybe</label>
             <?php endif; ?>
-            <input type="radio" id="rs_no" name="rsvp_status" value="no"<?= $ochk('rsvp_status', 'no', 'yes') ?>>
+            <input type="radio" id="rs_no" name="response" value="no"<?= $ochk('response', 'no', 'yes') ?>>
             <label for="rs_no">Can't make it</label>
           </div>
         </div>
@@ -163,12 +162,12 @@ $fmtTime = static function (?string $t): string {
         </div>
         <?php endif; ?>
 
-        <?php if (!empty($fields['party_count'])): ?>
+        <?php if (!empty($fields['party_size'])): ?>
         <div class="field">
-          <label for="party_count">How many in your party?</label>
+          <label for="party_size">How many in your party?</label>
           <div class="stepper">
             <button type="button" data-step="-1" aria-label="Fewer">&minus;</button>
-            <input type="number" id="party_count" name="party_count" inputmode="numeric" min="1" max="50" value="<?= e($old['party_count'] ?? '1') ?>">
+            <input type="number" id="party_size" name="party_size" inputmode="numeric" min="1" max="50" value="<?= e($old['party_size'] ?? '1') ?>">
             <button type="button" data-step="1" aria-label="More">+</button>
           </div>
         </div>

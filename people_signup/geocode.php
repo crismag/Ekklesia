@@ -27,11 +27,11 @@ if (isset($_SESSION['sg_geo_last']) && ($now - (int) $_SESSION['sg_geo_last']) <
 }
 $_SESSION['sg_geo_last'] = $now;
 
-$street = sg_str($_POST['address'] ?? '');
-$unit   = sg_str($_POST['address2'] ?? '');
+$street = sg_str($_POST['address_line1'] ?? '');
+$unit   = sg_str($_POST['address_line2'] ?? '');
 $city   = sg_str($_POST['city'] ?? '');
-$state  = sg_str($_POST['state'] ?? '');
-$zip    = sg_str($_POST['zip'] ?? '');
+$state  = sg_str($_POST['region'] ?? '');
+$zip    = sg_str($_POST['postal_code'] ?? '');
 $country = sg_str($_POST['country'] ?? '') ?: (string) sg_cfg('defaults.country', 'Canada');
 
 if ($street === '' && $zip === '' && $city === '') {

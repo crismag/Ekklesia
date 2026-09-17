@@ -9,6 +9,7 @@ require_once __DIR__ . '/includes/admin_auth.php';
 rv_admin_gate();
 
 $db = rv_db();
+$members = rv_members_db();
 $flash = '';
 $ATT = ['registered', 'checked_in', 'no_show', 'cancelled'];
 
@@ -17,11 +18,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '')
         $flash = 'Session expired — please retry.';
     } else {
         $id  = (int) ($_POST['id'] ?? 0);
-        $new = (string) ($_POST['attendance_status'] ?? '');
+        $new = (string) ($_POST['attendance'] ?? '');
         if ($id > 0 && in_array($new, $ATT, true)) {
             try {
-                $st = $db->prepare('UPDATE rsvp_attendance SET attendance_status = :s WHERE id = :id');
-                $st->execute([':s' => $new, ':id' => $id]);
+                $st = $db->prepare('UPDATE visitor_rsvps SET attendance = :s, updated_at = :now WHERE id = :id');
+                $st->execute([':s' => $new, ':now' => rsvp_now(), ':id' => $id]);
                 $flash = "Updated #$id.";
             } catch (Throwable $ex) {
                 error_log('[events_rsvp admin] ' . $ex->getMessage());
@@ -30,31 +31,30 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '')
         }
     }
     $_SESSION['rv_admin_flash'] = $flash;
-    header('Location: admin_attendance.php?event_source=' . urlencode((string) ($_POST['event_source'] ?? '')) . '&event_id=' . (int) ($_POST['event_id'] ?? 0));
+    header('Location: admin_attendance.php?event_id=' . (int) ($_POST['event_id'] ?? 0));
     exit;
 }
 if (!empty($_SESSION['rv_admin_flash'])) { $flash = (string) $_SESSION['rv_admin_flash']; unset($_SESSION['rv_admin_flash']); }
 
-// Events that have received RSVPs (distinct source+id), newest activity first.
+// Events that have received RSVPs, newest activity first.
 $events = $db->query(
-    'SELECT event_source, event_id, COUNT(*) c, MAX(created_at) last
-       FROM rsvp_attendance GROUP BY event_source, event_id ORDER BY last DESC'
+    'SELECT event_id, COUNT(*) c, MAX(created_at) last
+       FROM visitor_rsvps GROUP BY event_id ORDER BY last DESC'
 )->fetchAll();
 
-$selSource = (string) ($_GET['event_source'] ?? ($events[0]['event_source'] ?? ''));
-$selId     = (int) ($_GET['event_id'] ?? ($events[0]['event_id'] ?? 0));
+$selId = (int) ($_GET['event_id'] ?? ($events[0]['event_id'] ?? 0));
 
 $rows = [];
 $tally = ['yes' => 0, 'maybe' => 0, 'no' => 0, 'people' => 0];
 $eventInfo = null;
 if ($selId > 0) {
-    $eventInfo = rv_load_event($db, $selId);
-    $st = $db->prepare('SELECT * FROM rsvp_attendance WHERE event_source = :s AND event_id = :id ORDER BY created_at DESC');
-    $st->execute([':s' => $selSource, ':id' => $selId]);
+    $eventInfo = rv_load_event($members, $selId);
+    $st = $db->prepare('SELECT * FROM visitor_rsvps WHERE event_id = :id ORDER BY created_at DESC');
+    $st->execute([':id' => $selId]);
     $rows = $st->fetchAll();
     foreach ($rows as $r) {
-        $tally[$r['rsvp_status']] = ($tally[$r['rsvp_status']] ?? 0) + 1;
-        if ($r['rsvp_status'] !== 'no') { $tally['people'] += max(1, (int) $r['party_count']); }
+        $tally[$r['response']] = ($tally[$r['response']] ?? 0) + 1;
+        if ($r['response'] !== 'no') { $tally['people'] += max(1, (int) $r['party_size']); }
     }
 }
 
@@ -95,18 +95,17 @@ $badge = ['registered' => '', 'checked_in' => 'b-in', 'no_show' => 'b-no', 'canc
   <?php else: ?>
     <form class="picker" method="get" onchange="this.submit()">
       <label for="ev" class="muted">Event:</label>
-      <select id="ev" name="event_id" onchange="var o=this.options[this.selectedIndex];document.getElementById('src').value=o.dataset.src;this.form.submit()">
+      <select id="ev" name="event_id" onchange="this.form.submit()">
         <?php foreach ($events as $ev):
-          $info = rv_load_event($db, (int) $ev['event_id']);
+          $info = rv_load_event($members, (int) $ev['event_id']);
           $label = $info['title'] ?? ('Event #' . (int) $ev['event_id']);
         ?>
-          <option value="<?= (int) $ev['event_id'] ?>" data-src="<?= e($ev['event_source']) ?>"
-            <?= ($selId === (int) $ev['event_id'] && $selSource === $ev['event_source']) ? 'selected' : '' ?>>
+          <option value="<?= (int) $ev['event_id'] ?>"
+            <?= $selId === (int) $ev['event_id'] ? 'selected' : '' ?>>
             <?= e($label) ?> — <?= (int) $ev['c'] ?> response<?= (int) $ev['c'] === 1 ? '' : 's' ?>
           </option>
         <?php endforeach; ?>
       </select>
-      <input type="hidden" id="src" name="event_source" value="<?= e($selSource) ?>">
     </form>
 
     <?php if ($eventInfo): ?>
@@ -129,30 +128,29 @@ $badge = ['registered' => '', 'checked_in' => 'b-in', 'no_show' => 'b-no', 'canc
       <?php if (!$rows): ?><tr><td colspan="6" class="muted" style="text-align:center;padding:24px">No responses for this event.</td></tr><?php endif; ?>
       <?php foreach ($rows as $r): $rid = (int) $r['id']; ?>
         <tr>
-          <td><b><?= e(trim($r['first_name_snapshot'] . ' ' . $r['last_name_snapshot'])) ?></b>
-            <?php if ($r['city_snapshot']): ?><br><span class="muted"><?= e($r['city_snapshot']) ?></span><?php endif; ?></td>
-          <td><span class="r-<?= e($r['rsvp_status']) ?>"><?= e(ucfirst($r['rsvp_status'])) ?></span></td>
-          <td><?= (int) $r['party_count'] ?></td>
+          <td><b><?= e(trim($r['first_name'] . ' ' . $r['last_name'])) ?></b>
+            <?php if ($r['city']): ?><br><span class="muted"><?= e($r['city']) ?></span><?php endif; ?></td>
+          <td><span class="r-<?= e($r['response']) ?>"><?= e(ucfirst($r['response'])) ?></span></td>
+          <td><?= (int) $r['party_size'] ?></td>
           <td class="muted">
-            <?php if ($r['email_snapshot']): ?><?= e($r['email_snapshot']) ?><br><?php endif; ?>
-            <?php if ($r['phone_snapshot']): ?><?= e($r['phone_snapshot']) ?><br><?php endif; ?>
+            <?php if ($r['email']): ?><?= e($r['email']) ?><br><?php endif; ?>
+            <?php if ($r['phone']): ?><?= e($r['phone']) ?><br><?php endif; ?>
             <?php if ($r['notes']): ?>&ldquo;<?= e($r['notes']) ?>&rdquo;<?php endif; ?>
           </td>
           <td>
-            <span class="badge"><?= e($r['person_type']) ?></span>
-            <?php if ($r['member_id']): ?><br><span class="muted">member #<?= (int) $r['member_id'] ?></span>
-            <?php elseif ($r['signup_id']): ?><br><span class="muted">signup #<?= (int) $r['signup_id'] ?></span><?php endif; ?>
+            <span class="badge"><?= $r['person_id'] ? 'member' : 'visitor' ?></span>
+            <?php if ($r['person_id']): ?><br><span class="muted">member #<?= (int) $r['person_id'] ?></span>
+            <?php elseif ($r['visitor_registration_id']): ?><br><span class="muted">signup #<?= (int) $r['visitor_registration_id'] ?></span><?php endif; ?>
           </td>
           <td>
             <form method="post">
               <input type="hidden" name="csrf" value="<?= e($csrf) ?>">
               <input type="hidden" name="action" value="attendance">
               <input type="hidden" name="id" value="<?= $rid ?>">
-              <input type="hidden" name="event_source" value="<?= e($selSource) ?>">
               <input type="hidden" name="event_id" value="<?= $selId ?>">
-              <select name="attendance_status" onchange="this.form.submit()">
+              <select name="attendance" onchange="this.form.submit()">
                 <?php foreach ($ATT as $a): ?>
-                  <option value="<?= e($a) ?>"<?= $r['attendance_status'] === $a ? ' selected' : '' ?>><?= e(str_replace('_', ' ', $a)) ?></option>
+                  <option value="<?= e($a) ?>"<?= $r['attendance'] === $a ? ' selected' : '' ?>><?= e(str_replace('_', ' ', $a)) ?></option>
                 <?php endforeach; ?>
               </select>
             </form>
