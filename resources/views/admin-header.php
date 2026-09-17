@@ -18,36 +18,35 @@ $chromeJson = json_encode(
 
 $content = '';
 if (!$isAdmin) {
-    $content .= '<div class="read-only-banner">Read-only — only portal admins can save header changes.</div>';
+    $content .= '<div class="ek-alert" role="note">Only a portal-wide admin can change the brand.</div>';
 }
-$content .= '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>Brand</h2><p>Name shown beside the logo mark at the top of the sidebar, and as the home link\'s name.</p></div>' . admin_section_status_badge('Live') . '</div>'
-    . '<div class="admin-card-body">'
-    . '<div class="field-row">'
-    . '<div class="field"><label for="brandTitle">Brand title</label><input type="text" id="brandTitle" maxlength="60"></div>'
-    . '<div class="field"><label for="brandSubtitle">Brand subtitle (stored; not currently shown)</label><input type="text" id="brandSubtitle" maxlength="120"></div>'
+$content .= '<section class="ek-card" aria-labelledby="brandHeading">'
+    . '<div class="ek-card-head"><div><h2 id="brandHeading">Brand</h2><p>The product name at the top of the sidebar on every page. The church name from Church information is shown beneath it.</p></div></div>'
+    . '<div class="ek-card-body"><div class="ek-form">'
+    . '<div class="ek-field"><label for="brandTitle">Brand name</label><input class="ek-input" type="text" id="brandTitle" maxlength="60"></div>'
+    . '<div class="ek-field"><label for="brandSubtitle">Brand subtitle</label><input class="ek-input" type="text" id="brandSubtitle" maxlength="120" aria-describedby="brandSubtitleHint"><span class="ek-hint" id="brandSubtitleHint">Saved, but not shown at the moment: the sidebar shows the church name there instead.</span></div>'
     . '</div></div>'
     . '<div class="actions-bar">'
-    . '<div></div>'
-    . '<div style="display:flex;gap:8px;align-items:center"><span class="toast" id="hdrToast"></span><button class="button" id="saveBtn"' . ($isAdmin ? '' : ' aria-disabled="true"') . '>Save changes</button></div>'
+    . '<button class="ek-btn ek-btn-primary" type="button" id="saveBtn"' . ($isAdmin ? '' : ' aria-disabled="true"') . '>Save brand</button>'
+    . '<span class="toast" id="hdrToast" role="status"></span>'
     . '</div>'
-    . '</article>'
+    . '</section>'
 
     // Navigation used to be edited here as a row of top-bar links. Since the
     // workspace sidebar it comes from the workspace map, which follows each
     // person's access; a hand-edited list could not. Saying so is better than
     // an editor whose changes appear nowhere.
-    . '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>Navigation</h2><p>The sidebar lists the portal\'s workspaces and the pages in each.</p></div></div>'
-    . '<div class="admin-card-body" style="color:var(--muted);font-size:13px;line-height:1.5">'
-    . '<p style="margin:0">Navigation is no longer edited here. Every page shows the same workspace sidebar (the menu button opens it on phones), and each person sees only the pages their account can use.</p>'
-    . '</div></article>';
+    . '<section class="ek-card" aria-labelledby="navHeading">'
+    . '<div class="ek-card-head"><div><h2 id="navHeading">Navigation</h2><p>The sidebar lists the portal\'s workspaces and the pages in each.</p></div></div>'
+    . '<div class="ek-card-body" style="color:var(--muted);font-size:13px;line-height:1.5">'
+    . '<p style="margin:0">Navigation is not edited here. Every page shows the same workspace sidebar (the menu button opens it on phones), and each person sees only the pages their account can use.</p>'
+    . '</div></section>';
 
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'header',
-    'pageTitle' => 'Header · Admin', 'pageSubtitle' => 'Brand text.',
+    'pageTitle' => 'Header', 'pageSubtitle' => 'Brand text.',
     'sectionTitle' => 'Header',
-    'sectionDescription' => 'Edit the product name shown at the top of the sidebar on every page.',
+    'sectionDescription' => 'The product name shown at the top of the sidebar on every page.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);
 ?>

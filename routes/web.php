@@ -1123,23 +1123,16 @@ $webRoutes = [
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
-        $campuses = [];
-        $campusId = (int) ($req['campus_id'] ?? 0);
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['maintenance_flash'] ?? $_SESSION['people_flash'] ?? '');
         unset($_SESSION['maintenance_flash'], $_SESSION['people_flash']);
         $archives = [];
         // The view already hides everything from a non-admin, but it should not
-        // need to: archive metadata and the campus list are only fetched for an
-        // actor who is allowed to see them. Defence in depth — if the template
-        // is ever restructured, there is nothing in scope to leak.
+        // need to: archive metadata is only fetched for an actor who is allowed
+        // to see it. Defence in depth — if the template is ever restructured,
+        // there is nothing in scope to leak.
         $isMaintenanceAdmin = $actor !== null && !empty($actor['isPortalWideAdmin']);
         if ($isMaintenanceAdmin) {
-            try {
-                $campuses = \App\Providers\PortalServiceProvider::makePersonAdminService()->campuses();
-            } catch (\Throwable) {
-                $campuses = [];
-            }
             try {
                 $archives = \App\Providers\PortalServiceProvider::makeMaintenanceBackupService()->store()->listRecent();
             } catch (\Throwable) {

@@ -54,12 +54,19 @@ Portal-wide admins always see everything.
 
 ## Managing accounts (Users & access)
 
-Portal-wide admins manage logins on **Users & access** (under *Users & Access*):
+Portal-wide admins manage logins on **Admin → Users & access**. The list shows every
+login with the person it belongs to, its roles, whether it is active and when it last
+signed in; search and the filters find, for example, logins that must change their
+password or have never signed in. Open a login to change it:
 
-1. **Add a user** — enter an email, display name, and a password (min 12 characters). Optionally give them an initial role. New accounts are set to *must change password at next login* by default.
-2. **Assign roles** — add one or more roles per user, each optionally scoped to a campus and/or ministry.
-3. **Reset password** — set a new password for someone who's locked out.
-4. **Activate / deactivate** — turn access off without deleting the account.
+1. **Add a login** — enter an email, display name, and a password (min 12 characters). Optionally give it an initial role. New logins are set to *must change password at next sign-in* by default.
+2. **Link it to a person** — find the member record the login belongs to. A login belongs to one person: a login already linked to someone else, or a person who already has a login, is refused.
+3. **Assign roles** — add one or more roles, each optionally scoped to a campus and/or ministry.
+4. **Reset password** — set a new password for someone who's locked out.
+5. **Activate / deactivate** — turn access off without deleting the login.
+
+Every change made there is recorded, and **Admin → Activity history** shows who changed
+which login or record, and when.
 
 ### Safety guards
 

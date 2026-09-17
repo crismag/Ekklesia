@@ -18,32 +18,30 @@ $chromeJson = json_encode(
 
 $content = '';
 if (!$isAdmin) {
-    $content .= '<div class="read-only-banner">Read-only — only portal admins can save footer changes.</div>';
+    $content .= '<div class="ek-alert" role="note">Only a portal-wide admin can change the footer.</div>';
 }
-$content .= '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>Footer text</h2><p>Two slots — a left phrase and a right phrase. Either may be empty.</p></div>' . admin_section_status_badge('Live') . '</div>'
-    . '<div class="admin-card-body">'
+$content .= '<section class="ek-card" aria-labelledby="footerHeading">'
+    . '<div class="ek-card-head"><div><h2 id="footerHeading">Footer text</h2><p>A short phrase on the left and one on the right, at the bottom of every page. Either may be empty.</p></div></div>'
+    . '<div class="ek-card-body" style="display:grid;gap:var(--sp-3,12px)">'
     . '<div class="field-row">'
-    . '<div class="field"><label for="leftText">Left text</label><input type="text" id="leftText" maxlength="80"></div>'
-    . '<div class="field"><label for="rightText">Right text</label><input type="text" id="rightText" maxlength="120"></div>'
+    . '<div class="ek-field"><label for="leftText">Left</label><input class="ek-input" type="text" id="leftText" maxlength="80"></div>'
+    . '<div class="ek-field"><label for="rightText">Right</label><input class="ek-input" type="text" id="rightText" maxlength="120"></div>'
     . '</div>'
-    . '<label class="switch" style="margin-top:6px"><input type="checkbox" id="minimalCheckbox"> Minimal footer (single thin row, no border, no padding)</label>'
+    . '<label class="switch"><input type="checkbox" id="minimalCheckbox"> Minimal footer: one thin row, without the border and padding</label>'
     . '</div>'
-    . '<div class="actions-bar"><div></div><div style="display:flex;gap:8px;align-items:center"><span class="toast" id="ftrToast"></span><button class="button" id="saveBtn"' . ($isAdmin ? '' : ' aria-disabled="true"') . '>Save changes</button></div></div>'
-    . '</article>'
+    . '<div class="actions-bar"><button class="ek-btn ek-btn-primary" type="button" id="saveBtn"' . ($isAdmin ? '' : ' aria-disabled="true"') . '>Save footer</button><span class="toast" id="ftrToast" role="status"></span></div>'
+    . '</section>'
 
-    . '<article class="admin-card">'
-    . '<div class="admin-card-head"><div><h2>Live preview</h2></div></div>'
-    . '<div class="admin-card-body" style="padding:0">'
-    . '<div id="footerPreview" style="background:linear-gradient(180deg,var(--gradient-top,#0c2f28),var(--gradient-mid,#123b31));padding:24px"><div id="prevFooterMount"></div></div>'
-    . '</div>'
-    . '</article>';
+    . '<section class="ek-card" aria-labelledby="footerPreviewHeading">'
+    . '<div class="ek-card-head"><div><h2 id="footerPreviewHeading">Preview</h2><p>Updates as you type.</p></div></div>'
+    . '<div id="footerPreview" style="background:linear-gradient(180deg,var(--gradient-top,#0c2f28),var(--gradient-mid,#123b31));padding:24px;border-radius:0 0 var(--radius-lg,12px) var(--radius-lg,12px)"><div id="prevFooterMount"></div></div>'
+    . '</section>';
 
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'footer',
-    'pageTitle' => 'Footer · Admin', 'pageSubtitle' => 'Footer text + minimal toggle.',
+    'pageTitle' => 'Footer', 'pageSubtitle' => 'Footer text.',
     'sectionTitle' => 'Footer',
-    'sectionDescription' => 'Manage the global footer text. The minimal mode collapses it to a single thin row across every page.',
+    'sectionDescription' => 'The text at the bottom of every page.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);
 ?>
