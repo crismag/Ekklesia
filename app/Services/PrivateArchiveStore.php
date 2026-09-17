@@ -102,6 +102,12 @@ final class PrivateArchiveStore
         if ($relative === '' || str_contains($relative, '..')) {
             throw new InvalidArgumentException('Invalid archive path.');
         }
+        // Only archives this store wrote (YYYY/MM/<file>). The private folder also
+        // holds the live visitors database and other server-only files, which are
+        // not downloads.
+        if (!self::isArchivePath($relative)) {
+            throw new InvalidArgumentException('That archive file was not found.');
+        }
         $full = $this->root() . '/' . $relative;
         $root = realpath($this->root()) ?: $this->root();
         $root = rtrim($root, '/');
@@ -169,6 +175,9 @@ final class PrivateArchiveStore
             }
             $full = $file->getPathname();
             $rel = ltrim(str_replace('\\', '/', substr($full, strlen($root))), '/');
+            if (!self::isArchivePath($rel)) {
+                continue;
+            }
             $out[] = [
                 'relative' => $rel,
                 'filename' => $name,
@@ -227,5 +236,14 @@ final class PrivateArchiveStore
         // default (0664, group-writable). It holds metadata only, but there is
         // no reason for it to be looser than what it indexes.
         @chmod($path, 0640);
+    }
+
+    /**
+     * Whether a path relative to the store is one of its archives: a file directly
+     * inside a YYYY/MM folder, as allocate() names them.
+     */
+    public static function isArchivePath(string $relative): bool
+    {
+        return preg_match('#^\d{4}/\d{2}/[^/]+$#', $relative) === 1;
     }
 }
