@@ -45,7 +45,7 @@ test.describe('Authorization: HTML render ≠ API permission', () => {
       expect(isUnauthorizedStatus(res.status()) || res.status() === 400).toBeTruthy();
       if ((res.headers()['content-type'] ?? '').includes('json')) {
         const body = await res.json().catch(() => ({} as Record<string, unknown>));
-        expect(body.email ?? body.actorId ?? body.portalUserId).toBeFalsy();
+        expect(body.email ?? body.actorId ?? body.accountId).toBeFalsy();
       }
     });
   }

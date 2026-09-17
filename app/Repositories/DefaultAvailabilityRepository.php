@@ -26,9 +26,9 @@ final class DefaultAvailabilityRepository implements AvailabilityRepository
         return $this->adapter->findById($unavailabilityId);
     }
 
-    public function create(AvailabilityCommand $command, int $createdByPortalUserId, DateTimeImmutable $now): int
+    public function create(AvailabilityCommand $command, int $createdByAccountId, DateTimeImmutable $now): int
     {
-        return $this->adapter->create($command, $createdByPortalUserId, $now);
+        return $this->adapter->create($command, $createdByAccountId, $now);
     }
 
     public function delete(int $unavailabilityId): bool

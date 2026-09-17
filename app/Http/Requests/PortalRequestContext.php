@@ -15,7 +15,7 @@ use App\Services\AuthService;
  * Resolution order (first match wins):
  *   1. session_token in the request (from cookie or Authorization header)
  *      → AuthService::resolveActor() — produces a real ActorContext from
- *        the portal_users / portal_user_roles / portal_user_person_links rows.
+ *        the user_accounts / account_roles rows.
  *   2. Direct ActorContext fields in the request payload — used by tests and
  *      service-internal callers that already hold a context. Permissions
  *      default to ViewOwnAssignments only when nothing else is supplied.

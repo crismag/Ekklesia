@@ -30,7 +30,7 @@ final readonly class AuthService
 {
     /**
      * Hard-coded administrator username. Lets a deployment ship with a known
-     * way in even when no ChurchCRM person rows exist yet (and acts as the
+     * way in even when no person rows exist yet (and acts as the
      * "always works" recovery account). Password comes from
      * PORTAL_HARDCODED_ADMIN_PASSWORD env var, defaulting to the well-known
      * fallback below — operators MUST override the env in production.
@@ -44,7 +44,7 @@ final readonly class AuthService
         private MinistryRepository $ministryRepository,
         private PasswordHasher $hasher,
         private int $sessionLifetimeSeconds = 60 * 60 * 12,   // 12 hours default
-        private ?\App\Services\ChurchCrmIdentityResolver $identityResolver = null,
+        private ?\App\Services\PersonIdentityResolver $identityResolver = null,
     ) {
     }
 
@@ -65,7 +65,7 @@ final readonly class AuthService
         }
 
         // 1. Hard-coded "Church Admin" recovery account — always honored when
-        //    the env-configured password matches. Provisions a portal_users
+        //    the env-configured password matches. Provisions a user_accounts
         //    row keyed by HARDCODED_ADMIN_EMAIL so subsequent logins go down
         //    the normal path.
         if (strtolower($identifier) === self::HARDCODED_ADMIN_USERNAME
@@ -78,7 +78,7 @@ final readonly class AuthService
             }
         }
 
-        // 2. Lookup the lowercased identifier in portal_users. Existing flow.
+        // 2. Lookup the lowercased identifier in user_accounts. Existing flow.
         $user = $this->repository->findUserByEmail(strtolower($identifier));
         if ($user !== null) {
             if (!$user['is_active']) {
@@ -86,26 +86,26 @@ final readonly class AuthService
             }
             if (!$this->hasher->verify($plainPassword, $user['password_hash'])) {
                 // Existing portal account but wrong password — try the
-                // ChurchCRM fallback (admin may have reset their default).
-                $fallback = $this->tryChurchCrmFallback($identifier, $plainPassword);
+                // person-record fallback (admin may have reset their default).
+                $fallback = $this->tryPersonFallback($identifier, $plainPassword);
                 if ($fallback !== null) {
                     return $this->finalizeLogin($fallback, $ipAddress, $userAgent);
                 }
                 throw new PermissionDenied('Invalid credentials.');
             }
-            $mustChange = $this->repository->isMustChangePassword($user['portal_user_id']);
+            $mustChange = $this->repository->isMustChangePassword($user['id']);
             return $this->finalizeLogin([
-                'portal_user_id'       => $user['portal_user_id'],
+                'id'                   => $user['id'],
                 'email'                => $user['email'],
                 'display_name'         => $user['display_name'],
                 'must_change_password' => $mustChange,
             ], $ipAddress, $userAgent);
         }
 
-        // 3. No portal_users row — try ChurchCRM identity resolver. If the
+        // 3. No user_accounts row — try the person identity resolver. If the
         //    submitted password matches the default ChristLike#<FNI><LNI>#2026!
         //    formula, auto-provision the account.
-        $fallback = $this->tryChurchCrmFallback($identifier, $plainPassword);
+        $fallback = $this->tryPersonFallback($identifier, $plainPassword);
         if ($fallback !== null) {
             return $this->finalizeLogin($fallback, $ipAddress, $userAgent);
         }
@@ -117,20 +117,20 @@ final readonly class AuthService
     }
 
     /**
-     * Resolve the username via ChurchCRM and (when the submitted password
-     * matches the default formula) provision a portal_users row + roles.
+     * Resolve the username against people records and (when the submitted password
+     * matches the default formula) provision a user_accounts row + roles.
      *
      * Returns the same partial-user shape finalizeLogin() expects, or null
      * when no fallback path matched.
      *
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   display_name:?string,
      *   must_change_password:bool
      * }|null
      */
-    private function tryChurchCrmFallback(string $identifier, string $plainPassword): ?array
+    private function tryPersonFallback(string $identifier, string $plainPassword): ?array
     {
         if ($this->identityResolver === null) {
             return null;
@@ -140,11 +140,11 @@ final readonly class AuthService
             return null;
         }
 
-        $existing = $this->repository->findUserByChurchcrmPersonId($identity['personId']);
+        $existing = $this->repository->findUserByPersonId($identity['personId']);
         if ($existing !== null) {
             // Already provisioned. The default password is retired — the user
             // may only authenticate with the password stored on their row.
-            // (Phone-login users reach this path because their portal_users
+            // (Phone-login users reach this path because their user_accounts
             // email is synthetic and never matches the raw identifier typed.)
             if (!$existing['is_active']) {
                 return null;
@@ -152,9 +152,9 @@ final readonly class AuthService
             if (!$this->hasher->verify($plainPassword, $existing['password_hash'])) {
                 return null;
             }
-            $this->syncRolesFromChurchCrm($existing['portal_user_id'], $identity);
+            $this->syncRolesFromPerson($existing['id'], $identity);
             return [
-                'portal_user_id'       => $existing['portal_user_id'],
+                'id'                   => $existing['id'],
                 'email'                => $existing['email'],
                 'display_name'         => $existing['display_name'],
                 'must_change_password' => $existing['must_change_password'],
@@ -170,22 +170,21 @@ final readonly class AuthService
         // synthetic phone-keyed value so we never violate the unique index.
         $loginEmail = $identity['email'] !== null
             ? strtolower($identity['email'])
-            : 'phone+' . \App\Services\ChurchCrmIdentityResolver::normalizePhone($identity['phone'] ?? '') . '@portal.local';
+            : 'phone+' . \App\Services\PersonIdentityResolver::normalizePhone($identity['phone'] ?? '') . '@portal.local';
         $displayName = trim(($identity['firstName'] ?? '') . ' ' . ($identity['lastName'] ?? ''));
         if ($displayName === '') $displayName = null;
 
         $hash = $this->hasher->hash($plainPassword);
-        $newId = $this->repository->provisionUserFromChurchCrm(
+        $newId = $this->repository->provisionUserForPerson(
             $loginEmail,
             $hash,
             $displayName,
             $identity['personId'],
         );
-        $this->repository->linkUserToPerson($newId, $identity['personId'], true);
-        $this->syncRolesFromChurchCrm($newId, $identity);
+        $this->syncRolesFromPerson($newId, $identity);
 
         return [
-            'portal_user_id'       => $newId,
+            'id'                   => $newId,
             'email'                => $loginEmail,
             'display_name'         => $displayName,
             'must_change_password' => true,
@@ -193,11 +192,11 @@ final readonly class AuthService
     }
 
     /**
-     * Replace the role set for a portal user with the role mix derived from
-     * ChurchCRM:
-     *   - "member"  always (everyone in person_per gets viewer privileges)
-     *   - "leader"  one row per ministry the person leads (scope_ministry_id)
-     *   - "admin"   when usr_Admin = 1
+     * Replace the role set for an account with the role mix derived from
+     * the person (see PersonIdentityResolver):
+     *   - "member"  always (everyone in people gets viewer privileges)
+     *   - "leader"  one row per ministry the person leads (ministry_id)
+     *   - "admin"   when the person already holds portal-wide admin
      *
      * @param array{
      *   personId:int,
@@ -207,29 +206,29 @@ final readonly class AuthService
      *   campusId:?int
      * } $identity
      */
-    private function syncRolesFromChurchCrm(int $portalUserId, array $identity): void
+    private function syncRolesFromPerson(int $accountId, array $identity): void
     {
-        $this->repository->clearRolesForUser($portalUserId);
+        $this->repository->clearRolesForUser($accountId);
         // Base member role — everyone in the people DB gets viewer privileges.
-        $this->repository->assignRole($portalUserId, 'member', $identity['campusId'], null);
+        $this->repository->assignRole($accountId, 'member', $identity['campusId'], null);
 
         foreach ($identity['leaderMinistryIds'] as $ministryId) {
-            $this->repository->assignRole($portalUserId, 'leader', $identity['campusId'], $ministryId);
+            $this->repository->assignRole($accountId, 'leader', $identity['campusId'], $ministryId);
         }
 
         if ($identity['isPortalAdmin']) {
             // Portal-wide admin — no scope columns set.
-            $this->repository->assignRole($portalUserId, 'admin', null, null);
+            $this->repository->assignRole($accountId, 'admin', null, null);
         } elseif ($identity['canManageGroups']) {
             // Has manage-groups but isn't full admin — promote to scheduler so
             // they can edit ministry schedules but not flip portal settings.
-            $this->repository->assignRole($portalUserId, 'scheduler', $identity['campusId'], null);
+            $this->repository->assignRole($accountId, 'scheduler', $identity['campusId'], null);
         }
     }
 
     /**
      * Provision (idempotently) the hard-coded recovery admin and return an
-     * AuthSession for it. The first time this fires it inserts a portal_users
+     * AuthSession for it. The first time this fires it inserts a user_accounts
      * row; subsequent calls just create a fresh session against that row.
      */
     private function loginHardcodedAdmin(?string $ipAddress, ?string $userAgent): AuthSession
@@ -242,15 +241,15 @@ final readonly class AuthService
             $randomHash = $this->hasher->hash(bin2hex(random_bytes(32)));
             $newId = $this->repository->createUser($email, $randomHash, 'Church Admin');
             $this->repository->assignRole($newId, 'admin', null, null);
-            $portalUserId = $newId;
+            $accountId = $newId;
             $displayName = 'Church Admin';
         } else {
-            $portalUserId = $existing['portal_user_id'];
+            $accountId = $existing['id'];
             $displayName = $existing['display_name'] ?? 'Church Admin';
         }
 
         return $this->finalizeLogin([
-            'portal_user_id'       => $portalUserId,
+            'id'                   => $accountId,
             'email'                => $email,
             'display_name'         => $displayName,
             'must_change_password' => false,
@@ -262,7 +261,7 @@ final readonly class AuthService
      * gather the person links, and assemble the AuthSession DTO.
      *
      * @param array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   display_name:?string,
      *   must_change_password:bool
@@ -275,35 +274,24 @@ final readonly class AuthService
         $token = bin2hex(random_bytes(32));
 
         $this->repository->createSession(
-            portalUserId: $user['portal_user_id'],
+            accountId: $user['id'],
             sessionToken: $token,
             createdAt: $now,
             expiresAt: $expiresAt,
             ipAddress: $ipAddress,
             userAgent: $userAgent,
         );
-        $this->repository->recordLogin($user['portal_user_id'], $now);
+        $this->repository->recordLogin($user['id'], $now);
 
-        $profile = $this->repository->loadUserProfile($user['portal_user_id']);
-        $primaryPersonId = null;
-        $personLinks = [];
-        if ($profile !== null) {
-            foreach ($profile['person_links'] as $link) {
-                $personLinks[] = $link['person_id'];
-                if ($link['is_primary'] && $primaryPersonId === null) {
-                    $primaryPersonId = $link['person_id'];
-                }
-            }
-        }
+        $profile = $this->repository->loadUserProfile($user['id']);
 
         return new AuthSession(
-            portalUserId: $user['portal_user_id'],
+            accountId: $user['id'],
             email: $user['email'],
             displayName: $user['display_name'],
             sessionToken: $token,
             expiresAt: $expiresAt,
-            primaryPersonId: $primaryPersonId,
-            personLinks: $personLinks,
+            personId: $profile['person_id'] ?? null,
             mustChangePassword: (bool) $user['must_change_password'],
         );
     }
@@ -330,7 +318,7 @@ final readonly class AuthService
             throw new PermissionDenied('Session expired.');
         }
 
-        $profile = $this->repository->loadUserProfile($session['portal_user_id']);
+        $profile = $this->repository->loadUserProfile($session['account_id']);
         if ($profile === null || !$profile['is_active']) {
             throw new PermissionDenied('Account no longer available.');
         }
@@ -350,26 +338,20 @@ final readonly class AuthService
                 }
             }
             if ($role['role'] === 'admin'
-                && $role['scope_campus_id']   === null
-                && $role['scope_ministry_id'] === null
+                && $role['campus_id']   === null
+                && $role['ministry_id'] === null
             ) {
                 $isPortalWideAdmin = true;
             }
-            if ($role['scope_ministry_id'] !== null) {
-                $ministryScope[$role['scope_ministry_id']] = $role['scope_ministry_id'];
+            if ($role['ministry_id'] !== null) {
+                $ministryScope[$role['ministry_id']] = $role['ministry_id'];
             }
-            if ($role['scope_campus_id'] !== null) {
-                $campusScope[$role['scope_campus_id']] = $role['scope_campus_id'];
+            if ($role['campus_id'] !== null) {
+                $campusScope[$role['campus_id']] = $role['campus_id'];
             }
         }
 
-        $primaryPersonId = null;
-        foreach ($profile['person_links'] as $link) {
-            if ($link['is_primary']) {
-                $primaryPersonId = $link['person_id'];
-                break;
-            }
-        }
+        $primaryPersonId = $profile['person_id'];
 
         // Default current campus = first scoped campus, if any.
         // Real per-request override (top-bar selector equivalent) is applied
@@ -381,7 +363,7 @@ final readonly class AuthService
         }
 
         return new ActorContext(
-            actorId: $profile['portal_user_id'],
+            actorId: $profile['id'],
             personId: $primaryPersonId,
             displayName: $displayName !== null ? (string) $displayName : null,
             permissions: array_values($permissions),
@@ -436,7 +418,7 @@ final readonly class AuthService
 
     /**
      * Bootstrap a new portal user. Used by the admin CLI, never by end-user UI.
-     * Returns the new portal_user_id.
+     * Returns the new account id.
      */
     public function createUser(string $email, string $plainPassword, ?string $displayName = null): int
     {
@@ -454,24 +436,25 @@ final readonly class AuthService
         return $this->repository->createUser($email, $hash, $displayName);
     }
 
-    public function linkPerson(int $portalUserId, int $personId, bool $isPrimary = false): void
+    /** Set the person this login belongs to (one person per login). */
+    public function linkPerson(int $accountId, int $personId): void
     {
-        if ($portalUserId <= 0 || $personId <= 0) {
-            throw new ValidationFailed('Both portal user id and person id are required.');
+        if ($accountId <= 0 || $personId <= 0) {
+            throw new ValidationFailed('Both account id and person id are required.');
         }
-        $this->repository->linkUserToPerson($portalUserId, $personId, $isPrimary);
+        $this->repository->linkUserToPerson($accountId, $personId);
     }
 
     public function assignRole(
-        int $portalUserId,
+        int $accountId,
         string $role,
-        ?int $scopeCampusId = null,
-        ?int $scopeMinistryId = null,
+        ?int $campusId = null,
+        ?int $ministryId = null,
     ): void {
         if (!in_array($role, ['admin', 'leader', 'scheduler', 'member'], true)) {
             throw new ValidationFailed("Unknown role: $role");
         }
-        $this->repository->assignRole($portalUserId, $role, $scopeCampusId, $scopeMinistryId);
+        $this->repository->assignRole($accountId, $role, $campusId, $ministryId);
     }
 
     /**
@@ -485,12 +468,11 @@ final readonly class AuthService
         }
 
         return [
-            'portalUserId' => (int) $profile['portal_user_id'],
+            'accountId' => (int) $profile['id'],
             'email' => (string) $profile['email'],
             'displayName' => $profile['display_name'],
             'personId' => $context->personId,
             'roles' => $profile['roles'],
-            'personLinks' => $profile['person_links'],
             'permissions' => array_map(static fn (PortalPermission $permission): string => $permission->value, $context->permissions),
             'ministryScopeIds' => $context->ministryScopeIds,
             'campusScopeIds' => $context->campusScopeIds,
@@ -555,7 +537,7 @@ final readonly class AuthService
         }
 
         $user = $this->repository->findUserByEmail((string) $profile['email']);
-        if ($user === null || (int) $user['portal_user_id'] !== $context->actorId) {
+        if ($user === null || (int) $user['id'] !== $context->actorId) {
             throw new PermissionDenied('Account no longer available.');
         }
         if (!$this->hasher->verify($currentPassword, (string) $user['password_hash'])) {
@@ -634,26 +616,26 @@ final readonly class AuthService
             $password = $temporaryPassword !== null && $temporaryPassword !== ''
                 ? $temporaryPassword
                 : bin2hex(random_bytes(9));
-            $portalUserId = $this->createUser($email, $password, $displayName);
+            $accountId = $this->createUser($email, $password, $displayName);
         } else {
-            $portalUserId = (int) $user['portal_user_id'];
+            $accountId = (int) $user['id'];
             if ($displayName !== null && trim($displayName) !== '') {
-                $this->repository->updateDisplayName($portalUserId, trim($displayName));
+                $this->repository->updateDisplayName($accountId, trim($displayName));
             }
         }
 
         if (($personId ?? 0) > 0) {
-            $this->linkPerson($portalUserId, (int) $personId, isPrimary: true);
+            $this->linkPerson($accountId, (int) $personId);
         }
 
         $this->assignRole(
-            $portalUserId,
+            $accountId,
             $role,
-            scopeCampusId: ($scopeCampusId ?? 0) > 0 ? (int) $scopeCampusId : null,
-            scopeMinistryId: ($scopeMinistryId ?? 0) > 0 ? (int) $scopeMinistryId : null,
+            campusId: ($scopeCampusId ?? 0) > 0 ? (int) $scopeCampusId : null,
+            ministryId: ($scopeMinistryId ?? 0) > 0 ? (int) $scopeMinistryId : null,
         );
 
-        $profile = $this->repository->loadUserProfile($portalUserId);
+        $profile = $this->repository->loadUserProfile($accountId);
         if ($profile === null) {
             throw new PermissionDenied('Provisioned account could not be loaded.');
         }
@@ -662,7 +644,7 @@ final readonly class AuthService
             $context,
             action: $user === null ? 'portal_access.create' : 'portal_access.update',
             targetType: 'portal_user',
-            targetId: (string) $portalUserId,
+            targetId: (string) $accountId,
             summary: sprintf('%s %s as %s', $user === null ? 'Created' : 'Updated', $email, $role),
             payload: [
                 'email'             => $email,
@@ -701,13 +683,13 @@ final readonly class AuthService
         ?string $ua,
     ): void {
         $this->repository->recordAudit(
-            actorUserId:   $context->actorId,
-            actorPersonId: $context->personId,
+            accountId:     $context->actorId,
+            personId:      $context->personId,
             action:        $action,
             targetType:    $targetType,
             targetId:      $targetId,
             summary:       $summary,
-            payload:       $payload,
+            details:       $payload,
             ipAddress:     $ip,
             userAgent:     $ua,
             at:            new DateTimeImmutable(),
@@ -732,11 +714,11 @@ final readonly class AuthService
         }
 
         return [
-            'portalUserId' => (int) $user['portal_user_id'],
+            'accountId' => (int) $user['id'],
             'email' => (string) $user['email'],
             'isActive' => (bool) $user['is_active'],
             'displayName' => $user['display_name'],
-            'personLinks' => $user['person_links'] ?? [],
+            'personId' => $user['person_id'] ?? null,
             'roles' => $roles,
             'canAssignPeopleToManagedMinistries' => $canManageSchedules,
         ];

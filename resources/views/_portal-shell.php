@@ -1669,7 +1669,7 @@ SRCHJS;
                 . '</label>';
         }
         // Role chip: the shell's actor payload exposes only isPortalWideAdmin, so
-        // "Admin" is the single role it can state truthfully. portal_user_roles is
+        // "Admin" is the single role it can state truthfully. account_roles is
         // multi-row (admin/leader/scheduler/member, each optionally scoped to a
         // ministry and campus) — rendering "Member" for a scoped leader would be
         // actively misleading, so the chip is omitted rather than guessed.

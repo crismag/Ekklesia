@@ -1696,7 +1696,7 @@ $webRoutes = [
         return '';
     },
 
-    // System users — manage portal_users + role assignments (no ChurchCRM deps).
+    // System users — manage user_accounts + role assignments.
     'GET /admin/users' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector, $resolveAllMinistries): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         $basePath = (string) ($req['_base_path'] ?? '');
@@ -1743,7 +1743,7 @@ $webRoutes = [
                 );
                 $role = (string) ($req['role'] ?? '');
                 if ($role !== '') {
-                    $svc->addRole($newId, $role, $ci($req['scope_campus_id'] ?? null), $ci($req['scope_ministry_id'] ?? null));
+                    $svc->addRole($newId, $role, $ci($req['campus_id'] ?? null), $ci($req['ministry_id'] ?? null));
                 }
                 header('Location: ' . $target . '?notice=created&user_id=' . $newId, true, 302); return '';
             }
@@ -1756,11 +1756,11 @@ $webRoutes = [
                 header('Location: ' . $target . '?notice=pw&user_id=' . $uid, true, 302); return '';
             }
             if ($action === 'addrole') {
-                $svc->addRole($uid, (string) ($req['role'] ?? ''), $ci($req['scope_campus_id'] ?? null), $ci($req['scope_ministry_id'] ?? null));
+                $svc->addRole($uid, (string) ($req['role'] ?? ''), $ci($req['campus_id'] ?? null), $ci($req['ministry_id'] ?? null));
                 header('Location: ' . $target . '?notice=role&user_id=' . $uid, true, 302); return '';
             }
             if ($action === 'removerole') {
-                $svc->removeRole((int) ($req['role_id'] ?? 0));
+                $svc->removeRole((int) ($req['account_role_id'] ?? 0));
                 header('Location: ' . $target . '?notice=role&user_id=' . $uid, true, 302); return '';
             }
             if ($action === 'delete') {

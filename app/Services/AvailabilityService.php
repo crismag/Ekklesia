@@ -142,7 +142,7 @@ final readonly class AvailabilityService
             startsOn: $row['starts_on'],
             endsOn: $row['ends_on'],
             reason: $row['reason'],
-            createdByPortalUserId: (int) $row['created_by_portal_user_id'],
+            createdByAccountId: (int) $row['created_by_account_id'],
             createdAt: $row['created_at'],
             updatedAt: $row['updated_at'],
         );

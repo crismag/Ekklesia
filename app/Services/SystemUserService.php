@@ -10,12 +10,11 @@ use PDO;
 use RuntimeException;
 
 /**
- * System user administration — manage portal_users and their role assignments.
+ * System user administration — manage user_accounts and their role assignments.
  *
- * Direct-PDO against the portal database (portal_users / portal_user_roles /
- * portal_user_person_links). Passwords are hashed with the same PasswordHasher
- * the login uses, so accounts created/reset here authenticate normally. No
- * ChurchCRM dependency.
+ * Direct-PDO against the member database (user_accounts / account_roles /
+ * account_sessions). Passwords are hashed with the same PasswordHasher the
+ * login uses, so accounts created/reset here authenticate normally.
  */
 final readonly class SystemUserService
 {
@@ -30,12 +29,13 @@ final readonly class SystemUserService
     public function list(): array
     {
         $users = [];
-        $sql = 'SELECT portal_user_id, email, display_name, is_active, must_change_password, last_login_at
-                  FROM portal_users ORDER BY is_active DESC, display_name IS NULL, display_name ASC, email ASC';
+        $sql = 'SELECT id, person_id, email, display_name, is_active, must_change_password, last_login_at
+                  FROM user_accounts ORDER BY is_active DESC, display_name IS NULL, display_name ASC, email ASC';
         foreach ($this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
-            $id = (int) $r['portal_user_id'];
+            $id = (int) $r['id'];
             $users[$id] = [
-                'portal_user_id' => $id,
+                'id' => $id,
+                'person_id' => $r['person_id'] !== null ? (int) $r['person_id'] : null,
                 'email' => (string) $r['email'],
                 'display_name' => $r['display_name'] !== null ? (string) $r['display_name'] : '',
                 'is_active' => (int) $r['is_active'] === 1,
@@ -48,19 +48,19 @@ final readonly class SystemUserService
             return [];
         }
         $roles = $this->db->query(
-            'SELECT role_id, portal_user_id, role, scope_campus_id, scope_ministry_id
-               FROM portal_user_roles ORDER BY role ASC'
+            'SELECT id, account_id, role, campus_id, ministry_id
+               FROM account_roles ORDER BY role ASC'
         )->fetchAll(PDO::FETCH_ASSOC) ?: [];
         foreach ($roles as $r) {
-            $id = (int) $r['portal_user_id'];
+            $id = (int) $r['account_id'];
             if (!isset($users[$id])) {
                 continue;
             }
             $users[$id]['roles'][] = [
-                'role_id' => (int) $r['role_id'],
+                'id' => (int) $r['id'],
                 'role' => (string) $r['role'],
-                'scope_campus_id' => $r['scope_campus_id'] !== null ? (int) $r['scope_campus_id'] : null,
-                'scope_ministry_id' => $r['scope_ministry_id'] !== null ? (int) $r['scope_ministry_id'] : null,
+                'campus_id' => $r['campus_id'] !== null ? (int) $r['campus_id'] : null,
+                'ministry_id' => $r['ministry_id'] !== null ? (int) $r['ministry_id'] : null,
             ];
         }
         return array_values($users);
@@ -70,7 +70,7 @@ final readonly class SystemUserService
     public function find(int $id): ?array
     {
         foreach ($this->list() as $u) {
-            if ($u['portal_user_id'] === $id) {
+            if ($u['id'] === $id) {
                 return $u;
             }
         }
@@ -86,13 +86,13 @@ final readonly class SystemUserService
         if (strlen($password) < self::MIN_PASSWORD) {
             throw new InvalidArgumentException('Password must be at least ' . self::MIN_PASSWORD . ' characters.');
         }
-        $exists = $this->db->prepare('SELECT COUNT(*) FROM portal_users WHERE email = :e');
+        $exists = $this->db->prepare('SELECT COUNT(*) FROM user_accounts WHERE email = :e');
         $exists->execute([':e' => $email]);
         if ((int) $exists->fetchColumn() > 0) {
             throw new InvalidArgumentException('A user with this email already exists.');
         }
         $stmt = $this->db->prepare(
-            'INSERT INTO portal_users (email, password_hash, display_name, is_active, must_change_password, created_at, updated_at)
+            'INSERT INTO user_accounts (email, password_hash, display_name, is_active, must_change_password, created_at, updated_at)
              VALUES (:e, :h, :d, :a, :m, NOW(), NOW())'
         );
         $stmt->execute([
@@ -120,8 +120,8 @@ final readonly class SystemUserService
             }
         }
         $stmt = $this->db->prepare(
-            'UPDATE portal_users SET display_name = :d, is_active = :a, must_change_password = :m, updated_at = NOW()
-              WHERE portal_user_id = :id'
+            'UPDATE user_accounts SET display_name = :d, is_active = :a, must_change_password = :m, updated_at = NOW()
+              WHERE id = :id'
         );
         $stmt->execute([
             ':d' => trim($displayName) !== '' ? trim($displayName) : null,
@@ -139,7 +139,7 @@ final readonly class SystemUserService
         if (strlen($password) < self::MIN_PASSWORD) {
             throw new InvalidArgumentException('Password must be at least ' . self::MIN_PASSWORD . ' characters.');
         }
-        $stmt = $this->db->prepare('UPDATE portal_users SET password_hash = :h, updated_at = NOW() WHERE portal_user_id = :id');
+        $stmt = $this->db->prepare('UPDATE user_accounts SET password_hash = :h, updated_at = NOW() WHERE id = :id');
         $stmt->execute([':h' => $this->hasher->hash($password), ':id' => $id]);
     }
 
@@ -156,16 +156,16 @@ final readonly class SystemUserService
 
         // Skip exact duplicates.
         $dup = $this->db->prepare(
-            'SELECT COUNT(*) FROM portal_user_roles
-              WHERE portal_user_id = :u AND role = :r
-                AND scope_campus_id <=> :c AND scope_ministry_id <=> :m'
+            'SELECT COUNT(*) FROM account_roles
+              WHERE account_id = :u AND role = :r
+                AND campus_id <=> :c AND ministry_id <=> :m'
         );
         $dup->execute([':u' => $id, ':r' => $role, ':c' => $campusId, ':m' => $ministryId]);
         if ((int) $dup->fetchColumn() > 0) {
             return;
         }
         $stmt = $this->db->prepare(
-            'INSERT INTO portal_user_roles (portal_user_id, role, scope_campus_id, scope_ministry_id, created_at)
+            'INSERT INTO account_roles (account_id, role, campus_id, ministry_id, created_at)
              VALUES (:u, :r, :c, :m, NOW())'
         );
         $stmt->execute([':u' => $id, ':r' => $role, ':c' => $campusId, ':m' => $ministryId]);
@@ -173,17 +173,17 @@ final readonly class SystemUserService
 
     public function removeRole(int $roleId): void
     {
-        $stmt = $this->db->prepare('SELECT portal_user_id, role, scope_campus_id, scope_ministry_id FROM portal_user_roles WHERE role_id = :id');
+        $stmt = $this->db->prepare('SELECT account_id, role, campus_id, ministry_id FROM account_roles WHERE id = :id');
         $stmt->execute([':id' => $roleId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) {
             return;
         }
-        $isWideAdmin = $row['role'] === 'admin' && $row['scope_campus_id'] === null && $row['scope_ministry_id'] === null;
-        if ($isWideAdmin && $this->otherActiveAdmins((int) $row['portal_user_id']) === 0) {
+        $isWideAdmin = $row['role'] === 'admin' && $row['campus_id'] === null && $row['ministry_id'] === null;
+        if ($isWideAdmin && $this->otherActiveAdmins((int) $row['account_id']) === 0) {
             throw new RuntimeException('This is the last portal-wide admin role — assign another admin first.');
         }
-        $this->db->prepare('DELETE FROM portal_user_roles WHERE role_id = :id')->execute([':id' => $roleId]);
+        $this->db->prepare('DELETE FROM account_roles WHERE id = :id')->execute([':id' => $roleId]);
     }
 
     public function delete(int $id, int $currentUserId): void
@@ -200,10 +200,10 @@ final readonly class SystemUserService
         }
         $this->db->beginTransaction();
         try {
-            foreach (['portal_user_roles', 'portal_user_person_links', 'portal_sessions'] as $t) {
-                $this->db->prepare("DELETE FROM `$t` WHERE portal_user_id = :id")->execute([':id' => $id]);
+            foreach (['account_roles', 'account_sessions', 'account_tokens'] as $t) {
+                $this->db->prepare("DELETE FROM `$t` WHERE account_id = :id")->execute([':id' => $id]);
             }
-            $this->db->prepare('DELETE FROM portal_users WHERE portal_user_id = :id')->execute([':id' => $id]);
+            $this->db->prepare('DELETE FROM user_accounts WHERE id = :id')->execute([':id' => $id]);
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -215,7 +215,7 @@ final readonly class SystemUserService
     public function isPortalWideAdmin(array $user): bool
     {
         foreach ($user['roles'] as $r) {
-            if ($r['role'] === 'admin' && $r['scope_campus_id'] === null && $r['scope_ministry_id'] === null) {
+            if ($r['role'] === 'admin' && $r['campus_id'] === null && $r['ministry_id'] === null) {
                 return true;
             }
         }
@@ -226,11 +226,11 @@ final readonly class SystemUserService
     private function otherActiveAdmins(int $exceptUserId): int
     {
         $stmt = $this->db->prepare(
-            'SELECT COUNT(DISTINCT r.portal_user_id)
-               FROM portal_user_roles r
-               JOIN portal_users u ON u.portal_user_id = r.portal_user_id
-              WHERE r.role = "admin" AND r.scope_campus_id IS NULL AND r.scope_ministry_id IS NULL
-                AND u.is_active = 1 AND r.portal_user_id <> :ex'
+            'SELECT COUNT(DISTINCT r.account_id)
+               FROM account_roles r
+               JOIN user_accounts u ON u.id = r.account_id
+              WHERE r.role = "admin" AND r.campus_id IS NULL AND r.ministry_id IS NULL
+                AND u.is_active = 1 AND r.account_id <> :ex'
         );
         $stmt->execute([':ex' => $exceptUserId]);
         return (int) $stmt->fetchColumn();

@@ -54,10 +54,10 @@ final readonly class AuthController
         }
 
         return [
-            'portalUserId'    => $session->portalUserId,
+            'accountId'       => $session->accountId,
             'email'           => $session->email,
             'displayName'     => $session->displayName,
-            'primaryPersonId' => $session->primaryPersonId,
+            'personId'        => $session->personId,
             'sessionToken'    => $session->sessionToken,
             'expiresAt'       => $session->expiresAt->format(DATE_ATOM),
             // Tells the login UI to redirect to /password/change before
@@ -213,8 +213,8 @@ final readonly class AuthController
                 displayName: isset($request['displayName']) ? (string) $request['displayName'] : ((isset($request['display_name']) ? (string) $request['display_name'] : null)),
                 temporaryPassword: isset($request['temporaryPassword']) ? (string) $request['temporaryPassword'] : ((isset($request['temporary_password']) ? (string) $request['temporary_password'] : null)),
                 personId: isset($request['personId']) ? (int) $request['personId'] : (isset($request['person_id']) ? (int) $request['person_id'] : null),
-                scopeMinistryId: isset($request['scopeMinistryId']) ? (int) $request['scopeMinistryId'] : (isset($request['scope_ministry_id']) ? (int) $request['scope_ministry_id'] : null),
-                scopeCampusId: isset($request['scopeCampusId']) ? (int) $request['scopeCampusId'] : (isset($request['scope_campus_id']) ? (int) $request['scope_campus_id'] : null),
+                scopeMinistryId: isset($request['scopeMinistryId']) ? (int) $request['scopeMinistryId'] : (isset($request['ministry_id']) ? (int) $request['ministry_id'] : null),
+                scopeCampusId: isset($request['scopeCampusId']) ? (int) $request['scopeCampusId'] : (isset($request['campus_id']) ? (int) $request['campus_id'] : null),
                 auditMeta: $this->auditMeta($request),
             ),
         ];

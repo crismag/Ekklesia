@@ -6,8 +6,8 @@ declare(strict_types=1);
  * Smoke check: leader-facing ministry roster.
  *
  * Path:
- *   PortalAuthAdapter (mdb)        →  AuthService.login          → AuthSession
- *   PortalAuthAdapter (mdb)        →  AuthService.resolveActor   → ActorContext
+ *   SqlAuthAdapter (mdb)           →  AuthService.login          → AuthSession
+ *   SqlAuthAdapter (mdb)           →  AuthService.resolveActor   → ActorContext
  *   ChurchCrmMinistryAdapter (cc)  ←  MinistryService.getRoster
  *
  * Usage:
@@ -45,8 +45,8 @@ $reqctx   = PortalServiceProvider::makeRequestContext();
 echo "=== Login ===\n";
 $session = $auth->login($email, $password, ipAddress: '127.0.0.1', userAgent: 'smoke-ministry-roster');
 printf("  user=%d  primary_person=%s\n",
-    $session->portalUserId,
-    $session->primaryPersonId === null ? '(none)' : (string) $session->primaryPersonId,
+    $session->accountId,
+    $session->personId === null ? '(none)' : (string) $session->personId,
 );
 
 echo "\n=== GET /api/ministry-roster (controller) ===\n";

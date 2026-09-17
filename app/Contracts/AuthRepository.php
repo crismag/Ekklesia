@@ -15,7 +15,7 @@ interface AuthRepository
 {
     /**
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   password_hash:string,
      *   is_active:bool,
@@ -26,20 +26,20 @@ interface AuthRepository
 
     /**
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   is_active:bool,
      *   display_name:?string,
-     *   roles:list<array{role:string,scope_campus_id:?int,scope_ministry_id:?int}>,
-     *   person_links:list<array{person_id:int,is_primary:bool}>
+     *   roles:list<array{role:string,campus_id:?int,ministry_id:?int}>,
+     *   person_id:?int
      * }|null
      */
-    public function loadUserProfile(int $portalUserId): ?array;
+    public function loadUserProfile(int $accountId): ?array;
 
-    public function recordLogin(int $portalUserId, DateTimeImmutable $at): void;
+    public function recordLogin(int $accountId, DateTimeImmutable $at): void;
 
     public function createSession(
-        int $portalUserId,
+        int $accountId,
         string $sessionToken,
         DateTimeImmutable $createdAt,
         DateTimeImmutable $expiresAt,
@@ -48,7 +48,7 @@ interface AuthRepository
     ): void;
 
     /**
-     * @return array{portal_user_id:int,expires_at:DateTimeImmutable,revoked:bool}|null
+     * @return array{account_id:int,expires_at:DateTimeImmutable,revoked:bool}|null
      */
     public function findActiveSession(string $sessionToken): ?array;
 
@@ -63,23 +63,23 @@ interface AuthRepository
      * Pass $exceptToken = null to revoke ALL sessions.
      */
     public function revokeAllSessionsExcept(
-        int $portalUserId,
+        int $accountId,
         ?string $exceptToken,
         DateTimeImmutable $at,
     ): int;
 
     public function createUser(string $email, string $passwordHash, ?string $displayName): int;
 
-    public function provisionUserFromChurchCrm(
+    public function provisionUserForPerson(
         string $email,
         string $passwordHash,
         ?string $displayName,
-        int $churchcrmPersonId,
+        int $personId,
     ): int;
 
     /**
      * @return array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   password_hash:string,
      *   is_active:bool,
@@ -87,53 +87,53 @@ interface AuthRepository
      *   must_change_password:bool
      * }|null
      */
-    public function findUserByChurchcrmPersonId(int $churchcrmPersonId): ?array;
+    public function findUserByPersonId(int $personId): ?array;
 
-    public function setMustChangePassword(int $portalUserId, bool $value): void;
+    public function setMustChangePassword(int $accountId, bool $value): void;
 
-    public function isMustChangePassword(int $portalUserId): bool;
+    public function isMustChangePassword(int $accountId): bool;
 
-    public function clearRolesForUser(int $portalUserId): void;
+    public function clearRolesForUser(int $accountId): void;
 
-    public function linkUserToPerson(int $portalUserId, int $personId, bool $isPrimary): void;
+    public function linkUserToPerson(int $accountId, int $personId): void;
 
     public function assignRole(
-        int $portalUserId,
+        int $accountId,
         string $role,
-        ?int $scopeCampusId,
-        ?int $scopeMinistryId,
+        ?int $campusId,
+        ?int $ministryId,
     ): void;
 
     /**
      * @return list<array{
-     *   portal_user_id:int,
+     *   id:int,
      *   email:string,
      *   is_active:bool,
      *   display_name:?string,
-     *   person_links:list<array{person_id:int,is_primary:bool}>,
-     *   roles:list<array{role:string,scope_campus_id:?int,scope_ministry_id:?int}>
+     *   person_id:?int,
+     *   roles:list<array{role:string,campus_id:?int,ministry_id:?int}>
      * }>
      */
     public function listUsersWithAccess(): array;
 
-    public function updateDisplayName(int $portalUserId, ?string $displayName): void;
+    public function updateDisplayName(int $accountId, ?string $displayName): void;
 
-    public function updatePasswordHash(int $portalUserId, string $passwordHash): void;
+    public function updatePasswordHash(int $accountId, string $passwordHash): void;
 
     /**
-     * Append an entry to portal_audit_log. Every portal-originated write
-     * routes through here. $payload is JSON-encoded by the adapter.
+     * Append an entry to audit_log. Every portal-originated write
+     * routes through here. $details is JSON-encoded by the adapter.
      *
-     * @param array<string, mixed>|null $payload
+     * @param array<string, mixed>|null $details
      */
     public function recordAudit(
-        ?int $actorUserId,
-        ?int $actorPersonId,
+        ?int $accountId,
+        ?int $personId,
         string $action,
         ?string $targetType,
         ?string $targetId,
         ?string $summary,
-        ?array $payload,
+        ?array $details,
         ?string $ipAddress,
         ?string $userAgent,
         DateTimeImmutable $at,

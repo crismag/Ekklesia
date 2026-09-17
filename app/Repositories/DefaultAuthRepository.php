@@ -12,7 +12,7 @@ use DateTimeImmutable;
  * Source-agnostic auth repository.
  *
  * Composes a single AuthAdapter into the AuthRepository contract. Contains no
- * SQL. When the auth backend changes (e.g. swap PortalAuthAdapter for an
+ * SQL. When the auth backend changes (e.g. swap SqlAuthAdapter for an
  * LDAP/OIDC adapter later), this class is unchanged.
  */
 final class DefaultAuthRepository implements AuthRepository
@@ -27,36 +27,36 @@ final class DefaultAuthRepository implements AuthRepository
         return $this->adapter->findUserByEmail($email);
     }
 
-    public function loadUserProfile(int $portalUserId): ?array
+    public function loadUserProfile(int $accountId): ?array
     {
-        $user = $this->adapter->findUserById($portalUserId);
+        $user = $this->adapter->findUserById($accountId);
         if ($user === null) {
             return null;
         }
         return [
-            'portal_user_id' => $user['portal_user_id'],
+            'id'             => $user['id'],
+            'person_id'      => $user['person_id'],
             'email'          => $user['email'],
             'is_active'      => $user['is_active'],
             'display_name'   => $user['display_name'],
-            'roles'          => $this->adapter->listRolesForUser($portalUserId),
-            'person_links'   => $this->adapter->listPersonLinksForUser($portalUserId),
+            'roles'          => $this->adapter->listRolesForUser($accountId),
         ];
     }
 
-    public function recordLogin(int $portalUserId, DateTimeImmutable $at): void
+    public function recordLogin(int $accountId, DateTimeImmutable $at): void
     {
-        $this->adapter->recordLogin($portalUserId, $at);
+        $this->adapter->recordLogin($accountId, $at);
     }
 
     public function createSession(
-        int $portalUserId,
+        int $accountId,
         string $sessionToken,
         DateTimeImmutable $createdAt,
         DateTimeImmutable $expiresAt,
         ?string $ipAddress,
         ?string $userAgent,
     ): void {
-        $this->adapter->createSession($portalUserId, $sessionToken, $createdAt, $expiresAt, $ipAddress, $userAgent);
+        $this->adapter->createSession($accountId, $sessionToken, $createdAt, $expiresAt, $ipAddress, $userAgent);
     }
 
     public function findActiveSession(string $sessionToken): ?array
@@ -75,11 +75,11 @@ final class DefaultAuthRepository implements AuthRepository
     }
 
     public function revokeAllSessionsExcept(
-        int $portalUserId,
+        int $accountId,
         ?string $exceptToken,
         DateTimeImmutable $at,
     ): int {
-        return $this->adapter->revokeAllSessionsExcept($portalUserId, $exceptToken, $at);
+        return $this->adapter->revokeAllSessionsExcept($accountId, $exceptToken, $at);
     }
 
     public function createUser(string $email, string $passwordHash, ?string $displayName): int
@@ -87,47 +87,47 @@ final class DefaultAuthRepository implements AuthRepository
         return $this->adapter->createUser($email, $passwordHash, $displayName);
     }
 
-    public function provisionUserFromChurchCrm(
+    public function provisionUserForPerson(
         string $email,
         string $passwordHash,
         ?string $displayName,
-        int $churchcrmPersonId,
+        int $personId,
     ): int {
-        return $this->adapter->provisionUserFromChurchCrm($email, $passwordHash, $displayName, $churchcrmPersonId);
+        return $this->adapter->provisionUserForPerson($email, $passwordHash, $displayName, $personId);
     }
 
-    public function findUserByChurchcrmPersonId(int $churchcrmPersonId): ?array
+    public function findUserByPersonId(int $personId): ?array
     {
-        return $this->adapter->findUserByChurchcrmPersonId($churchcrmPersonId);
+        return $this->adapter->findUserByPersonId($personId);
     }
 
-    public function setMustChangePassword(int $portalUserId, bool $value): void
+    public function setMustChangePassword(int $accountId, bool $value): void
     {
-        $this->adapter->setMustChangePassword($portalUserId, $value);
+        $this->adapter->setMustChangePassword($accountId, $value);
     }
 
-    public function isMustChangePassword(int $portalUserId): bool
+    public function isMustChangePassword(int $accountId): bool
     {
-        return $this->adapter->isMustChangePassword($portalUserId);
+        return $this->adapter->isMustChangePassword($accountId);
     }
 
-    public function clearRolesForUser(int $portalUserId): void
+    public function clearRolesForUser(int $accountId): void
     {
-        $this->adapter->clearRolesForUser($portalUserId);
+        $this->adapter->clearRolesForUser($accountId);
     }
 
-    public function linkUserToPerson(int $portalUserId, int $personId, bool $isPrimary): void
+    public function linkUserToPerson(int $accountId, int $personId): void
     {
-        $this->adapter->linkUserToPerson($portalUserId, $personId, $isPrimary);
+        $this->adapter->linkUserToPerson($accountId, $personId);
     }
 
     public function assignRole(
-        int $portalUserId,
+        int $accountId,
         string $role,
-        ?int $scopeCampusId,
-        ?int $scopeMinistryId,
+        ?int $campusId,
+        ?int $ministryId,
     ): void {
-        $this->adapter->assignRole($portalUserId, $role, $scopeCampusId, $scopeMinistryId);
+        $this->adapter->assignRole($accountId, $role, $campusId, $ministryId);
     }
 
     public function listUsersWithAccess(): array
@@ -135,36 +135,36 @@ final class DefaultAuthRepository implements AuthRepository
         return $this->adapter->listUsersWithAccess();
     }
 
-    public function updateDisplayName(int $portalUserId, ?string $displayName): void
+    public function updateDisplayName(int $accountId, ?string $displayName): void
     {
-        $this->adapter->updateDisplayName($portalUserId, $displayName);
+        $this->adapter->updateDisplayName($accountId, $displayName);
     }
 
-    public function updatePasswordHash(int $portalUserId, string $passwordHash): void
+    public function updatePasswordHash(int $accountId, string $passwordHash): void
     {
-        $this->adapter->updatePasswordHash($portalUserId, $passwordHash);
+        $this->adapter->updatePasswordHash($accountId, $passwordHash);
     }
 
     public function recordAudit(
-        ?int $actorUserId,
-        ?int $actorPersonId,
+        ?int $accountId,
+        ?int $personId,
         string $action,
         ?string $targetType,
         ?string $targetId,
         ?string $summary,
-        ?array $payload,
+        ?array $details,
         ?string $ipAddress,
         ?string $userAgent,
         DateTimeImmutable $at,
     ): void {
         $this->adapter->recordAudit(
-            $actorUserId,
-            $actorPersonId,
+            $accountId,
+            $personId,
             $action,
             $targetType,
             $targetId,
             $summary,
-            $payload,
+            $details,
             $ipAddress,
             $userAgent,
             $at,

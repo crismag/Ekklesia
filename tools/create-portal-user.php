@@ -52,19 +52,19 @@ if (!in_array($role, ['admin', 'leader', 'scheduler', 'member'], true)) {
 
 $auth = PortalServiceProvider::makeAuthService();
 
-$portalUserId = $auth->createUser($email, $password, $displayName);
+$accountId = $auth->createUser($email, $password, $displayName);
 $auth->assignRole(
-    $portalUserId,
+    $accountId,
     $role,
-    scopeCampusId:   $scopeCampusId   > 0 ? $scopeCampusId   : null,
-    scopeMinistryId: $scopeMinistryId > 0 ? $scopeMinistryId : null,
+    campusId:        $scopeCampusId   > 0 ? $scopeCampusId   : null,
+    ministryId:      $scopeMinistryId > 0 ? $scopeMinistryId : null,
 );
 if ($personId > 0) {
-    $auth->linkPerson($portalUserId, $personId, isPrimary: true);
+    $auth->linkPerson($accountId, $personId);
 }
 
 echo "OK\n";
-echo "  portal_user_id : $portalUserId\n";
+echo "  account_id     : $accountId\n";
 echo "  email          : $email\n";
 echo "  role           : $role" . ($role === 'admin' && $scopeMinistryId === 0 && $scopeCampusId === 0 ? ' (portal-wide)' : '') . "\n";
 if ($scopeMinistryId > 0) {
@@ -74,5 +74,5 @@ if ($scopeCampusId > 0) {
     echo "  scope campus   : $scopeCampusId\n";
 }
 if ($personId > 0) {
-    echo "  linked person  : $personId (primary)\n";
+    echo "  linked person  : $personId\n";
 }
