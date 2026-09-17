@@ -17,7 +17,7 @@
   "features": { "advanced_link": true, "require_reason": true, "require_birth_month_year": true, "extra_page": true },
   "defaults": { "country": "Canada", "province": "Ontario" },
   "admin_access": { "prefix": "ChristLikeness", "default_word": "Welcome", "default_days": 7 },
-  "member_types": { "1": "Radical", "2": "Trailblazer", "3": "G&A" },
+  "member_types": ["Radical", "Trailblazer", "G&A"],
   "validation": { "max_name": 60, "max_city": 80 },
   "messages": {
     "success_title": "Thanks — you're signed in!",

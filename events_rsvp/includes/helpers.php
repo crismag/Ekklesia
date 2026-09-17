@@ -1,8 +1,7 @@
 <?php
 /**
  * Standalone helpers for the Events RSVP module: config, escaping, CSRF, event
- * loading (ChurchCRM events_event or module-owned rsvp_events), and ChurchCRM
- * member matching.
+ * loading (member database events), and member matching.
  */
 declare(strict_types=1);
 
@@ -43,7 +42,10 @@ if (!function_exists('rv_config')) {
     function rv_csrf(): string { rv_session(); if (empty($_SESSION['rv_csrf'])) { $_SESSION['rv_csrf'] = bin2hex(random_bytes(32)); } return $_SESSION['rv_csrf']; }
     function rv_csrf_ok(?string $t): bool { rv_session(); return is_string($t) && !empty($_SESSION['rv_csrf']) && hash_equals($_SESSION['rv_csrf'], $t); }
     function rv_csrf_rotate(): void { rv_session(); $_SESSION['rv_csrf'] = bin2hex(random_bytes(32)); }
+    /** Visitors database (SQLite): RSVPs, registrations, access codes. */
     function rv_db(): PDO { return rsvp_db(); }
+    /** Member database (MySQL): people, events, event_occurrences. */
+    function rv_members_db(): PDO { return rsvp_members_db(); }
 
     // ---- Rotating admin access code (ChristLikeness + WORD, with expiry) -----
     function rv_admin_module(): string { return 'rsvp'; }
@@ -58,14 +60,14 @@ if (!function_exists('rv_config')) {
 
     function rv_admin_active(): ?array
     {
-        $st = rv_db()->prepare('SELECT * FROM signup_admin_access WHERE module = :m ORDER BY id DESC LIMIT 1');
+        $st = rv_db()->prepare('SELECT * FROM visitor_admin_access_codes WHERE module = :m ORDER BY id DESC LIMIT 1');
         $st->execute([':m' => rv_admin_module()]);
         $r = $st->fetch();
         if (!$r) { return null; }
         $exp = strtotime((string) $r['expires_at']);
         $active = $exp !== false && $exp >= time();
         return [
-            'word' => (string) $r['word'], 'code' => rv_admin_prefix() . $r['word'],
+            'word' => (string) $r['code'], 'code' => rv_admin_prefix() . $r['code'],
             'issued_at' => (string) $r['issued_at'], 'expires_at' => (string) $r['expires_at'],
             'active' => $active, 'remaining_days' => $active ? (int) ceil(($exp - time()) / 86400) : 0,
             'note' => (string) ($r['note'] ?? ''),
@@ -78,8 +80,9 @@ if (!function_exists('rv_config')) {
         if ($word === '') { $word = rv_admin_gen_word(); }
         $days = max(1, min(365, $days));
         $expires = date('Y-m-d H:i:s', time() + $days * 86400);
-        $st = rv_db()->prepare('INSERT INTO signup_admin_access (module, word, expires_at, note) VALUES (:m, :w, :e, :n)');
-        $st->execute([':m' => rv_admin_module(), ':w' => $word, ':e' => $expires, ':n' => $note ?: null]);
+        // issued_at and expires_at come from the same (PHP) clock.
+        $st = rv_db()->prepare('INSERT INTO visitor_admin_access_codes (module, code, issued_at, expires_at, note) VALUES (:m, :w, :i, :e, :n)');
+        $st->execute([':m' => rv_admin_module(), ':w' => $word, ':i' => date('Y-m-d H:i:s'), ':e' => $expires, ':n' => $note ?: null]);
         return rv_admin_active();
     }
 
@@ -102,52 +105,49 @@ if (!function_exists('rv_config')) {
     function rv_json($data, int $code = 200): void { http_response_code($code); header('Content-Type: application/json'); echo json_encode($data); exit; }
 
     /**
-     * Load an event by id from the configured source. Returns a normalized shape
-     * (id, title, date, time, location, description, source) or null.
+     * Load an RSVP-able event by id from the member database (events), with
+     * the soonest scheduled date that is today or later. Returns a normalized
+     * shape (id, occurrence_id, title, date, time, location, description) or
+     * null. $db is the member database connection (rv_members_db()).
      */
     function rv_load_event(PDO $db, int $eventId): ?array
     {
         if ($eventId <= 0) { return null; }
-        $source = (string) rv_cfg('event_source', 'churchcrm');
 
-        if ($source === 'rsvp_events') {
-            $stmt = $db->prepare('SELECT id, title, event_date, event_time, location, description
-                                    FROM rsvp_events WHERE id = :id AND is_active = 1 LIMIT 1');
-            $stmt->execute([':id' => $eventId]);
-            $r = $stmt->fetch();
-            if (!$r) { return null; }
-            return [
-                'id' => (int) $r['id'], 'title' => (string) $r['title'],
-                'date' => $r['event_date'], 'time' => $r['event_time'],
-                'location' => (string) ($r['location'] ?? ''), 'description' => (string) ($r['description'] ?? ''),
-                'source' => 'rsvp_events',
-            ];
-        }
-
-        // Default: ChurchCRM events_event (+ soonest upcoming/today occurrence).
         $stmt = $db->prepare(
-            'SELECT e.event_id, e.event_title, e.event_desc, e.event_start, e.event_end,
-                    e.custom_location_name, e.custom_location_address,
-                    (SELECT MIN(occurrence_start) FROM event_occurrence o
-                      WHERE o.event_id = e.event_id AND o.is_cancelled = 0
-                        AND o.occurrence_start >= CURDATE()) AS next_occ
-               FROM events_event e
-              WHERE e.event_id = :id AND e.inactive = 0 LIMIT 1'
+            "SELECT e.id, e.title, e.summary, e.starts_on, e.start_time,
+                    e.location_name, e.location_address,
+                    (SELECT o.id FROM event_occurrences o
+                      WHERE o.event_id = e.id AND o.status = 'scheduled'
+                        AND o.starts_at >= CURDATE()
+                      ORDER BY o.starts_at LIMIT 1) AS next_occurrence_id,
+                    (SELECT MIN(o.starts_at) FROM event_occurrences o
+                      WHERE o.event_id = e.id AND o.status = 'scheduled'
+                        AND o.starts_at >= CURDATE()) AS next_starts_at
+               FROM events e
+              WHERE e.id = :id AND e.is_active = 1 AND e.archived_at IS NULL LIMIT 1"
         );
         $stmt->execute([':id' => $eventId]);
         $r = $stmt->fetch();
         if (!$r) { return null; }
-        $start = $r['next_occ'] ?: $r['event_start'];
-        $loc = rv_str($r['custom_location_name']);
-        if (rv_str($r['custom_location_address']) !== '') {
-            $loc = $loc === '' ? rv_str($r['custom_location_address']) : $loc . ' — ' . rv_str($r['custom_location_address']);
+        if ($r['next_starts_at']) {
+            $date = substr((string) $r['next_starts_at'], 0, 10);
+            $time = substr((string) $r['next_starts_at'], 11, 5);
+        } else {
+            $date = $r['starts_on'] ? (string) $r['starts_on'] : null;
+            $time = $r['start_time'] ? substr((string) $r['start_time'], 0, 5) : null;
+        }
+        $loc = rv_str($r['location_name']);
+        if (rv_str($r['location_address']) !== '') {
+            $loc = $loc === '' ? rv_str($r['location_address']) : $loc . ' — ' . rv_str($r['location_address']);
         }
         return [
-            'id' => (int) $r['event_id'], 'title' => (string) $r['event_title'],
-            'date' => $start ? substr((string) $start, 0, 10) : null,
-            'time' => $start ? substr((string) $start, 11, 5) : null,
-            'location' => $loc, 'description' => (string) ($r['event_desc'] ?? ''),
-            'source' => 'churchcrm',
+            'id' => (int) $r['id'],
+            'occurrence_id' => $r['next_occurrence_id'] !== null ? (int) $r['next_occurrence_id'] : null,
+            'title' => (string) $r['title'],
+            'date' => $date,
+            'time' => $time,
+            'location' => $loc, 'description' => (string) ($r['summary'] ?? ''),
         ];
     }
 
@@ -231,8 +231,8 @@ if (!function_exists('rv_config')) {
     }
 
     /**
-     * Match a submitted person against existing ChurchCRM members (person_per)
-     * using the 5-component comparison.
+     * Match a submitted person against existing people in the member database
+     * using the 5-component comparison. $db is rv_members_db().
      * @return array{exact:list<array<string,mixed>>,possible:list<array<string,mixed>>}
      */
     function rv_match_members(PDO $db, array $p): array
@@ -246,19 +246,19 @@ if (!function_exists('rv_config')) {
 
         $conds = [];
         $params = [];
-        if ($last !== '')  { $conds[] = 'LOWER(per_LastName) = :last'; $params[':last'] = $last; }
-        if ($email !== '') { $conds[] = '(LOWER(per_Email) = :e1 OR LOWER(per_WorkEmail) = :e2)'; $params[':e1'] = $email; $params[':e2'] = $email; }
-        $sql = 'SELECT per_ID AS id, per_FirstName AS fn, per_LastName AS ln,
-                       per_Email AS email, per_WorkEmail AS wemail,
-                       per_CellPhone AS cell, per_HomePhone AS home, per_WorkPhone AS work,
-                       per_BirthMonth AS bm, per_BirthYear AS by2, per_City AS city
-                  FROM person_per WHERE ' . implode(' OR ', $conds) . ' LIMIT 200';
+        if ($last !== '')  { $conds[] = 'LOWER(last_name) = :last'; $params[':last'] = $last; }
+        if ($email !== '') { $conds[] = 'LOWER(email) = :e1'; $params[':e1'] = $email; }
+        if ($conds === []) { return ['exact' => [], 'possible' => []]; }
+        $sql = 'SELECT id, first_name AS fn, last_name AS ln, email,
+                       mobile_phone AS mobile, home_phone AS home,
+                       birth_month AS bm, birth_year AS by2, city
+                  FROM people WHERE ' . implode(' OR ', $conds) . ' LIMIT 200';
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
 
         $exact = []; $possible = [];
         foreach ($stmt->fetchAll() as $r) {
-            $cand = rv_person($r['fn'], $r['ln'], $r['bm'], $r['by2'], [$r['email'], $r['wemail']], [$r['cell'], $r['home'], $r['work']]);
+            $cand = rv_person($r['fn'], $r['ln'], $r['bm'], $r['by2'], [$r['email']], [$r['mobile'], $r['home']]);
             $why  = rv_components($in, $cand);
             $level = rv_match_level($why);
             if ($level === 'none') { continue; }
@@ -269,8 +269,8 @@ if (!function_exists('rv_config')) {
     }
 
     /**
-     * Self-duplicate detection against people_signup_temp (staged guests) using
-     * the same 5-component comparison. Optionally scope to one source event.
+     * Self-duplicate detection against visitor_registrations (visitors database)
+     * using the same 5-component comparison. Optionally scope to one source event.
      * @return array{exact:list<array<string,mixed>>,possible:list<array<string,mixed>>}
      */
     function rv_find_signup_dupes(PDO $db, array $p, ?int $eventId = null): array
@@ -288,8 +288,8 @@ if (!function_exists('rv_config')) {
         if ($email !== '') { $conds[] = 'LOWER(email) = :e1'; $params[':e1'] = $email; }
         $sql = 'SELECT id, first_name AS fn, last_name AS ln, email, phone,
                        birth_month AS bm, birth_year AS by2, city, created_at
-                  FROM people_signup_temp
-                 WHERE migration_status IN (\'new\', \'reviewed\', \'duplicate\')
+                  FROM visitor_registrations
+                 WHERE status IN (\'new\', \'reviewed\', \'duplicate\')
                    AND (' . implode(' OR ', $conds) . ')';
         if ($eventId !== null) { $sql .= ' AND source_event_id = :ev'; $params[':ev'] = $eventId; }
         $sql .= ' ORDER BY created_at DESC LIMIT 100';

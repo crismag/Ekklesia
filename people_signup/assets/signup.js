@@ -28,7 +28,7 @@
   // Married toggle nudges Member Type toward Trailblazer (unless a child),
   // but never overrides a manual choice the guest just made.
   var married = document.getElementById('is_married');
-  var mtSel = document.getElementById('member_type');
+  var mtSel = document.getElementById('member_type_name');
   var mtHint = document.getElementById('mtHint');
   var byAttr = form.getAttribute('data-birth-year');
   var birthYear = byAttr ? parseInt(byAttr, 10) : null;
@@ -40,7 +40,7 @@
       var age = birthYear ? (new Date().getFullYear() - birthYear) : null;
       var isChild = age !== null && age <= 10;
       if (married.checked && !isChild) {
-        mtSel.value = '2'; // Trailblazer
+        mtSel.value = 'Trailblazer';
         if (mtHint) mtHint.textContent = '(set to Trailblazer — adjust if needed)';
       }
     });
@@ -54,7 +54,7 @@
     geoBtn.addEventListener('click', function () {
       var body = new URLSearchParams();
       body.set('csrf', csrf ? csrf.value : '');
-      ['address', 'address2', 'city', 'state', 'zip', 'country'].forEach(function (f) {
+      ['address_line1', 'address_line2', 'city', 'region', 'postal_code', 'country'].forEach(function (f) {
         var el = document.getElementById(f);
         if (el) body.set(f, el.value);
       });
@@ -69,10 +69,10 @@
         if (!j.ok) { if (status) { status.style.color = '#b3261e'; status.textContent = j.error || 'No match.'; } return; }
         var a = j.address || {};
         function setIf(id, v) { var el = document.getElementById(id); if (el && v) el.value = v; }
-        setIf('address', a.street);
+        setIf('address_line1', a.street);
         setIf('city', a.city);
-        setIf('state', a.state);
-        setIf('zip', a.postcode);
+        setIf('region', a.state);
+        setIf('postal_code', a.postcode);
         setIf('country', a.country);
         var lat = document.getElementById('latitude'); if (lat && j.lat != null) lat.value = j.lat;
         var lon = document.getElementById('longitude'); if (lon && j.lon != null) lon.value = j.lon;

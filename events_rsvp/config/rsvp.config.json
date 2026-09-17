@@ -1,8 +1,7 @@
 {
   "app": { "title": "Event RSVP", "church_name": "Christlikeness Church" },
-  "event_source": "churchcrm",
   "admin_access": { "prefix": "ChristLikeness", "default_word": "Welcome", "default_days": 7 },
-  "fields": { "email": true, "phone": true, "city": true, "birth_for_matching": true, "party_count": true, "notes": true },
+  "fields": { "email": true, "phone": true, "city": true, "birth_for_matching": true, "party_size": true, "notes": true },
   "features": { "allow_maybe": true, "require_name": true },
   "messages": {
     "success_title": "You're registered!",

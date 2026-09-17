@@ -5,7 +5,8 @@ but has **no dependency** on the portal's PHP includes, styles, or runtime.
 
 ## What it does
 
-- **`event.php?event_id=123`** — RSVP form for a single event. The event is always
+- **`event.php?event_id=123`** — RSVP form for a single event (`events.id` in the
+  member database). The event is always
   chosen by the URL and loaded server-side (`rv_load_event()`) — the guest never
   picks it from a list. Collects name, optional email/phone/city, optional birth
   month+year (for matching), Yes / Maybe / No, party size, and notes.
@@ -22,43 +23,46 @@ standalone app with its own access code.
 
 ## How a response is recorded
 
-- **Confident member match** → recorded as `person_type = member` with `member_id`.
-- **Anyone else** → staged in `people_signup_temp` (`source = rsvp`,
-  `source_event_id` set) and recorded as `person_type = new_signup` with
-  `signup_id`. Guests are **never** auto-added to the main member tables — the
-  People Sign-Up admin review is where staged people get promoted.
+RSVPs are stored in `visitor_rsvps` (visitors database) with the event's
+`event_id` and, when the event has an upcoming date, that date's
+`occurrence_id`.
 
-Every attendance row also keeps name/city/email/phone **snapshots** so the list is
+- **Confident member match** → recorded with `person_id` (member database).
+- **Anyone else** → saved in `visitor_registrations` (`source = rsvp`,
+  `source_event_id` set) and recorded with `visitor_registration_id`. Guests are
+  **never** auto-added to the member database — the People Sign-Up admin review
+  is where registrations get promoted.
+
+Every RSVP row also keeps the name/city/email/phone given, so the list is
 readable even before anyone is linked.
 
-## Event source
+## Events
 
-`config/rsvp.config.json` → `event_source`:
-
-- `churchcrm` (default) — reads `events_event` and shows the soonest occurrence
-  that is today or later.
-- `rsvp_events` — reads this module's own lightweight `rsvp_events` table (for
-  events that don't live in ChurchCRM).
+RSVPs are for member-database events only: `events` (active, not archived),
+showing the soonest scheduled `event_occurrences` date that is today or later,
+else the event's own start date.
 
 ## Configuration
 
 - **`config/rsvp.config.json`** — non-sensitive UI settings (title, which fields to
-  show, `allow_maybe`, messages, `event_source`).
-- **`config/rsvp.secure.php`** — DB credentials + admin token. Executed, never
+  show, `allow_maybe`, messages).
+- **`config/rsvp.secure.php`** — database settings + admin token. Executed, never
   served as text. Env first, then portal `.env`, then defaults.
 
   | Setting | Env var | Fallback |
   | --- | --- | --- |
-  | DB host/port/name/user/pass | `CHURCHCRM_DB_*` (then `DB_*`) | portal `.env` |
+  | Member database host/port/name/user/pass (MySQL) | `MEMBERS_DB_*` (then `DB_*`) | portal `.env` |
+  | Visitors database file (SQLite, relative to the Ekklesia root) | `VISITORS_DB_PATH` | `storage/private/database/visitors.sqlite` |
   | Admin access code | `RSVP_ADMIN_TOKEN` | `change-me-events_rsvp-admin` |
 
   **Change `RSVP_ADMIN_TOKEN` before going live.**
 
 ## Install
 
-1. Apply `sql/001_rsvp_tables.sql` once (creates `rsvp_events` and
-   `rsvp_attendance` in the ChurchCRM database).
-2. Set DB env vars (or rely on the portal `.env` fallback) and a strong
+1. The visitors database is `database/visitors/001_schema.sql` (built by
+   `database/migrate/visitors_from_legacy.php`); events come from the member
+   database (`database/members/001_schema.sql`).
+2. Set database env vars (or rely on the portal `.env` fallback) and a strong
    `RSVP_ADMIN_TOKEN`.
 3. Share links like `events_rsvp/event.php?event_id=5`. Admins visit
    `events_rsvp/admin_attendance.php`.

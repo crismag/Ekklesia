@@ -2,8 +2,8 @@
 /**
  * People Sign-Up — admin review (standalone, token-gated).
  * Compact, spreadsheet-style grid with in-place editing. Cells auto-save to
- * admin_save.php. Nothing here writes to the main member tables — it only edits
- * staged rows in people_signup_temp.
+ * admin_save.php. Nothing here writes to the member database — it only edits
+ * registrations in visitor_registrations. Promotion is migrate.php.
  */
 declare(strict_types=1);
 
@@ -11,17 +11,19 @@ require_once __DIR__ . '/includes/admin_auth.php';
 sg_admin_gate();
 
 $db = sg_db();
-$STATUSES = ['new', 'reviewed', 'duplicate', 'migrated', 'rejected'];
+$membersDb = sg_members_db();
+$STATUSES = ['new', 'reviewed', 'duplicate', 'promoted', 'rejected'];
+$STATUS_LABELS = ['new' => 'New', 'reviewed' => 'Reviewed', 'duplicate' => 'Duplicate', 'promoted' => 'Promoted to member', 'rejected' => 'Rejected'];
 
 // ---- Listing -------------------------------------------------------------
 $filter = (string) ($_GET['status'] ?? '');
-$where  = in_array($filter, $STATUSES, true) ? 'WHERE migration_status = :f' : '';
-$st = $db->prepare("SELECT * FROM people_signup_temp $where ORDER BY created_at DESC, id DESC LIMIT 500");
+$where  = in_array($filter, $STATUSES, true) ? 'WHERE status = :f' : '';
+$st = $db->prepare("SELECT * FROM visitor_registrations $where ORDER BY created_at DESC, id DESC LIMIT 500");
 $st->execute($where ? [':f' => $filter] : []);
 $rows = $st->fetchAll();
 
 $counts = [];
-foreach ($db->query('SELECT migration_status s, COUNT(*) c FROM people_signup_temp GROUP BY migration_status') as $r) {
+foreach ($db->query('SELECT status s, COUNT(*) c FROM visitor_registrations GROUP BY status') as $r) {
     $counts[$r['s']] = (int) $r['c'];
 }
 $total = array_sum($counts);
@@ -75,7 +77,7 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
   td.saved{box-shadow:inset 0 0 0 2px #1a7a3a}
   td.err{box-shadow:inset 0 0 0 2px #b3261e;background:#fdecea!important}
   .st-new select{color:#0c5a45}.st-reviewed select{color:#0f4e97}.st-duplicate select{color:#8a5a00}
-  .st-migrated select{color:#1a7a3a}.st-rejected select{color:#b3261e}
+  .st-promoted select{color:#1a7a3a}.st-rejected select{color:#b3261e}
   .sugg{padding:2px 4px;display:flex;gap:3px;flex-wrap:wrap;max-width:220px}
   .chip{border:1px solid #bcd6f5;background:#eaf1fb;color:#0f4e97;border-radius:5px;font-size:11px;padding:2px 6px;cursor:pointer;line-height:1.3}
   .chip:hover{background:#d9e8fb}
@@ -83,7 +85,7 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
   .hint{color:#6b7a72;font-size:11px;padding:4px 8px}
   .tbtn{font:inherit;font-size:12px;font-weight:800;background:#fff;color:#0c5a45;border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
   .tbtn:hover{background:#eafaf3}
-  #cls{font:inherit;font-size:12px;border-radius:6px;border:0;padding:4px 6px}
+  #membership_status_id{font:inherit;font-size:12px;border-radius:6px;border:0;padding:4px 6px}
   td.chk{text-align:center;background:var(--head)!important}
   td.act{padding:0 6px;text-align:center}
   .mg{font:inherit;font-size:11px;font-weight:800;background:#0c5a45;color:#fff;border:0;border-radius:5px;padding:4px 9px;cursor:pointer;white-space:nowrap}
@@ -99,22 +101,22 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
   <div class="tabs">
     <a href="admin_review.php" class="<?= $filter === '' ? 'on' : '' ?>">All <span class="n"><?= $total ?></span></a>
     <?php foreach ($STATUSES as $s): ?>
-      <a href="?status=<?= e($s) ?>" class="<?= $filter === $s ? 'on' : '' ?>"><?= ucfirst($s) ?> <span class="n"><?= (int) ($counts[$s] ?? 0) ?></span></a>
+      <a href="?status=<?= e($s) ?>" class="<?= $filter === $s ? 'on' : '' ?>"><?= e($STATUS_LABELS[$s]) ?> <span class="n"><?= (int) ($counts[$s] ?? 0) ?></span></a>
     <?php endforeach; ?>
   </div>
   <span class="sp"></span>
   <label style="font-size:12px">as
-    <select id="cls" title="Classification for migrated people">
+    <select id="membership_status_id" title="Membership status for promoted people">
       <option value="1" selected>Member</option>
       <option value="2">Regular Attender</option>
       <option value="3">Guest</option>
       <option value="5">Non-Attender</option>
     </select>
   </label>
-  <button type="button" id="bulkMigrate" class="tbtn">Migrate selected &#9656;</button>
+  <button type="button" id="bulkPromote" class="tbtn">Promote selected &#9656;</button>
 </div>
 <div class="hint" style="padding:4px 14px;background:#fff;border-bottom:1px solid var(--grid)">
-  Click a cell to edit (auto-saves). Tick rows and use <b>Migrate selected</b>, or the per-row <b>Migrate</b> button, to import into ChurchCRM. Last name is the only field ChurchCRM requires.
+  Click a cell to edit (auto-saves). Tick rows and use <b>Promote selected</b>, or the per-row <b>Promote</b> button, to add them to the member records. To link a guest to an existing member instead, set <b>Member&nbsp;#</b> (or click a suggestion) and promote.
 </div>
 <noscript>In-place editing needs JavaScript. The grid is read-only right now.</noscript>
 
@@ -130,7 +132,7 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
     <th>Member type</th>
     <th>Status</th><th>Member&nbsp;#</th><th>Possible match</th>
     <th>Facebook</th><th>LinkedIn</th><th>X</th>
-    <th>Notes</th><th>Source</th><th>When</th><th>Import</th>
+    <th>Notes</th><th>Source</th><th>When</th><th>Promote</th>
   </tr></thead>
   <tbody>
   <?php if (!$rows): ?>
@@ -138,16 +140,16 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
   <?php endif; ?>
   <?php foreach ($rows as $r):
     $rid = (int) $r['id'];
-    $m = sg_match_members($db, [
+    $m = sg_match_members($membersDb, [
         'first_name' => $r['first_name'], 'last_name' => $r['last_name'],
         'email' => $r['email'], 'phone' => $r['phone'],
         'birth_month' => $r['birth_month'], 'birth_year' => $r['birth_year'],
     ]);
     $suggest = array_slice(array_merge($m['exact'], $m['possible']), 0, 3);
-    $isMock = strtoupper(trim((string) $r['admin_notes'])) === 'MOCK';
-    $migrated = $r['migration_status'] === 'migrated';
-    // Rows that should not be imported: already migrated, rejected, or a known duplicate.
-    $noImport = in_array($r['migration_status'], ['migrated', 'rejected', 'duplicate'], true);
+    $isMock = strtoupper(trim((string) $r['reviewer_notes'])) === 'MOCK';
+    $promoted = $r['status'] === 'promoted';
+    // Rows that should not be promoted: already promoted, rejected, or a known duplicate.
+    $noImport = in_array($r['status'], ['promoted', 'rejected', 'duplicate'], true);
   ?>
     <tr data-row="<?= $rid ?>">
       <td class="chk"><?php if (!$noImport): ?><input type="checkbox" class="rowchk" value="<?= $rid ?>"><?php endif; ?></td>
@@ -155,8 +157,8 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
       <td><?= cell_text($r, 'first_name', $csrf, 96) ?></td>
       <td><?= cell_text($r, 'last_name', $csrf, 110) ?></td>
       <td><?= cell_text($r, 'city', $csrf, 110) ?></td>
-      <td><?= cell_text($r, 'address', $csrf, 150) ?></td>
-      <td><?= cell_text($r, 'address2', $csrf, 80) ?></td>
+      <td><?= cell_text($r, 'address_line1', $csrf, 150) ?></td>
+      <td><?= cell_text($r, 'address_line2', $csrf, 80) ?></td>
       <td>
         <select class="c" data-id="<?= $rid ?>" data-field="birth_month" data-original="<?= (int) $r['birth_month'] ?>">
           <option value="">—</option>
@@ -172,22 +174,22 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
       <td><?= cell_text($r, 'reason_for_visit', $csrf, 150) ?></td>
       <td><?= cell_text($r, 'invited_by', $csrf, 130) ?></td>
       <td>
-        <select class="c" data-id="<?= $rid ?>" data-field="member_type" data-original="<?= $r['member_type'] === null ? '' : (int) $r['member_type'] ?>">
+        <select class="c" data-id="<?= $rid ?>" data-field="member_type_name" data-original="<?= e($r['member_type_name'] ?? '') ?>">
           <option value="">—</option>
-          <option value="1"<?= (int) $r['member_type'] === 1 ? ' selected' : '' ?>>Radical</option>
-          <option value="2"<?= (int) $r['member_type'] === 2 ? ' selected' : '' ?>>Trailblazer</option>
-          <option value="3"<?= (int) $r['member_type'] === 3 ? ' selected' : '' ?>>G&amp;A</option>
-        </select>
-      </td>
-      <td class="st-<?= e($r['migration_status']) ?>">
-        <select class="c" data-id="<?= $rid ?>" data-field="migration_status" data-original="<?= e($r['migration_status']) ?>"
-                onchange="this.closest('td').className='st-'+this.value">
-          <?php foreach ($STATUSES as $s): ?>
-            <option value="<?= e($s) ?>"<?= $r['migration_status'] === $s ? ' selected' : '' ?>><?= ucfirst($s) ?></option>
+          <?php foreach (sg_member_type_names() as $mt): ?>
+          <option value="<?= e($mt) ?>"<?= (string) $r['member_type_name'] === $mt ? ' selected' : '' ?>><?= e($mt) ?></option>
           <?php endforeach; ?>
         </select>
       </td>
-      <td><?= cell_num($r, 'matched_member_id', 70, '—') ?></td>
+      <td class="st-<?= e($r['status']) ?>">
+        <select class="c" data-id="<?= $rid ?>" data-field="status" data-original="<?= e($r['status']) ?>"
+                onchange="this.closest('td').className='st-'+this.value">
+          <?php foreach ($STATUSES as $s): ?>
+            <option value="<?= e($s) ?>"<?= $r['status'] === $s ? ' selected' : '' ?>><?= e($STATUS_LABELS[$s]) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </td>
+      <td><?= cell_num($r, 'matched_person_id', 70, '—') ?></td>
       <td>
         <?php if ($suggest): ?>
           <div class="sugg">
@@ -200,17 +202,17 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
       <td><?= cell_text($r, 'facebook', $csrf, 120) ?></td>
       <td><?= cell_text($r, 'linkedin', $csrf, 120) ?></td>
       <td><?= cell_text($r, 'twitter', $csrf, 120) ?></td>
-      <td><?= $isMock ? '<span class="mock" style="padding:5px 7px;display:inline-block">MOCK</span>' : cell_text($r, 'admin_notes', $csrf, 150) ?></td>
+      <td><?= $isMock ? '<span class="mock" style="padding:5px 7px;display:inline-block">MOCK</span>' : cell_text($r, 'reviewer_notes', $csrf, 150) ?></td>
       <td class="hint"><?= e($r['source']) ?><?= $r['source_event_id'] ? ' #' . (int) $r['source_event_id'] : '' ?></td>
       <td class="hint"><?= e(substr((string) $r['created_at'], 0, 16)) ?></td>
       <td class="act">
-        <?php if ($migrated): ?>
-          <span class="done">&#10003; #<?= (int) $r['matched_member_id'] ?></span>
+        <?php if ($promoted): ?>
+          <span class="done">&#10003; #<?= (int) $r['matched_person_id'] ?></span>
         <?php elseif ($noImport): ?>
-          <button type="button" class="mg" data-migrate-id="<?= $rid ?>" disabled
-                  title="<?= e(ucfirst($r['migration_status'])) ?> rows can't be imported. Change status to enable.">Migrate &#9656;</button>
+          <button type="button" class="mg" data-promote-id="<?= $rid ?>" disabled
+                  title="<?= e($STATUS_LABELS[$r['status']] ?? ucfirst($r['status'])) ?> rows can't be promoted. Change status to enable.">Promote &#9656;</button>
         <?php else: ?>
-          <button type="button" class="mg" data-migrate-id="<?= $rid ?>">Migrate &#9656;</button>
+          <button type="button" class="mg" data-promote-id="<?= $rid ?>">Promote &#9656;</button>
         <?php endif; ?>
       </td>
     </tr>

@@ -6,7 +6,7 @@
   var btn = document.getElementById('submitBtn');
 
   // Party-count stepper.
-  var party = document.getElementById('party_count');
+  var party = document.getElementById('party_size');
   Array.prototype.forEach.call(document.querySelectorAll('.stepper button'), function (b) {
     b.addEventListener('click', function () {
       if (!party) return;

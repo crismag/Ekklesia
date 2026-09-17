@@ -81,10 +81,10 @@ if (!function_exists('sg_v_required')) {
         if ($has('birth_day') && $posted['birth_day'] !== null && ((int) $posted['birth_day'] < 1 || (int) $posted['birth_day'] > 31)) {
             $errors[] = 'Birth day looks invalid.';
         }
-        if ($has('gender') && $posted['gender'] !== null && !in_array((int) $posted['gender'], [1, 2], true)) {
+        if ($has('gender') && $posted['gender'] !== null && !in_array((string) $posted['gender'], ['male', 'female'], true)) {
             $errors[] = 'Gender is invalid.';
         }
-        if ($has('member_type') && $posted['member_type'] !== null && !in_array((int) $posted['member_type'], [1, 2, 3], true)) {
+        if ($has('member_type_name') && $posted['member_type_name'] !== null && !in_array((string) $posted['member_type_name'], sg_member_type_names(), true)) {
             $errors[] = 'Member type is invalid.';
         }
         if ($has('is_married') && $posted['is_married'] !== null && !in_array((int) $posted['is_married'], [0, 1], true)) {

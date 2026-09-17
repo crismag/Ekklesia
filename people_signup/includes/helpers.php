@@ -1,7 +1,7 @@
 <?php
 /**
  * Standalone helpers for the People Sign-Up module: config loading, output
- * escaping, CSRF, request helpers, and ChurchCRM member matching.
+ * escaping, CSRF, request helpers, and member matching.
  */
 declare(strict_types=1);
 
@@ -53,7 +53,10 @@ if (!function_exists('sg_config')) {
         return is_string($t) && !empty($_SESSION['sg_csrf']) && hash_equals($_SESSION['sg_csrf'], $t);
     }
     function sg_csrf_rotate(): void { sg_session(); $_SESSION['sg_csrf'] = bin2hex(random_bytes(32)); }
+    /** Visitors database (SQLite): registrations, promotions, access codes. */
     function sg_db(): PDO { return signup_db(); }
+    /** Member database (MySQL): people, member_types. */
+    function sg_members_db(): PDO { return signup_members_db(); }
 
     // ---- Rotating admin access code (ChristLikeness + WORD, with expiry) -----
     function sg_admin_module(): string { return 'signup'; }
@@ -70,15 +73,15 @@ if (!function_exists('sg_config')) {
     /** Current access code row (latest for this module) with computed status, or null. */
     function sg_admin_active(): ?array
     {
-        $st = sg_db()->prepare('SELECT * FROM signup_admin_access WHERE module = :m ORDER BY id DESC LIMIT 1');
+        $st = sg_db()->prepare('SELECT * FROM visitor_admin_access_codes WHERE module = :m ORDER BY id DESC LIMIT 1');
         $st->execute([':m' => sg_admin_module()]);
         $r = $st->fetch();
         if (!$r) { return null; }
         $exp = strtotime((string) $r['expires_at']);
         $active = $exp !== false && $exp >= time();
         return [
-            'word'        => (string) $r['word'],
-            'code'        => sg_admin_prefix() . $r['word'],
+            'word'        => (string) $r['code'],
+            'code'        => sg_admin_prefix() . $r['code'],
             'issued_at'   => (string) $r['issued_at'],
             'expires_at'  => (string) $r['expires_at'],
             'active'      => $active,
@@ -94,8 +97,10 @@ if (!function_exists('sg_config')) {
         if ($word === '') { $word = sg_admin_gen_word(); }
         $days = max(1, min(365, $days));
         $expires = date('Y-m-d H:i:s', time() + $days * 86400);
-        $st = sg_db()->prepare('INSERT INTO signup_admin_access (module, word, expires_at, note) VALUES (:m, :w, :e, :n)');
-        $st->execute([':m' => sg_admin_module(), ':w' => $word, ':e' => $expires, ':n' => $note ?: null]);
+        // issued_at and expires_at come from the same (PHP) clock, so the
+        // expiry comparison in sg_admin_active() stays consistent.
+        $st = sg_db()->prepare('INSERT INTO visitor_admin_access_codes (module, code, issued_at, expires_at, note) VALUES (:m, :w, :i, :e, :n)');
+        $st->execute([':m' => sg_admin_module(), ':w' => $word, ':i' => date('Y-m-d H:i:s'), ':e' => $expires, ':n' => $note ?: null]);
         return sg_admin_active();
     }
 
@@ -118,27 +123,32 @@ if (!function_exists('sg_config')) {
         return $a !== null && $a['active'] && hash_equals($a['code'], $given);
     }
 
-    // Member Type (ChurchCRM person_custom.c1): 1=Radical, 2=Trailblazer, 3=G&A.
-    function sg_member_type_label(?int $t): string
+    /**
+     * Member type names a registration may carry (member_types.name in the
+     * member database). Promotion resolves the name to member_type_id.
+     *
+     * @return list<string>
+     */
+    function sg_member_type_names(): array
     {
-        return [1 => 'Radical', 2 => 'Trailblazer', 3 => 'G&A'][$t] ?? '';
+        return array_values(array_map('strval', (array) sg_cfg('member_types', ['Radical', 'Trailblazer', 'G&A'])));
     }
 
     /**
-     * Auto-detect Member Type. Age bands: ≤10 → G&A (3); 11–29 → Radical (1);
-     * ≥30 → Trailblazer (2). A married adult (non-child) → Trailblazer regardless
+     * Auto-detect Member Type. Age bands: ≤10 → G&A; 11–29 → Radical;
+     * ≥30 → Trailblazer. A married adult (non-child) → Trailblazer regardless
      * of age. Returns null when there's nothing to go on (no birth year, not married).
      */
-    function sg_detect_member_type(?int $birthYear, bool $married): ?int
+    function sg_detect_member_type(?int $birthYear, bool $married): ?string
     {
         $age = ($birthYear && $birthYear > 1900) ? ((int) date('Y') - $birthYear) : null;
         $isChild = $age !== null && $age <= 10;
 
-        if ($married && !$isChild) { return 2; }   // Trailblazer
+        if ($married && !$isChild) { return 'Trailblazer'; }
         if ($age === null) { return null; }
-        if ($age <= 10) { return 3; }              // G&A
-        if ($age <= 29) { return 1; }              // Radical (11–15 uncertain band defaults here)
-        return 2;                                   // Trailblazer
+        if ($age <= 10) { return 'G&A'; }
+        if ($age <= 29) { return 'Radical'; }      // 11–15 uncertain band defaults here
+        return 'Trailblazer';
     }
     function sg_json($data, int $code = 200): void
     {
@@ -252,8 +262,9 @@ if (!function_exists('sg_config')) {
     }
 
     /**
-     * Match a submitted person against existing ChurchCRM members (person_per)
-     * using the 5-component comparison. Never auto-merges.
+     * Match a submitted person against existing people in the member database
+     * using the 5-component comparison. Never auto-merges. $db is the member
+     * database connection (sg_members_db()).
      *
      * @param array{first_name?:string,last_name?:string,email?:string,phone?:string,birth_month?:int|string,birth_year?:int|string} $p
      * @return array{exact:list<array<string,mixed>>,possible:list<array<string,mixed>>}
@@ -272,13 +283,13 @@ if (!function_exists('sg_config')) {
         // Candidate pull: same last name (covers name matches) OR an email hit.
         $conds = [];
         $params = [];
-        if ($last !== '')  { $conds[] = 'LOWER(per_LastName) = :last'; $params[':last'] = $last; }
-        if ($email !== '') { $conds[] = '(LOWER(per_Email) = :e1 OR LOWER(per_WorkEmail) = :e2)'; $params[':e1'] = $email; $params[':e2'] = $email; }
-        $sql = 'SELECT per_ID AS id, per_FirstName AS fn, per_LastName AS ln,
-                       per_Email AS email, per_WorkEmail AS wemail,
-                       per_CellPhone AS cell, per_HomePhone AS home, per_WorkPhone AS work,
-                       per_BirthMonth AS bm, per_BirthYear AS by2, per_City AS city
-                  FROM person_per
+        if ($last !== '')  { $conds[] = 'LOWER(last_name) = :last'; $params[':last'] = $last; }
+        if ($email !== '') { $conds[] = 'LOWER(email) = :e1'; $params[':e1'] = $email; }
+        if ($conds === []) { return ['exact' => [], 'possible' => []]; }
+        $sql = 'SELECT id, first_name AS fn, last_name AS ln, email,
+                       mobile_phone AS mobile, home_phone AS home,
+                       birth_month AS bm, birth_year AS by2, city
+                  FROM people
                  WHERE ' . implode(' OR ', $conds) . ' LIMIT 200';
 
         $stmt = $db->prepare($sql);
@@ -287,7 +298,7 @@ if (!function_exists('sg_config')) {
         $exact = [];
         $possible = [];
         foreach ($stmt->fetchAll() as $r) {
-            $cand = sg_person($r['fn'], $r['ln'], $r['bm'], $r['by2'], [$r['email'], $r['wemail']], [$r['cell'], $r['home'], $r['work']]);
+            $cand = sg_person($r['fn'], $r['ln'], $r['bm'], $r['by2'], [$r['email']], [$r['mobile'], $r['home']]);
             $why  = sg_components($in, $cand);
             $level = sg_match_level($why);
             if ($level === 'none') { continue; }
@@ -305,9 +316,9 @@ if (!function_exists('sg_config')) {
     }
 
     /**
-     * Detect prior entries for the same person already staged in the signup table
-     * (self-duplicate detection), using the same 5-component comparison. Ignores
-     * rows already handled (migrated/rejected) and an optional row id to exclude.
+     * Detect prior registrations for the same person (self-duplicate detection)
+     * in the visitors database, using the same 5-component comparison. Ignores
+     * rows already handled (promoted/rejected) and an optional row id to exclude.
      *
      * @param array{first_name?:string,last_name?:string,email?:string,phone?:string,birth_month?:int|string,birth_year?:int|string} $p
      * @return array{exact:list<array<string,mixed>>,possible:list<array<string,mixed>>}
@@ -327,8 +338,8 @@ if (!function_exists('sg_config')) {
         if ($email !== '') { $conds[] = 'LOWER(email) = :e1'; $params[':e1'] = $email; }
         $sql = 'SELECT id, first_name AS fn, last_name AS ln, email, phone,
                        birth_month AS bm, birth_year AS by2, city, created_at
-                  FROM people_signup_temp
-                 WHERE migration_status IN (\'new\', \'reviewed\', \'duplicate\')
+                  FROM visitor_registrations
+                 WHERE status IN (\'new\', \'reviewed\', \'duplicate\')
                    AND (' . implode(' OR ', $conds) . ')';
         if ($excludeId !== null) {
             $sql .= ' AND id <> :ex';
