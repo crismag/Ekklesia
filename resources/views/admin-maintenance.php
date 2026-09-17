@@ -125,40 +125,18 @@ ob_start();
   </div></article>
 <?php else: ?>
 
-<div class="mt-grid">
-  <article class="admin-card">
-    <div class="admin-card-head"><div>
-      <h2>Import members from a spreadsheet</h2>
-      <p>Bring member information in from an Excel workbook.</p>
-    </div></div>
-    <div class="admin-card-body">
-      <p class="mt-help">You will be able to check every row and fix problems before anything is
-         saved to the member records. Nothing changes until you confirm.</p>
-      <a class="mt-btn" href="<?= $base ?>/admin/maintenance/import">Choose a spreadsheet</a>
-    </div>
-  </article>
-
-  <article class="admin-card">
-    <div class="admin-card-head"><div>
-      <h2>Download member records</h2>
-      <p>Save member information as an Excel workbook.</p>
-    </div></div>
-    <div class="admin-card-body">
-      <form method="post" action="<?= $base ?>/admin/maintenance/export-xlsx">
-        <div class="mt-field">
-          <label for="exportCampus">Which members</label>
-          <select id="exportCampus" name="campus_id">
-            <option value="0">Everyone (one sheet per campus)</option>
-            <?php foreach ($campuses as $c): ?>
-              <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <button class="mt-btn" type="submit">Download Excel workbook</button>
-      </form>
-    </div>
-  </article>
-</div>
+<!-- Member import and the workbook export belong to People & Records
+     (docs/design/surfaces.md); this page keeps backups and points there. -->
+<article class="admin-card">
+  <div class="admin-card-head"><div>
+    <h2>Import or export member records</h2>
+    <p>Spreadsheet imports and the member workbook are in People &amp; Records.</p>
+  </div></div>
+  <div class="admin-card-body">
+    <p class="mt-help">Take a backup below before a large import. Exported workbooks are also listed with the backups.</p>
+    <a class="mt-btn" href="<?= $base ?>/admin/maintenance/import">Open Import &amp; export</a>
+  </div>
+</article>
 
 <article class="admin-card">
   <div class="admin-card-head"><div>
@@ -260,8 +238,8 @@ $content = ob_get_clean();
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'maintenance',
     'pageTitle' => 'Maintenance · Admin',
-    'pageSubtitle' => 'Import, export and backups',
+    'pageSubtitle' => 'Backups',
     'sectionTitle' => 'Maintenance',
-    'sectionDescription' => 'Import and export member records, and keep safe copies of church data.',
+    'sectionDescription' => 'Keep safe copies of church data, and download what has been saved.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);

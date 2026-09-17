@@ -1386,9 +1386,8 @@ $webRoutes = [
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
-        $svc = \App\Providers\PortalServiceProvider::makePersonAdminService();
-        $imp = \App\Providers\PortalServiceProvider::makeMemberCampusImportService();
-        $campuses = $svc->campuses();
+        $isAdmin = $actor !== null && !empty($actor['isPortalWideAdmin']);
+        $campuses = [];
         $campusId = (int) ($req['campus_id'] ?? 0);
         $hubSheet = (string) ($req['hub_sheet'] ?? \App\Services\MemberWorkbookParser::HUB_SHEET);
         $nySheet = (string) ($req['ny_sheet'] ?? '');
@@ -1401,47 +1400,65 @@ $webRoutes = [
         $rows = [];
         $counts = ['draft' => 0, 'ready' => 0, 'skip' => 0, 'applied' => 0, 'total' => 0];
         $statusFilter = (string) ($req['status'] ?? '');
-        try {
-            $batches = $imp->batches();
-            $bid = (int) ($req['batch'] ?? 0);
-            if ($bid > 0) {
-                $batch = $imp->batch($bid);
-                if ($batch) {
-                    $listed = $imp->rows($bid, $statusFilter);
-                    $rows = $listed['rows'];
-                    $counts = $listed['counts'];
-                    $campusId = (int) $batch['campus_id'];
+        /** @var list<array{relative:string,filename:string,bytes:int,mtime:int}> $exports used by the template */
+        $exports = [];
+        // Staging rows are member records in waiting: nothing is read for anyone
+        // but a portal administrator (the view refuses them too).
+        if ($isAdmin) {
+            try {
+                $campuses = \App\Providers\PortalServiceProvider::makePersonAdminService()->campuses();
+                $imp = \App\Providers\PortalServiceProvider::makeMemberCampusImportService();
+                $batches = $imp->batches();
+                $bid = (int) ($req['batch'] ?? 0);
+                if ($bid > 0) {
+                    $batch = $imp->batch($bid);
+                    if ($batch) {
+                        $listed = $imp->rows($bid, $statusFilter);
+                        $rows = $listed['rows'];
+                        $counts = $listed['counts'];
+                        $campusId = (int) $batch['campus_id'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                if ($flash === '') {
+                    $flash = $e->getMessage();
+                    $notice = 'error';
                 }
             }
-        } catch (\Throwable $e) {
-            if ($flash === '') {
-                $flash = $e->getMessage();
-                $notice = 'error';
-            }
-        }
-        // What the workbook called each ministry, and whether that landed
-        // anywhere. Read here rather than in the view so the page has no idea
-        // where the decisions are stored.
-        /** @var list<array<string,mixed>> $ministryNameRows used by the template */
-        $ministryNameRows = [];
-        /** @var list<array{id:int,name:string}> $ministryChoices used by the template */
-        $ministryChoices = [];
-        /** @var int $ministryNamesPending used by the template */
-        $ministryNamesPending = 0;
-        try {
-            $nameMap = \App\Providers\PortalServiceProvider::makeMinistryNameMap();
-            $ministryNameRows = $nameMap->rows();
-            $ministryNamesPending = $nameMap->pendingCount();
-            foreach (\App\Providers\PortalServiceProvider::makeMinistryService()->listMinistriesPublic(null) as $m) {
-                $ministryChoices[] = [
-                    'id' => (int) ($m['ministry_id'] ?? $m['ministryId'] ?? 0),
-                    'name' => (string) ($m['name'] ?? ''),
-                ];
-            }
-            usort($ministryChoices, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
-        } catch (\Throwable) {
-            // A portal without a decisions file simply shows no table.
+            // What the workbook called each ministry, and whether that landed
+            // anywhere. Read here rather than in the view so the page has no idea
+            // where the decisions are stored.
+            /** @var list<array<string,mixed>> $ministryNameRows used by the template */
             $ministryNameRows = [];
+            /** @var list<array{id:int,name:string}> $ministryChoices used by the template */
+            $ministryChoices = [];
+            /** @var int $ministryNamesPending used by the template */
+            $ministryNamesPending = 0;
+            try {
+                $nameMap = \App\Providers\PortalServiceProvider::makeMinistryNameMap();
+                $ministryNameRows = $nameMap->rows();
+                $ministryNamesPending = $nameMap->pendingCount();
+                foreach (\App\Providers\PortalServiceProvider::makeMinistryService()->listMinistriesPublic(null) as $m) {
+                    $ministryChoices[] = [
+                        'id' => (int) ($m['ministry_id'] ?? $m['ministryId'] ?? 0),
+                        'name' => (string) ($m['name'] ?? ''),
+                    ];
+                }
+                usort($ministryChoices, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+            } catch (\Throwable) {
+                // A portal without a decisions file simply shows no table.
+                $ministryNameRows = [];
+            }
+            // Workbooks exported before, newest first (backups stay on Backups & maintenance).
+            try {
+                foreach (\App\Providers\PortalServiceProvider::makeMaintenanceBackupService()->store()->listRecent() as $file) {
+                    if (str_ends_with((string) $file['filename'], '.xlsx') && count($exports) < 5) {
+                        $exports[] = $file;
+                    }
+                }
+            } catch (\Throwable) {
+                $exports = [];
+            }
         }
 
         ob_start();
@@ -2796,9 +2813,14 @@ $webRoutes['POST /admin/maintenance/export-xlsx'] = function (array $req) use ($
     if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
     $basePath = (string) ($req['_base_path'] ?? '');
     $actor = $resolvePortalActor($req);
+    // The workbook export lives on People & Records › Import & export; a failure
+    // goes back to whichever page asked for it.
+    $fromImport = (string) ($req['return'] ?? '') === 'import';
+    $failTo = $basePath . ($fromImport ? '/admin/maintenance/import' : '/admin/maintenance') . '?notice=error';
+    $flashKey = $fromImport ? 'people_flash' : 'maintenance_flash';
     if ($actor === null || empty($actor['isPortalWideAdmin'])) {
-        $_SESSION['maintenance_flash'] = 'Only a portal-wide admin can export members.';
-        header('Location: ' . $basePath . '/admin/maintenance?notice=error', true, 302);
+        $_SESSION[$flashKey] = 'Only a portal-wide admin can export members.';
+        header('Location: ' . $failTo, true, 302);
         return '';
     }
     try {
@@ -2830,8 +2852,8 @@ $webRoutes['POST /admin/maintenance/export-xlsx'] = function (array $req) use ($
         $_SESSION['maintenance_flash'] = 'Saved styled workbook ' . $slot['relative'] . '.';
         header('Location: ' . $basePath . '/admin/maintenance/file?path=' . rawurlencode($slot['relative']), true, 302);
     } catch (\Throwable $e) {
-        $_SESSION['maintenance_flash'] = $e->getMessage();
-        header('Location: ' . $basePath . '/admin/maintenance?notice=error', true, 302);
+        $_SESSION[$flashKey] = $e->getMessage();
+        header('Location: ' . $failTo, true, 302);
     }
     return '';
 };
