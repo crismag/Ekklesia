@@ -656,7 +656,7 @@ if (!function_exists('portal_nav_bar')) {
   transition:background .12s;
 }
 .portal-brand:hover{background:rgba(255,255,255,.24)}
-.portal-brand-mark{position:relative;display:block;width:24px;height:24px;border-radius:6px;background:#fff center/cover no-repeat url("/church_portal/images/christlikeness_colored.jpg");box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+.portal-brand-mark{position:relative;display:block;width:24px;height:24px;border-radius:6px;background:#fff center/cover no-repeat box-shadow:0 0 0 1px rgba(255,255,255,.18)}
 .portal-brand-text{
   color:#f8fffb;
   font-weight:900;
@@ -1729,7 +1729,7 @@ SRCHJS;
             '<a class="skip-link" href="#portal-main">Skip to main content</a>'
             . '<header class="topbar">'
             . '<div class="topbar-brand">'
-            . '<a class="portal-brand" href="%s/" aria-label="%s"><span class="portal-brand-mark" aria-hidden="true"></span></a>'
+            . '<a class="portal-brand" href="%s/" aria-label="%s"><span class="portal-brand-mark" aria-hidden="true" style="background-image:url(\'%s/images/christlikeness_colored.jpg\')"></span></a>'
             . '<span class="portal-brand-text" aria-hidden="true">%s</span>'
             . '</div>'
             . '%s'
@@ -1748,6 +1748,8 @@ SRCHJS;
             . '%s%s%s%s',
             htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars((string) ($chrome['header']['brandTitle'] ?? 'Scheduler') . ' home', ENT_QUOTES, 'UTF-8'),
+            // The logo follows the base path: the app runs at a site root or under a folder.
+            htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars((string) ($chrome['header']['brandTitle'] ?? ''), ENT_QUOTES, 'UTF-8'),
             portal_nav_bar($basePath, $navGroups),
             $campusSelectHtml,
