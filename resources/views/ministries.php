@@ -340,7 +340,7 @@ $subtitle = $minSettings['subtitle'] ?? 'Who is assigned across ministries — g
             const day = days[dk] || (days[dk] = { key: dk, startsOn: a.starts_on, ministries: {} });
             const m = day.ministries[a.ministry_id] || (day.ministries[a.ministry_id] = { id: a.ministry_id, name: a.ministry_name, occ: {} });
             const o = m.occ[a.occurrence_id] || (m.occ[a.occurrence_id] = { id: a.occurrence_id, title: a.event_title || 'Scheduled item', startsOn: a.starts_on, roles: {} });
-            const r = o.roles[a.role_id] || (o.roles[a.role_id] = { id: a.role_id, name: a.role_name || 'Assigned', people: [] });
+            const r = o.roles[a.serving_role_id] || (o.roles[a.serving_role_id] = { id: a.serving_role_id, name: a.role_name || 'Assigned', people: [] });
             if (a.person_name) r.people.push(a.person_name);
         });
         return Object.values(days).sort((x, y) => new Date(x.startsOn) - new Date(y.startsOn))
