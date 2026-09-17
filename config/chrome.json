@@ -1,7 +1,7 @@
 {
-    "_comment": "Site-wide header + footer overrides. Edit via /admin/header and /admin/footer. primaryNav is the SINGLE source of the portal's primary navigation (Phase 1) — page views no longer define their own. Daily-work tabs: Home, Calendar, Ministries, People, Events (once). Docs, Printables, My Schedule, Availability, Account, and Admin are overflow/drawer items unless an admin pins Docs in primaryNav.",
+    "_comment": "Site-wide header + footer text. Edit via /admin/header and /admin/footer. Navigation is NOT configured here: since Phase 2 the workspace map (app/Core/Navigation/Workspaces.php) is the single source of the portal's navigation. primaryNav is retained only so older saves round-trip; nothing renders it.",
     "header": {
-        "brandTitle": "Scheduler",
+        "brandTitle": "Ekklesia",
         "brandSubtitle": "Campus-aware ministry operations",
         "primaryNav": [
             {

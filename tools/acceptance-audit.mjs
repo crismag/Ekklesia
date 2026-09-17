@@ -89,7 +89,7 @@ async function measure(page) {
       return r.width > 0 && r.height > 0;
     };
 
-    const nav = document.querySelector('nav.portal-nav, nav[aria-label="Primary"]');
+    const nav = document.querySelector('.ek-sidebar nav.ek-nav, nav.portal-nav, nav[aria-label="Primary"]');
     const navLabels = nav
       ? [...nav.querySelectorAll('a')].map((a) => (a.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
       : [];

@@ -1113,7 +1113,11 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
     'GET /admin/ministries' => fn (array $req) => _adminSectionRender($req, 'admin-ministries.php', $resolvePortalActor, $resolveCampusSelector),
-    'GET /admin/groups-and-ministries' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+    // Members & leaders moves into the Ministries workspace (surfaces.md). The
+    // editor itself is unchanged and kept whole at its new address until each
+    // ministry has its own Members & leaders tab; the old admin address sends
+    // people to the Ministries workspace, and deep links keep their ministry.
+    'GET /ministries/members-and-leaders' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
@@ -1122,8 +1126,8 @@ $webRoutes = [
         require __DIR__ . '/../admin/groups_and_ministries/ministries.php';
         return (string) ob_get_clean();
     },
-    // Deep link to a specific ministry, e.g. /admin/groups-and-ministries/victuals
-    'GET /admin/groups-and-ministries/{slug}' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+    // Deep link to a specific ministry, e.g. /ministries/members-and-leaders/victuals
+    'GET /ministries/members-and-leaders/{slug}' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);
         $campusSelector = $resolveCampusSelector($req);
@@ -1131,6 +1135,17 @@ $webRoutes = [
         ob_start();
         require __DIR__ . '/../admin/groups_and_ministries/ministries.php';
         return (string) ob_get_clean();
+    },
+    'GET /admin/groups-and-ministries' => function (array $req): string {
+        header('Location: ' . ((string) ($req['_base_path'] ?? '')) . '/ministries', true, 302);
+
+        return '';
+    },
+    'GET /admin/groups-and-ministries/{slug}' => function (array $req): string {
+        header('Location: ' . ((string) ($req['_base_path'] ?? '')) . '/ministries/members-and-leaders/'
+            . rawurlencode((string) ($req['slug'] ?? '')), true, 302);
+
+        return '';
     },
     'GET /admin/calendar'   => fn (array $req) => _adminSectionRender($req, 'admin-calendar.php',   $resolvePortalActor, $resolveCampusSelector),
     'GET /admin/events'     => fn (array $req) => _adminSectionRender($req, 'admin-events.php',     $resolvePortalActor, $resolveCampusSelector),

@@ -125,7 +125,7 @@ final class ChromeSettingsService
 
         return [
             'header' => [
-                'brandTitle'    => mb_substr(trim((string) ($headerIn['brandTitle']    ?? 'Scheduler')), 0, 60),
+                'brandTitle'    => mb_substr(trim((string) ($headerIn['brandTitle']    ?? 'Ekklesia')), 0, 60),
                 'brandSubtitle' => mb_substr(trim((string) ($headerIn['brandSubtitle'] ?? '')), 0, 120),
                 'primaryNav'    => $cleanNav !== [] ? $cleanNav : $this->defaults()['header']['primaryNav'],
             ],
@@ -152,7 +152,7 @@ final class ChromeSettingsService
     {
         return [
             'header' => [
-                'brandTitle'    => 'Scheduler',
+                'brandTitle'    => 'Ekklesia',
                 'brandSubtitle' => 'Campus-aware ministry operations',
                 'primaryNav'    => [
                     ['label' => 'Dashboard',    'href' => '/',             'icon' => 'dashboard'],

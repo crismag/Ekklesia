@@ -110,7 +110,7 @@ JS;
 
 echo admin_render_page([
     'basePath' => $basePath,
-    'activeId' => 'dashboard',
+    'activeId' => 'announcements',
     'pageTitle' => 'Announcements',
     'pageSubtitle' => 'Church-wide notes on the home page',
     'sectionTitle' => 'Announcements',

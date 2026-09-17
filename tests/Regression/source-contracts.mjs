@@ -391,23 +391,34 @@ ok(printView.includes("aria-pressed"), 'preset state is exposed, not just colour
 ok(printView.includes('Nothing selected'),
    'an empty selection says so rather than printing a blank sheet silently');
 
-console.log('Wave 1 navigation — chrome and overflow');
+console.log('Phase 2 navigation — workspace map, sidebar and drawer');
 const chrome = JSON.parse(read('config/chrome.json'));
-const primary = chrome.header.primaryNav.map((item) => item.label);
-ok(JSON.stringify(primary) === JSON.stringify(['Home', 'Calendar', 'Ministries', 'People', 'Events']),
-  'primary tabs are daily work: Home, Calendar, Ministries, People, Events');
-ok(!primary.includes('Docs'), 'Docs is not a default primary tab');
-ok(primary.filter((label) => label === 'Events').length === 1, 'Events appears once in primaryNav');
-ok(!chrome.header.primaryNav.some((item) => item.href === '/printables'),
-  'Printables is not a primary tab');
-ok(shellSrc.includes('function portal_nav_has_path'),
-  'overflow skips destinations already in the primary tabs');
-ok(shellSrc.includes("label' => 'Docs'") && shellSrc.includes('$secondaryNav[]'),
-  'Docs is offered as an overflow item when it is not pinned');
-ok(!shellSrc.includes("$navGroups[] = ['href' => $basePath . '/docs'"),
-  'Docs is not auto-appended to the primary tab row');
-ok(shellSrc.includes("label' => 'Printables'"), 'Printables remains in overflow');
-ok(shellSrc.includes("label' => 'Serving'"), 'Serving is named in overflow and points at ministries');
+const workspacesSrc = read('app/Core/Navigation/Workspaces.php');
+ok(chrome.header.brandTitle === 'Ekklesia', 'the product is named Ekklesia by default');
+ok(!shellSrc.includes("chrome['header']['primaryNav']"),
+  'chrome.json primaryNav no longer drives navigation');
+ok(!shellSrc.includes('class="portal-nav"') && !shellSrc.includes('nav-tab'),
+  'the top-bar tab row is gone');
+ok(!shellSrc.includes('id="moreBtn"'), 'the overflow menu is gone — every destination is in the workspace map');
+ok(shellSrc.includes('ek_workspace_nav($basePath, $actor, $location)')
+  && shellSrc.includes("ek_workspace_nav($basePath, $actor, $location, 'Workspaces (menu)')"),
+  'the sidebar and the drawer render the same workspace navigation');
+for (const label of ['Home', 'People & Records', 'Ministries', 'Events & Calendar', 'Serving & Scheduling', 'Visitors & RSVPs', 'Admin']) {
+  ok(workspacesSrc.includes(`'label' => '${label}'`), `workspace exists: ${label}`);
+}
+ok(workspacesSrc.includes("'label' => 'Printables', 'href' => '/printables'"), 'Printables lives in Serving & Scheduling');
+ok(workspacesSrc.includes("'label' => 'Portal appearance & notices'"), 'Admin groups portal appearance & notices');
+ok(!workspacesSrc.includes('Website & appearance'), 'the portal is not labelled as the church website');
+ok(shellSrc.includes("'/docs'") && shellSrc.includes('User guide'), 'the user guide stays reachable from the sidebar and drawer');
+ok(/\.ek-sidebar\{display:none\}/.test(shellSrc) && shellSrc.includes('@media screen and (min-width:1024px)'),
+  'the sidebar shows only on desktop screens, never on paper');
+ok(/@media print\{[^}]*\.ek-sidebar/.test(shellSrc), 'the sidebar never prints');
+ok(shellSrc.includes('@media(max-width:1023px){.ham-btn{display:grid!important}}'),
+  'below 1024px the menu button opens the drawer');
+ok(shellSrc.includes('ekklesia_sidebar_rail_v1') && !/localStorage[^\n]*(aria-current|is-current|location)/.test(shellSrc),
+  'storage remembers only the collapsed sidebar, never which page is current');
+ok(shellSrc.includes('background:#fff center/cover no-repeat;box-shadow'),
+  'the brand mark background declaration is terminated');
 ok(shellSrc.includes("id=\"campusSelect\""), 'campus selector is kept');
 ok(shellSrc.includes("id=\"searchBtn\""), 'search is kept');
 ok(shellSrc.includes("basePath+'/events/'+id"),

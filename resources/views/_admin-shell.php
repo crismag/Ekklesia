@@ -23,7 +23,15 @@ if (!function_exists('admin_can_use_admin')) {
 
 if (!function_exists('admin_sections')) {
     /**
-     * Admin navigation, ordered by how often the work is done.
+     * The administration capabilities, grouped, and who holds each.
+     *
+     * Since Phase 2 this no longer renders any navigation: the workspace map
+     * (App\Core\Navigation\Workspaces) places every admin page in its
+     * workspace, and the application sidebar shows it. This list still decides
+     * whether an actor has any business in the admin area at all
+     * (admin_can_use_admin), which is what the "not yours" notice rests on.
+     *
+     * Originally: admin navigation, ordered by how often the work is done.
      *
      * The previous order led with the control board and then Maintenance —
      * backups, restores and imports — above People. That ranked the rarest and
@@ -54,7 +62,7 @@ if (!function_exists('admin_sections')) {
             ]],
 
             ['group' => 'Ministries', 'icon' => 'ministry', 'need' => 'perm:manage_ministry_roles', 'children' => [
-                ['id' => 'groups',     'label' => 'Members & leaders', 'href' => $basePath . '/admin/groups-and-ministries', 'icon' => 'people',   'need' => 'perm:manage_ministry_roles'],
+                ['id' => 'groups',     'label' => 'Members & leaders', 'href' => $basePath . '/ministries/members-and-leaders', 'icon' => 'people',   'need' => 'perm:manage_ministry_roles'],
                 ['id' => 'ministries', 'label' => 'Ministry list',     'href' => $basePath . '/admin/ministries',            'icon' => 'ministry', 'need' => 'admin'],
             ]],
 
@@ -169,115 +177,6 @@ if (!function_exists('admin_visible_sections')) {
     }
 }
 
-if (!function_exists('admin_side_link')) {
-    /** @param array<string,mixed> $item */
-    function admin_side_link(array $item, string $activeId): string
-    {
-        $isActive = ($item['id'] ?? '') === $activeId;
-        return sprintf(
-            // aria-label mirrors the visible label so the control still has an
-            // accessible name while its <details> group is collapsed, and the
-            // decorative icon is hidden from assistive tech.
-            '<a class="admin-side-item%s" href="%s"%s aria-label="%s"><span class="admin-side-icon" aria-hidden="true">%s</span><span class="admin-side-label">%s</span>%s</a>',
-            $isActive ? ' is-active' : '',
-            htmlspecialchars((string) $item['href'], ENT_QUOTES, 'UTF-8'),
-            $isActive ? ' aria-current="page"' : '',
-            htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8'),
-            portal_icon((string) $item['icon']),
-            htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8'),
-            isset($item['badge'])
-                ? '<span class="admin-side-badge">' . htmlspecialchars((string) $item['badge'], ENT_QUOTES, 'UTF-8') . '</span>'
-                : '',
-        );
-    }
-}
-
-if (!function_exists('admin_side_group_key')) {
-    /** A stable identifier for a nav group, for remembering it open or shut. */
-    function admin_side_group_key(string $label): string
-    {
-        return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($label)) ?? '', '-');
-    }
-}
-
-if (!function_exists('admin_sidebar_html')) {
-    /** @param ?array<string,mixed> $actor */
-    function admin_sidebar_html(string $basePath, string $activeId, ?array $actor = null): string
-    {
-        $caret = '<svg class="admin-side-caret" viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5l8 7-8 7z"/></svg>';
-        $out = '';
-        foreach (admin_visible_sections($basePath, $actor) as $node) {
-            if (isset($node['group'])) {
-                $childHtml = '';
-                $open = false;
-                foreach ($node['children'] as $child) {
-                    if (($child['id'] ?? '') === $activeId) { $open = true; }
-                    $childHtml .= admin_side_link($child, $activeId);
-                }
-                // Which section you are in is a fact about the URL, so it is
-                // decided here and never read back from browser storage. The
-                // group carries it separately from `open`, because a group can
-                // be collapsed by hand and still be the one you are inside —
-                // and that is exactly when the marker is worth having.
-                $groupKey = admin_side_group_key((string) $node['group']);
-                $out .= sprintf(
-                    '<details class="admin-side-group%s"%s data-group="%s"%s>'
-                    . '<summary class="admin-side-summary"><span class="admin-side-icon">%s</span>'
-                    . '<span class="admin-side-label">%s</span>%s%s</summary>'
-                    . '<div class="admin-side-children">%s</div></details>',
-                    $open ? ' is-current' : '',
-                    $open ? ' open' : '',
-                    htmlspecialchars($groupKey, ENT_QUOTES, 'UTF-8'),
-                    $open ? ' data-current="1"' : '',
-                    portal_icon((string) $node['icon']),
-                    htmlspecialchars((string) $node['group'], ENT_QUOTES, 'UTF-8'),
-                    // Named for assistive tech, which cannot see the highlight.
-                    $open ? '<span class="sr-only"> (current section)</span>' : '',
-                    $caret,
-                    $childHtml,
-                );
-            } else {
-                $out .= admin_side_link($node, $activeId);
-            }
-        }
-        return '<button class="admin-sidebar-toggle" type="button" id="adminNavToggle"'
-            . ' aria-expanded="false" aria-controls="adminSidebar">Admin sections</button>'
-            . '<aside class="admin-sidebar" id="adminSidebar" aria-label="Admin navigation">' . $out . '</aside>'
-            . '<script>(function(){var b=document.getElementById("adminNavToggle"),n=document.getElementById("adminSidebar");'
-            . 'if(!b||!n)return;var mq=window.matchMedia("(max-width:880px)");'
-            . 'function sync(){if(mq.matches){n.hidden=b.getAttribute("aria-expanded")!=="true";}else{n.hidden=false;}}'
-            . 'b.addEventListener("click",function(){b.setAttribute("aria-expanded",b.getAttribute("aria-expanded")==="true"?"false":"true");sync();});'
-            . 'mq.addEventListener?mq.addEventListener("change",sync):mq.addListener(sync);sync();})();</script>'
-            // Remember which groups the administrator left open. Only that:
-            // which page is active comes from the URL and is rendered above, so
-            // storage can never disagree with the address bar about where you
-            // are. The group containing the current page is always open on
-            // arrival regardless of what was remembered — being taken to a page
-            // whose section is shut is disorienting.
-            . '<script>(function(){var KEY="portal_admin_nav_open_v1";'
-            . 'var groups=[].slice.call(document.querySelectorAll(".admin-side-group[data-group]"));'
-            . 'if(!groups.length)return;var shut={};'
-            . 'try{shut=JSON.parse(localStorage.getItem(KEY)||"{}")||{};}catch(e){shut={};}'
-            . 'groups.forEach(function(g){'
-            . 'if(g.dataset.current==="1"){g.open=true;return;}'
-            . 'if(Object.prototype.hasOwnProperty.call(shut,g.dataset.group)){g.open=!shut[g.dataset.group];}'
-            . '});'
-            // Record only a toggle that actually changed something. Chromium
-            // fires "toggle" for a server-rendered <details open> during parse,
-            // so listening naively wrote an entry for whichever group the
-            // server had opened — and storage quietly became a record of every
-            // section you had ever visited, which then stayed open on every
-            // later page. Comparing against the state at attach time makes a
-            // parse-time toggle a no-op and a click a real change.
-            . 'var last={};groups.forEach(function(g){last[g.dataset.group]=g.open;});'
-            . 'groups.forEach(function(g){g.addEventListener("toggle",function(){'
-            . 'if(g.open===last[g.dataset.group])return;'
-            . 'last[g.dataset.group]=g.open;shut[g.dataset.group]=!g.open;'
-            . 'try{localStorage.setItem(KEY,JSON.stringify(shut));}catch(e){}'
-            . '});});})();</script>';
-    }
-}
-
 if (!function_exists('admin_section_status_badge')) {
     /** Render a small badge: "Live", "Planned", "Beta", etc. */
     /**
@@ -326,43 +225,6 @@ body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMac
   overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
 a{color:inherit}
 .shell{width:100%;max-width:none;margin:0;padding:0 0 40px}
-.admin-titleblock{position:relative;isolation:isolate}
-.admin-titleblock::before{content:"";position:absolute;top:-18px;bottom:-14px;left:calc(-1 * var(--portal-gutter,1.5rem));right:calc(-1 * var(--portal-gutter,1.5rem));
-  width:auto;background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0,var(--gradient-mid,#123b31) 100%);z-index:-1}
-.admin-titleblock{margin:0 0 18px;color:#f8fffb}
-.admin-titleblock .crumbs{margin-bottom:6px;color:rgba(248,255,251,.78);font-size:12px}
-.admin-titleblock .crumbs a{color:#fff;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;min-height:24px}
-.admin-titleblock h1{margin:0;font-size:clamp(24px,3.2vw,34px);line-height:1.04}
-.admin-titleblock .sub{color:rgba(248,255,251,.78);font-size:13px;margin-top:4px}
-.admin-layout:not(:has(.admin-sidebar)){grid-template-columns:minmax(0,1fr)}
-.admin-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;align-items:start;width:100%;min-width:0}
-/* No sidebar to sit beside, so the notice gets the full width. */
-.admin-layout.is-unavailable{grid-template-columns:minmax(0,1fr)}
-.admin-sidebar{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius,10px);box-shadow:0 16px 42px rgba(27,50,40,.08);overflow:hidden;position:sticky;top:14px;display:grid}
-.admin-side-item{display:flex;align-items:center;gap:10px;padding:11px 14px;text-decoration:none;color:var(--ink);font-weight:600;font-size:13px;border-left:3px solid transparent;transition:background .12s,border-color .12s}
-.admin-side-item:hover{background:var(--soft)}
-.admin-side-item.is-active{background:var(--soft);border-left-color:var(--teal);color:var(--deep)}
-.admin-side-icon{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;background:var(--soft);color:var(--teal);flex-shrink:0}
-.admin-side-icon svg{width:16px;height:16px}
-.admin-side-label{flex:1}
-.admin-side-badge{font-size:12px;font-weight:800;background:var(--gold);color:var(--on-gold);padding:2px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
-.admin-side-group{display:block;border-top:1px solid var(--line)}
-.admin-side-group:first-child,.admin-side-item:first-child+.admin-side-group{border-top:0}
-.admin-side-summary{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;color:var(--ink);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.03em;list-style:none;user-select:none}
-.admin-side-summary::-webkit-details-marker{display:none}
-.admin-side-summary:hover{background:var(--soft)}
-.admin-side-caret{margin-left:auto;opacity:.55;transition:transform .15s}
-.admin-side-group[open]>.admin-side-summary .admin-side-caret{transform:rotate(90deg)}
-.admin-side-group[open]>.admin-side-summary{color:var(--deep)}
-/* The section you are in, marked whether or not it is expanded. A collapsed
-   group is exactly when this is worth having, and the bar is not colour alone:
-   the label also goes bold and the group is named to assistive tech. */
-.admin-side-group.is-current>.admin-side-summary{color:var(--deep);font-weight:800;
-  box-shadow:inset 3px 0 0 var(--teal);background:var(--soft)}
-.admin-side-children{display:grid;padding-bottom:4px}
-.admin-side-children .admin-side-item{padding-left:20px;font-size:12.5px}
-.admin-side-children .admin-side-icon{width:22px;height:22px}
-.admin-side-children .admin-side-icon svg{width:13px;height:13px}
 .admin-content{display:grid;gap:14px;width:100%;min-width:0;max-width:none}
 .admin-card-body .field,.admin-card-body .field-row{max-width:48rem}
 .admin-card-body .field-row{max-width:72rem}
@@ -407,21 +269,8 @@ a{color:inherit}
 .theme-info{padding:10px 12px;display:grid;gap:3px}
 .theme-info b{font-size:13px}
 .theme-info small{color:var(--muted);font-size:12px}
-/* Below 880px the sidebar used to reflow into wrapped 50%-width items, which
-   produced a ragged multi-row strip with misaligned partial underlines (audit
-   H7 / Cursor finding 8). It is a navigation list, so on small screens it stays
-   a full-width vertical list inside a disclosure — the section groupings the
-   markup already expresses via <details> are preserved. */
 @media(max-width:880px){
-  .admin-layout{grid-template-columns:1fr}
-  .admin-sidebar{position:static;display:block}
-  .admin-side-item{display:flex;min-height:48px;flex:none;width:100%;border-left:3px solid transparent;border-bottom:1px solid var(--line)}
-  .admin-side-item.is-active{border-left-color:var(--teal);border-bottom-color:var(--line)}
-  .admin-side-summary{min-height:48px}
-  .admin-side-children .admin-side-item{padding-left:26px}
   .field-row{grid-template-columns:1fr}
-  .admin-sidebar-toggle{display:flex}
-  .admin-sidebar[hidden]{display:none}
 }
 /* Shared admin responsive layer (Phase 1.5 primitives). Applied once here so
    all 24 admin views inherit it — eight of them had no media query at all
@@ -449,9 +298,6 @@ a{color:inherit}
   .admin-actions,.admin-card-actions{display:flex;flex-wrap:wrap;gap:8px}
   .admin-actions>*,.admin-card-actions>*{flex:1 1 auto}
 }
-.admin-sidebar-toggle{display:none;align-items:center;gap:8px;width:100%;min-height:48px;padding:0 14px;
-  margin:0 0 12px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius,10px);
-  font:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer}
 </style>
 CSS;
     }
@@ -459,7 +305,8 @@ CSS;
 
 if (!function_exists('admin_render_page')) {
     /**
-     * Render a complete admin sub-page (topbar + breadcrumb + sidebar + content).
+     * Render a complete admin sub-page: the application shell, the workspace
+     * tabs for the page's workspace, a page header and the content.
      * Call from each /admin/{section} route view.
      *
      * @param array{
@@ -483,7 +330,40 @@ if (!function_exists('admin_render_page')) {
         $defaultCampusId = $campusSelector['defaultCampusId'] ?? null;
 
         $title = htmlspecialchars($args['pageTitle'], ENT_QUOTES, 'UTF-8');
-        $subtitle = htmlspecialchars($args['pageSubtitle'], ENT_QUOTES, 'UTF-8');
+
+        // A member with no administrative capability used to get the full
+        // navigation and an empty page from every entry in it. Say plainly
+        // that the area is not theirs, and point at what is.
+        $canUseAdmin = admin_can_use_admin($args['actor'] ?? null);
+
+        // Each admin section belongs to a workspace page (surfaces.md). Pin it,
+        // so the sidebar, the top bar and the tabs agree with this page even
+        // when its URL is a deep link (/admin/people/view?id=…).
+        $place = \App\Core\Navigation\Workspaces::adminSections()[(string) $args['activeId']] ?? null;
+        $crumbs = '';
+        if ($place !== null) {
+            \App\Core\Navigation\Workspaces::setCurrent($place[0], $place[1], $place[2]);
+            // Breadcrumbs name only what the tabs do not: the workspace, and the
+            // parent entry of a sub-page.
+            $workspace = \App\Core\Navigation\Workspaces::workspace($place[0]);
+            $visible = [];
+            foreach (\App\Core\Navigation\Workspaces::visible($args['basePath'], $args['actor'] ?? null) as $ws) {
+                $visible[$ws['id']] = $ws;
+            }
+            if ($workspace !== null) {
+                $wsLabel = htmlspecialchars((string) $workspace['label'], ENT_QUOTES, 'UTF-8');
+                $crumbs = isset($visible[$place[0]])
+                    ? '<a href="' . htmlspecialchars((string) $visible[$place[0]]['pages'][0]['href'], ENT_QUOTES, 'UTF-8') . '">' . $wsLabel . '</a>'
+                    : $wsLabel;
+                if ($place[2] !== null) {
+                    foreach ($workspace['pages'] as $page) {
+                        if ($page['id'] === $place[1]) {
+                            $crumbs .= ' &rsaquo; ' . htmlspecialchars((string) $page['label'], ENT_QUOTES, 'UTF-8');
+                        }
+                    }
+                }
+            }
+        }
 
         ob_start();
         ?>
@@ -510,45 +390,34 @@ if (!function_exists('admin_render_page')) {
         'Sign in',
         $args['basePath'] . '/login',
     ) ?>
-    <div class="admin-titleblock">
-        <?php if ($args['activeId'] !== 'overview'): ?><div class="crumbs"><a href="<?= $base ?>/admin">Administration</a><?= $args['activeId'] !== 'overview' ? ' &rsaquo; ' . htmlspecialchars($args['sectionTitle'], ENT_QUOTES, 'UTF-8') : '' ?></div><?php endif; ?>
-        <h1><?= htmlspecialchars($args['sectionTitle'], ENT_QUOTES, 'UTF-8') ?></h1>
-        <div class="sub"><?= htmlspecialchars($args['sectionDescription'], ENT_QUOTES, 'UTF-8') ?></div>
-    </div>
-    <?php
-        // A member with no administrative capability used to get the full
-        // navigation and an empty page from every entry in it. Say plainly
-        // that the area is not theirs, and point at what is.
-        $canUseAdmin = admin_can_use_admin($args['actor'] ?? null);
-    ?>
-    <div class="admin-layout<?= $canUseAdmin ? '' : ' is-unavailable' ?>">
-        <?php if ($canUseAdmin): ?>
-        <?= admin_sidebar_html($args['basePath'], $args['activeId'], $args['actor'] ?? null) ?>
+    <main class="admin-content ek-page" id="portal-main" tabindex="-1">
+        <?php if ($canUseAdmin && $place !== null): ?>
+        <?= ek_workspace_tabs($args['basePath'], $place[0], $place[1], $args['actor'] ?? null, $place[2]) ?>
         <?php endif; ?>
-        <main class="admin-content" id="portal-main" tabindex="-1">
-            <?php if ($canUseAdmin): ?>
-                <?= $renderBody() ?>
-            <?php else: ?>
-                <section class="admin-card">
-                    <div class="admin-card-head"><div>
-                        <h2><?= ($args['actor'] ?? null) === null ? 'Please sign in' : 'You do not have access to this area' ?></h2>
-                        <p><?= ($args['actor'] ?? null) === null
-                            ? 'Administration is available to signed-in staff and ministry leaders.'
-                            : 'Administration is for staff and ministry leaders who manage church records. Your account does not include it.' ?></p>
-                    </div></div>
-                    <div class="admin-card-body">
-                        <p class="muted">If you think this is wrong, ask a church administrator to review your account.</p>
-                        <p>
-                            <a class="button" href="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>/">Go to the home page</a>
-                            <?php if (($args['actor'] ?? null) !== null): ?>
-                            <a class="button secondary" href="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>/my-schedule">My schedule</a>
-                            <?php endif; ?>
-                        </p>
-                    </div>
-                </section>
-            <?php endif; ?>
-        </main>
-    </div>
+        <?php if ($crumbs !== ''): ?><p class="ek-crumbs"><?= $crumbs ?></p><?php endif; ?>
+        <?= ek_page_header((string) $args['sectionTitle'], (string) $args['sectionDescription']) ?>
+        <?php if ($canUseAdmin): ?>
+            <?= $renderBody() ?>
+        <?php else: ?>
+            <section class="admin-card">
+                <div class="admin-card-head"><div>
+                    <h2><?= ($args['actor'] ?? null) === null ? 'Please sign in' : 'You do not have access to this area' ?></h2>
+                    <p><?= ($args['actor'] ?? null) === null
+                        ? 'Administration is available to signed-in staff and ministry leaders.'
+                        : 'Administration is for staff and ministry leaders who manage church records. Your account does not include it.' ?></p>
+                </div></div>
+                <div class="admin-card-body">
+                    <p class="muted">If you think this is wrong, ask a church administrator to review your account.</p>
+                    <p>
+                        <a class="button" href="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>/">Go to the home page</a>
+                        <?php if (($args['actor'] ?? null) !== null): ?>
+                        <a class="button secondary" href="<?= htmlspecialchars($base, ENT_QUOTES, 'UTF-8') ?>/my-schedule">My schedule</a>
+                        <?php endif; ?>
+                    </p>
+                </div>
+            </section>
+        <?php endif; ?>
+    </main>
     <?= portal_footer() ?>
 </div>
 </body>

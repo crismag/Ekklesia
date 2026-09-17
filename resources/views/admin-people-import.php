@@ -471,10 +471,10 @@ ob_start();
 $content = ob_get_clean();
 
 echo admin_render_page([
-    'basePath' => $basePath, 'activeId' => 'maintenance',
+    'basePath' => $basePath, 'activeId' => 'import',
     'pageTitle' => 'Member import · Maintenance',
     'pageSubtitle' => 'Stage a campus Hub worksheet, clean rows, then replace that campus roster.',
-    'sectionTitle' => 'Maintenance · Member import',
+    'sectionTitle' => 'Member import',
     'sectionDescription' => 'Load the Drive Excel workbook (.xlsx keeps merged household cells), review staging, then apply ready rows.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);

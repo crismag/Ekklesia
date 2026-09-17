@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/_portal-components.php';
+require_once __DIR__ . '/../../app/Core/Navigation/Workspaces.php';
 
 if (!function_exists('portal_theme_style_block')) {
     /**
@@ -236,34 +237,10 @@ if (!function_exists('portal_chrome')) {
             return \App\Providers\PortalServiceProvider::makeChromeSettingsService()->load();
         } catch (\Throwable) {
             return [
-                'header' => ['brandTitle' => 'Scheduler', 'brandSubtitle' => '', 'primaryNav' => []],
+                'header' => ['brandTitle' => 'Ekklesia', 'brandSubtitle' => '', 'primaryNav' => []],
                 'footer' => ['leftText' => 'Church Portal', 'rightText' => '', 'minimal' => true],
             ];
         }
-    }
-}
-
-if (!function_exists('portal_nav_has_path')) {
-    /**
-     * Whether a nav list already contains this portal path (e.g. '/events').
-     *
-     * Used so overflow items are never a second copy of a primary tab.
-     *
-     * @param list<array{href?:string}> $items
-     */
-    function portal_nav_has_path(array $items, string $basePath, string $path): bool
-    {
-        $suffix = '/' . ltrim($path, '/');
-        $want = rtrim($basePath, '/') . ($suffix === '/' ? '/' : $suffix);
-        $wantNorm = rtrim($want, '/') ?: '/';
-        foreach ($items as $item) {
-            $got = rtrim((string) ($item['href'] ?? ''), '/') ?: '/';
-            if ($got === $wantNorm) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
 
@@ -395,28 +372,21 @@ if (!function_exists('portal_left_toggle')) {
     }
 }
 
-if (!function_exists('portal_nav_bar')) {
+if (!function_exists('portal_shell_styles')) {
     /**
-     * @param list<array{label:string,href?:string,icon?:string,items?:list<array{label:string,href:string,icon?:string}>}> $groups
+     * The application shell's stylesheet: layout, top bar, workspace sidebar,
+     * drawer, search, and the ek-* kit. Emitted once per page by
+     * portal_header(); later calls return ''.
      */
-    function portal_nav_bar(string $basePath, array $groups = []): string
+    function portal_shell_styles(): string
     {
         static $styleEmitted = false;
-        if ($groups === []) {
-            // Flat top-level tabs — no nested dropdowns on desktop (all extras live in the drawer).
-            $groups = [
-                ['label' => 'Home',         'href' => $basePath . '/',             'icon' => 'dashboard'],
-                ['label' => 'My Schedule',  'href' => $basePath . '/my-schedule',  'icon' => 'calendar'],
-                ['label' => 'Ministries',   'href' => $basePath . '/ministries',   'icon' => 'ministry'],
-                ['label' => 'Calendar',     'href' => $basePath . '/calendar',     'icon' => 'events'],
-                ['label' => 'Events',       'href' => $basePath . '/events',       'icon' => 'availability-short'],
-            ];
+        if ($styleEmitted) {
+            return '';
         }
+        $styleEmitted = true;
 
-        $style = '';
-        if (!$styleEmitted) {
-            $styleEmitted = true;
-            $style = <<<'CSS'
+        return <<<'CSS'
 <style>
 /* ======================================================
    Portal global topbar — Facebook-style single bar
@@ -612,17 +582,20 @@ if (!function_exists('portal_nav_bar')) {
 /* Screen-shell changes must not leak into paper. Printables keep their own
    @page sizes; this only stops the fluid chrome from becoming the print box. */
 @media print{
-  .portal-left,.portal-right,.portal-left-toggle,.portal-right-toggle,.topbar,.side-drawer,.skip-link,.search-overlay{display:none !important}
+  .portal-left,.portal-right,.portal-left-toggle,.portal-right-toggle,.topbar,.ek-sidebar,.side-drawer,.drawer-backdrop,.skip-link,.search-overlay,.search-backdrop,.context-bar{display:none !important}
   .shell,.shell>#portal-main,.shell>main,.portal-body,.portal-main-slot{
     width:auto;max-width:none;margin:0;padding:0;
     grid-template-columns:minmax(0,1fr);
   }
 }
 
-/* Topbar: 3-column grid [brand | nav | actions] */
+/* Topbar: a slim bar over the content [brand (phones) | where you are | actions].
+   Navigation lives in the workspace sidebar (desktop) and the drawer (below
+   1024px); the bar keeps its height and theme gradient so pages composed
+   beneath it (dark title bands, heroes) sit exactly where they did. */
 .topbar{
   display:grid;
-  grid-template-columns:auto 1fr auto;
+  grid-template-columns:auto minmax(0,1fr) auto;
   align-items:stretch;
   height:56px;
   background:linear-gradient(135deg,var(--gradient-top,#0e3528) 0%,var(--gradient-mid,#1c6642) 100%);
@@ -656,7 +629,7 @@ if (!function_exists('portal_nav_bar')) {
   transition:background .12s;
 }
 .portal-brand:hover{background:rgba(255,255,255,.24)}
-.portal-brand-mark{position:relative;display:block;width:24px;height:24px;border-radius:6px;background:#fff center/cover no-repeat box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+.portal-brand-mark{position:relative;display:block;width:24px;height:24px;border-radius:6px;background:#fff center/cover no-repeat;box-shadow:0 0 0 1px rgba(255,255,255,.18)}
 .portal-brand-text{
   color:#f8fffb;
   font-weight:900;
@@ -668,146 +641,15 @@ if (!function_exists('portal_nav_bar')) {
   letter-spacing:-.01em;
 }
 @media(max-width:640px){.portal-brand-text{display:none}}
-
-/* Center nav cell */
-.portal-nav{
-  display:flex;
-  align-items:stretch;
-  justify-content:center;
-  /* Phase 1: was overflow:hidden, which silently CLIPPED tabs from 830px down
-     (audit: /my-schedule lost DASHBOARD and DOCS at 900px). Never hide a
-     destination — scroll it instead, with a fade hinting there is more. */
-  overflow-x:auto;
-  overflow-y:hidden;
-  scrollbar-width:none;
-  -ms-overflow-style:none;
-  scroll-snap-type:x proximity;
-  margin:0;
-  padding:0;
-}
-.portal-nav::-webkit-scrollbar{display:none}
-.portal-nav .nav-tab{scroll-snap-align:start;flex:0 0 auto}
-/* Between the drawer breakpoint and 1023px the full tab row must still FIT —
-   scrolling is the safety net, not the design. Tighten spacing so all five
-   primary tabs are visible without interaction. */
-/* NOTE: these use .portal-nav .nav-tab (not bare .nav-tab) because the base
-   .nav-tab rule is declared later in this same stylesheet — a media query adds
-   no specificity, so a bare selector here would lose on source order. */
-/* 12px labels need a little more room than the old 10px ones; tighten padding
-   from 1200px down so the full row still fits without scrolling. */
-@media(max-width:1200px){
-  .portal-nav .nav-tab{padding:0 12px}
-}
-@media(max-width:1023px){
-  .portal-nav{justify-content:flex-start}
-  .portal-nav .nav-tab{padding:0 10px;letter-spacing:.02em}
-  /* The standalone admin icon now duplicates "Settings & Admin" in the More
-     menu; dropping it below 1024 returns 36px to the tab row.
-     Needs .topbar-actions specificity: a later .icon-btn rule sets display:grid. */
-  .topbar-actions .settings-btn,.topbar-actions .admin-inert{display:none!important}
-  /* the campus control is the widest item in the actions column; cap it so the
-     primary tabs keep their room */
-  .topbar-campus .topbar-campus-select{max-width:104px!important;min-width:0!important}
-}
-@media(max-width:900px){
-  .portal-nav .nav-tab{padding:0 6px;font-size:12px}
-  .topbar-campus .topbar-campus-select{max-width:78px!important}
-}
-/* 821-860px is the tightest band: the drawer has not taken over yet and the
-   full tab row plus actions must still fit. */
-@media(max-width:860px){
-  .portal-nav .nav-tab{padding:0 4px;font-size:12px}
-  .topbar-campus .topbar-campus-select{max-width:52px!important}
-  .topbar-actions .button{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-}
-/* If a future nav ever exceeds the row, fade the edge so the scroll is legible
-   rather than clipping a destination out of existence. */
-.portal-nav.is-scrollable{
-  -webkit-mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);
-  mask-image:linear-gradient(to right,#000 0,#000 calc(100% - 24px),transparent 100%);
-}
-
-/* Search + overflow ("More") controls */
+/* On desktop the sidebar carries the brand; the bar says where you are. */
+@media(min-width:1024px){.topbar-brand{display:none}}
+.topbar-context{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:0 14px;line-height:1.2}
+.topbar-context-ws{font-size:12px;font-weight:700;letter-spacing:.03em;color:rgba(248,255,251,.72);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-context-page{font-size:15px;font-weight:800;color:#f8fffb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1023px){.topbar-context{padding:0 4px}}
+@media(max-width:480px){.topbar-context-ws{display:none}}
 .search-btn{display:grid!important}
-.more-wrap{position:relative;display:grid;place-items:center}
-.more-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:220px;z-index:70;
-  background:var(--paper,#fff);border:1px solid var(--line,#d9e4dd);
-  border-radius:var(--radius,8px);box-shadow:0 4px 12px rgba(12,40,30,.18);
-  padding:6px;display:grid;gap:2px}
-.more-menu[hidden]{display:none}
-.more-item{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;
-  border-radius:var(--radius-sm,6px);color:var(--ink,#17211b);text-decoration:none;
-  font-size:14px;font-weight:600}
-.more-item:hover,.more-item:focus-visible{background:var(--soft,#eef4f0)}
-.more-item svg{width:18px;height:18px;color:var(--teal,#117b6d);flex:0 0 auto}
-
-/* Each tab */
-.nav-tab{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:3px;
-  padding:0 18px;
-  height:100%;
-  text-decoration:none;
-  color:rgba(248,255,251,.62);
-  font-size:12px;
-  font-weight:700;
-  letter-spacing:.02em;
-  text-transform:uppercase;
-  border-bottom:3px solid transparent;
-  border-top:3px solid transparent; /* balance so text sits dead-center */
-  white-space:nowrap;
-  cursor:pointer;
-  transition:color .12s,background .12s,border-color .12s;
-  position:relative;
-  min-width:64px;
-}
-.nav-tab svg{width:22px;height:22px;flex-shrink:0;margin-bottom:1px}
-.nav-tab:hover{color:#f8fffb;background:rgba(255,255,255,.09)}
-.nav-tab.is-active{color:#f8fffb;border-bottom-color:var(--gold,#4ade80);background:rgba(255,255,255,.07)}
-
-/* Groups with sub-items: flyout on hover via visibility (no layout shift) */
-.nav-group{position:relative;display:flex;align-items:stretch}
-.nav-flyout{
-  visibility:hidden;
-  opacity:0;
-  pointer-events:none;
-  position:absolute;
-  top:calc(100% + 6px);
-  left:50%;
-  transform:translateX(-50%);
-  min-width:220px;
-  background:#fff;
-  border-radius:10px;
-  border:1px solid var(--line,#dde8e2);
-  box-shadow:0 12px 40px rgba(9,25,20,.22);
-  padding:8px;
-  z-index:40;
-  transition:opacity .14s,visibility .14s;
-}
-.nav-group:hover .nav-flyout,.nav-group:focus-within .nav-flyout{
-  visibility:visible;
-  opacity:1;
-  pointer-events:auto;
-}
-.nav-flyout a{
-  display:flex;
-  align-items:center;
-  gap:9px;
-  padding:9px 11px;
-  border-radius:7px;
-  color:var(--ink,#1a2e26);
-  text-decoration:none;
-  font-size:13px;
-  font-weight:700;
-  transition:background .1s;
-}
-.nav-flyout a:hover,.nav-flyout a.is-active{background:var(--soft,#f0f7f3)}
-.nav-flyout a svg{width:17px;height:17px;color:var(--accent,#1a6b4a)}
-/* Small arrow under the active tab when flyout contains the active link */
-.nav-tab.has-active{color:#f8fffb;border-bottom-color:var(--gold,#4ade80);background:rgba(255,255,255,.07)}
 
 /* Actions cell (right) */
 .topbar-actions{
@@ -831,8 +673,6 @@ if (!function_exists('portal_nav_bar')) {
   transition:background .12s;
 }
 .icon-btn:hover{background:rgba(255,255,255,.22)}
-.icon-btn.admin-inert{opacity:.5;cursor:default}
-.icon-btn.admin-inert:hover{background:transparent}
 .icon-btn svg{width:18px;height:18px}
 .topbar-actions .button,.topbar-actions button.button{
   min-height:36px;
@@ -886,23 +726,22 @@ if (!function_exists('portal_nav_bar')) {
   width:auto !important;
 }
 .topbar-campus-select option{background:var(--gradient-mid,#123b31);color:#f8fffb}
-/* hamburger — hidden on desktop */
+/* hamburger — hidden where the sidebar is showing */
 .ham-btn{display:none!important}
+@media(max-width:1023px){.ham-btn{display:grid!important}}
 @media(max-width:820px){
-  .portal-nav{display:none}
   /* Touch targets: the icon buttons are 36px on desktop (pointer-precise) but
      must reach the 44px minimum on touch. */
   .topbar-actions .icon-btn{width:44px;height:44px}
   /* Campus stays reachable: the topbar select is replaced by the context bar
      below the header, NOT hidden (audit C5 / INV-3 — campus filters data via
      the portal_campus_id cookie whether or not the control is visible). */
-  .topbar-campus,.topbar-actions .button.secondary,.settings-btn,.more-wrap{display:none}
+  .topbar-campus,.topbar-actions .button.secondary{display:none}
   /* ...except the user menu, which is now the only route to sign out.
      Hiding it here would take personal functions and sign-out away from
      every phone. */
   .topbar-actions .user-menu,.topbar-actions .user-menu .button.secondary{display:inline-flex}
   .topbar-actions .button{padding:0 10px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .ham-btn{display:grid!important}
 }
 @media(max-width:820px) and (orientation:landscape){
   .topbar-actions .button{min-width:36px;padding:0 8px}
@@ -1000,50 +839,386 @@ if (!function_exists('portal_nav_bar')) {
 .portal-notice-close{width:30px;height:30px;border:1px solid #dfcbb3;border-radius:7px;background:#fff;color:var(--deep,#123b31);cursor:pointer;font-weight:950}
 .portal-notice-body{padding:12px 14px;color:#765f4b;font-weight:800;font-size:13px;line-height:1.45}
 @keyframes noticeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* ======================================================
+   Workspace sidebar (desktop, >=1024px)
+   One fixed column in the theme's deep colour: brand, workspaces, the
+   signed-in person. The content is offset with padding on .shell, so every
+   page keeps its <div class="shell"> -> header -> <main> skeleton.
+   ====================================================== */
+:root{--ek-sidebar-w:248px;--ek-rail-w:64px}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.ek-sidebar{display:none}
+@media screen and (min-width:1024px){
+  .ek-sidebar{display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:40;
+    width:var(--ek-sidebar-w);box-sizing:border-box;color:#f1f7f4;
+    background:linear-gradient(180deg,var(--gradient-top,#0c2f28) 0%,var(--deep,#123b31) 100%);
+    box-shadow:1px 0 0 rgba(255,255,255,.06),4px 0 18px rgba(9,25,20,.12)}
+  .shell:has(>.ek-sidebar){padding-left:var(--ek-sidebar-w)}
+  html.ek-rail .ek-sidebar{width:var(--ek-rail-w)}
+  html.ek-rail .shell:has(>.ek-sidebar){padding-left:var(--ek-rail-w)}
+}
+@supports not selector(:has(*)){
+  @media screen and (min-width:1024px){body{padding-left:var(--ek-sidebar-w)}html.ek-rail body{padding-left:var(--ek-rail-w)}}
+}
+.ek-side-brand{display:flex;align-items:center;gap:10px;min-height:64px;padding:0 14px;flex-shrink:0;
+  text-decoration:none;color:inherit;border-bottom:1px solid rgba(255,255,255,.08)}
+.ek-side-brand .portal-brand-mark{width:32px;height:32px;border-radius:9px;flex-shrink:0}
+.ek-side-brand-text{display:grid;min-width:0;line-height:1.2}
+.ek-side-brand-name{font-size:16px;font-weight:800;letter-spacing:-.01em;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ek-side-brand-sub{font-size:12px;color:rgba(241,247,244,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ek-sidebar .ek-nav{flex:1;overflow-y:auto;padding:10px 8px 12px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent}
+.ek-side-foot{flex-shrink:0;border-top:1px solid rgba(255,255,255,.08);padding:8px;display:grid;gap:2px}
+.ek-side-user{display:flex;align-items:center;gap:10px;padding:6px 8px;min-width:0}
+.ek-avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;
+  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);font-weight:800;font-size:14px;color:#fff}
+.ek-side-user-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ek-side-link{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;padding:6px 8px;box-sizing:border-box;
+  border:0;border-radius:8px;background:none;color:rgba(241,247,244,.86);font:inherit;font-size:13px;font-weight:600;
+  text-decoration:none;cursor:pointer;text-align:left}
+.ek-side-link:hover{background:rgba(255,255,255,.08);color:#fff}
+.ek-side-link svg{width:16px;height:16px;flex-shrink:0;opacity:.85}
+.ek-side-signout{margin:0}
+.ek-sidebar :focus-visible{outline-color:var(--focus-ring-inverse,#fff)}
+html.ek-rail .ek-side-brand{justify-content:center;padding:0}
+html.ek-rail .ek-side-brand-text,html.ek-rail .ek-side-user-name,html.ek-rail .ek-side-label,
+html.ek-rail .ek-sidebar .ek-ws-pages,html.ek-rail .ek-sidebar .ek-ws-label{display:none}
+html.ek-rail .ek-side-user,html.ek-rail .ek-side-link{justify-content:center}
+html.ek-rail .ek-sidebar .ek-ws-head{justify-content:center;padding:6px 0}
+html.ek-rail .ek-collapse svg{transform:scaleX(-1)}
+
+/* Workspace navigation — shared by the sidebar and the phone drawer. */
+.ek-nav{display:grid;align-content:start;gap:2px}
+.ek-ws{display:grid;gap:1px}
+.ek-ws+.ek-ws{margin-top:2px}
+.ek-ws-head{display:flex;align-items:center;gap:10px;min-height:40px;padding:4px 8px;border-radius:10px;
+  text-decoration:none;font-size:14px;font-weight:650;line-height:1.2}
+.ek-ws-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex-shrink:0}
+.ek-ws-icon svg{width:16px;height:16px}
+.ek-ws-label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ek-ws-pages{list-style:none;margin:0 0 6px;padding:0 0 0 22px;display:grid;gap:1px}
+.ek-ws-page{display:flex;align-items:center;min-height:34px;padding:4px 10px 4px 16px;border-radius:8px;
+  text-decoration:none;font-size:13px;font-weight:550;line-height:1.25;position:relative}
+.ek-ws-page::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:transparent}
+.ek-ws-page[aria-current]{font-weight:750}
+
+.ek-sidebar .ek-ws-head{color:rgba(241,247,244,.86)}
+.ek-sidebar .ek-ws-head:hover{background:rgba(255,255,255,.08);color:#fff}
+.ek-sidebar .ek-ws-icon{background:rgba(255,255,255,.1);color:#fff}
+.ek-sidebar .ek-ws.is-current>.ek-ws-head{color:#fff;background:rgba(255,255,255,.1)}
+.ek-sidebar .ek-ws.is-current>.ek-ws-head .ek-ws-icon{background:var(--gold,#c48725);color:var(--on-gold,#17211b)}
+.ek-sidebar .ek-ws-pages{border-left:1px solid rgba(255,255,255,.12);margin-left:22px;padding-left:0}
+.ek-sidebar .ek-ws-page{color:rgba(241,247,244,.8)}
+.ek-sidebar .ek-ws-page:hover{background:rgba(255,255,255,.08);color:#fff}
+.ek-sidebar .ek-ws-page[aria-current]{color:#fff;background:rgba(255,255,255,.14)}
+.ek-sidebar .ek-ws-page[aria-current]::before{background:var(--gold,#c48725);left:-1px}
+
+.side-drawer .ek-nav{padding:6px 8px}
+.side-drawer .ek-ws-head{min-height:48px;color:var(--ink,#17211b);font-size:15px}
+.side-drawer .ek-ws-head:hover{background:var(--soft,#eef4f0)}
+.side-drawer .ek-ws-icon{width:36px;height:36px;border-radius:10px;background:var(--soft,#eef4f0);color:var(--teal-ink,#117b6d)}
+.side-drawer .ek-ws-icon svg{width:20px;height:20px}
+.side-drawer .ek-ws.is-current>.ek-ws-head{background:var(--soft,#eef4f0);font-weight:800}
+.side-drawer .ek-ws-pages{padding-left:46px}
+.side-drawer .ek-ws-page{min-height:44px;font-size:14px;color:var(--ink,#17211b)}
+.side-drawer .ek-ws-page:hover{background:var(--soft,#eef4f0)}
+.side-drawer .ek-ws-page[aria-current]{background:var(--soft,#eef4f0);color:var(--teal-ink,#117b6d)}
+.side-drawer .ek-ws-page[aria-current]::before{background:var(--teal,#117b6d)}
+
+/* ======================================================
+   Kit — ek-* primitives for redesigned pages (surfaces.md).
+   Scoped to ek- classes: nothing here touches Calendar, Scheduling or
+   printables markup. Spacing follows the --sp-* ladder; colours are theme
+   tokens, so every preset carries through.
+   ====================================================== */
+.ek-page{display:grid;gap:var(--sp-4,16px);min-width:0;color:var(--ink,#17211b);font-size:14px;line-height:1.5}
+.ek-crumbs{margin:0;font-size:12px;font-weight:600;color:var(--muted,#627169)}
+.ek-crumbs a{color:var(--teal-ink,#117b6d);text-decoration:none}
+.ek-crumbs a:hover{text-decoration:underline}
+.ek-page-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--sp-3,12px)}
+.ek-page-headings{min-width:0;flex:1 1 320px}
+.ek-page-title{margin:0;font-size:clamp(22px,2.6vw,28px);line-height:1.2;font-weight:750;letter-spacing:-.015em;color:var(--ink,#17211b);overflow-wrap:break-word}
+.ek-page-desc{margin:var(--sp-1,4px) 0 0;font-size:14px;line-height:1.5;color:var(--muted,#627169);max-width:72ch}
+.ek-page-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2,8px)}
+
+.ek-tabs{display:flex;gap:var(--sp-1,4px);overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line,#d9e4dd);min-width:0}
+.ek-tabs::-webkit-scrollbar{display:none}
+.ek-tab{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:40px;padding:0 var(--sp-3,12px);
+  margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--muted,#627169);font-size:13px;font-weight:650;
+  text-decoration:none;white-space:nowrap}
+.ek-tab:hover{color:var(--ink,#17211b)}
+.ek-tab[aria-current]{color:var(--teal-ink,#117b6d);border-bottom-color:var(--teal,#117b6d)}
+.ek-tabs.is-sub{border-bottom:0;gap:var(--sp-2,8px)}
+.ek-tabs.is-sub .ek-tab{min-height:32px;margin:0;border:1px solid var(--line,#d9e4dd);border-radius:var(--radius-full,999px);background:var(--paper,#fff)}
+.ek-tabs.is-sub .ek-tab[aria-current]{background:var(--soft,#eef4f0);border-color:var(--teal,#117b6d)}
+
+.ek-card{background:var(--paper,#fff);border:1px solid var(--line,#d9e4dd);border-radius:var(--radius-lg,12px);
+  box-shadow:0 1px 2px rgba(16,32,24,.04),0 8px 24px rgba(16,32,24,.05);min-width:0;overflow:hidden}
+.ek-card-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:var(--sp-3,12px);
+  padding:var(--sp-4,16px) var(--sp-5,20px);border-bottom:1px solid var(--line,#d9e4dd)}
+.ek-card-head h2,.ek-card-head h3{margin:0;font-size:16px;font-weight:700;line-height:1.3;color:var(--ink,#17211b)}
+.ek-card-head p{margin:2px 0 0;font-size:13px;color:var(--muted,#627169)}
+.ek-card-body{padding:var(--sp-4,16px) var(--sp-5,20px)}
+.ek-grid{display:grid;gap:var(--sp-4,16px);grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr))}
+
+.ek-stats{display:grid;gap:var(--sp-3,12px);grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr))}
+.ek-stat{display:grid;gap:2px;padding:var(--sp-3,12px) var(--sp-4,16px);background:var(--paper,#fff);
+  border:1px solid var(--line,#d9e4dd);border-radius:var(--radius,8px);text-decoration:none;color:inherit}
+.ek-stat-label{font-size:12px;font-weight:650;color:var(--muted,#627169)}
+.ek-stat-value{font-size:24px;font-weight:750;line-height:1.15;color:var(--ink,#17211b);font-variant-numeric:tabular-nums}
+a.ek-stat:hover{border-color:var(--teal,#117b6d)}
+
+.ek-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;max-width:100%}
+.ek-table{width:100%;border-collapse:collapse;font-size:13px}
+.ek-table th{text-align:left;font-size:12px;font-weight:700;color:var(--muted,#627169);background:var(--soft,#eef4f0);
+  padding:var(--sp-2,8px) var(--sp-3,12px);border-bottom:1px solid var(--line,#d9e4dd);white-space:nowrap}
+.ek-table td{padding:var(--sp-2,8px) var(--sp-3,12px);border-bottom:1px solid var(--line,#d9e4dd);vertical-align:top}
+.ek-table tbody tr:last-child td{border-bottom:0}
+.ek-table tbody tr:hover td{background:color-mix(in srgb,var(--soft,#eef4f0) 60%,transparent)}
+.ek-table.is-sticky thead th{position:sticky;top:0;z-index:1}
+.ek-table .is-num{text-align:right;font-variant-numeric:tabular-nums}
+.ek-table a{color:var(--teal-ink,#117b6d)}
+
+.ek-form{display:grid;gap:var(--sp-4,16px);max-width:48rem}
+.ek-field{display:grid;gap:6px;min-width:0}
+.ek-field>label,.ek-label{font-size:13px;font-weight:650;color:var(--ink,#17211b)}
+.ek-hint{font-size:12px;color:var(--muted,#627169)}
+.ek-input,.ek-select{width:100%;box-sizing:border-box;min-height:40px;padding:8px 12px;font:inherit;font-size:14px;
+  color:var(--ink,#17211b);background:var(--paper,#fff);border:1px solid var(--line,#d9e4dd);border-radius:var(--radius,8px);
+  transition:border-color .12s,box-shadow .12s}
+textarea.ek-input{min-height:96px;resize:vertical}
+.ek-input:focus,.ek-select:focus{outline:none;border-color:var(--teal,#117b6d);box-shadow:var(--focus-shadow,0 0 0 3px rgba(17,123,109,.3))}
+.ek-input[aria-invalid="true"]{border-color:var(--rose,#b84957)}
+
+.ek-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2,8px);min-height:40px;
+  padding:0 var(--sp-4,16px);border-radius:var(--radius,8px);border:1px solid var(--line,#d9e4dd);
+  background:var(--paper,#fff);color:var(--ink,#17211b);font:inherit;font-size:14px;font-weight:650;line-height:1;
+  text-decoration:none;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s}
+.ek-btn:hover{background:var(--soft,#eef4f0)}
+.ek-btn svg{width:16px;height:16px}
+.ek-btn-primary{background:var(--teal,#117b6d);border-color:var(--teal,#117b6d);color:var(--on-teal,#fff)}
+.ek-btn-primary:hover{background:var(--teal-ink,#0e6a5e);border-color:var(--teal-ink,#0e6a5e)}
+.ek-btn-quiet{background:transparent;border-color:transparent;color:var(--teal-ink,#117b6d)}
+.ek-btn-quiet:hover{background:var(--soft,#eef4f0)}
+.ek-btn-danger{background:var(--paper,#fff);border-color:var(--rose,#b84957);color:var(--rose-ink,#b84957)}
+.ek-btn-danger:hover{background:var(--rose,#b84957);color:var(--on-rose,#fff)}
+.ek-btn[disabled],.ek-btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed;pointer-events:none}
+
+.ek-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--radius-full,999px);
+  font-size:12px;font-weight:650;line-height:1.5;white-space:nowrap;background:var(--soft,#eef4f0);color:var(--ink,#17211b)}
+.ek-badge.is-ok{color:var(--teal-ink,#117b6d)}
+.ek-badge.is-warn{color:var(--gold-ink,#92651c)}
+.ek-badge.is-error{color:var(--rose-ink,#b84957)}
+.ek-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border:1px solid var(--line,#d9e4dd);
+  border-radius:var(--radius-full,999px);background:var(--paper,#fff);color:var(--ink,#17211b);font-size:12px;font-weight:600;text-decoration:none}
+a.ek-chip:hover,button.ek-chip:hover{border-color:var(--teal,#117b6d)}
+.ek-chip[aria-pressed="true"]{background:var(--soft,#eef4f0);border-color:var(--teal,#117b6d);color:var(--teal-ink,#117b6d)}
+
+.ek-empty{display:grid;justify-items:center;text-align:center;gap:var(--sp-2,8px);padding:var(--sp-8,32px) var(--sp-4,16px);
+  border:1px dashed var(--line,#d9e4dd);border-radius:var(--radius-lg,12px);background:var(--paper,#fff);color:var(--muted,#627169)}
+.ek-empty h3,.ek-empty strong{margin:0;font-size:15px;font-weight:700;color:var(--ink,#17211b)}
+.ek-empty p{margin:0;max-width:52ch}
+
+.ek-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2,8px)}
+.ek-toolbar .ek-spacer{flex:1}
+
+.ek-alert{display:flex;gap:var(--sp-3,12px);align-items:flex-start;padding:var(--sp-3,12px) var(--sp-4,16px);
+  border:1px solid var(--line,#d9e4dd);border-left-width:4px;border-radius:var(--radius,8px);background:var(--paper,#fff);font-size:14px}
+.ek-alert.is-ok{border-left-color:var(--teal,#117b6d)}
+.ek-alert.is-error{border-left-color:var(--rose,#b84957)}
+.ek-alert.is-error strong{color:var(--rose-ink,#b84957)}
+
+@media(max-width:640px){
+  .ek-card-head,.ek-card-body{padding:var(--sp-3,12px) var(--sp-4,16px)}
+  .ek-page-actions{width:100%}
+  .ek-btn,.ek-input,.ek-select{min-height:44px}
+  .ek-input,.ek-select{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+  .ek-btn,.ek-input,.ek-select{transition:none}
+}
 </style>
 CSS;
+    }
+}
+
+if (!function_exists('ek_request_path')) {
+    /** The current request path below the portal base path ('/admin/people'). */
+    function ek_request_path(string $basePath): string
+    {
+        $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?? '/');
+        $base = rtrim($basePath, '/');
+        if ($base !== '' && ($path === $base || str_starts_with($path, $base . '/'))) {
+            $path = substr($path, strlen($base));
         }
+        $path = '/' . trim($path, '/');
 
-        $links = [];
-        foreach ($groups as $group) {
-            if (isset($group['href'])) {
-                // Direct top-level tab — single link, no flyout
-                $links[] = sprintf(
-                    '<a class="nav-tab" href="%s">%s<span>%s</span></a>',
-                    htmlspecialchars((string) $group['href'], ENT_QUOTES, 'UTF-8'),
-                    isset($group['icon']) ? portal_icon((string) $group['icon']) : '',
-                    htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8'),
-                );
-                continue;
-            }
+        return $path;
+    }
+}
 
-            // Group with sub-items: tab acts as label; flyout appears on hover.
-            // Use visibility/opacity so no layout shift occurs (no flicker).
-            $flyoutItems = '';
-            // Use the first item's href as the tab's own href so it's still clickable.
-            $firstHref = '';
-            foreach (($group['items'] ?? []) as $item) {
-                if ($firstHref === '') {
-                    $firstHref = htmlspecialchars((string) ($item['href'] ?? ''), ENT_QUOTES, 'UTF-8');
+if (!function_exists('ek_current_location')) {
+    /**
+     * Where this request sits in the workspace map, from the URL (or from the
+     * page itself when it pinned its place, as the admin shell does).
+     *
+     * @return ?array{workspace:string,page:string,child:?string}
+     */
+    function ek_current_location(string $basePath): ?array
+    {
+        return \App\Core\Navigation\Workspaces::current(ek_request_path($basePath));
+    }
+}
+
+if (!function_exists('ek_workspace_nav')) {
+    /**
+     * The workspace navigation: every workspace this actor may use, the current
+     * one expanded to its pages. Rendered identically in the desktop sidebar
+     * and the phone drawer; only the surrounding CSS differs.
+     *
+     * Which page is current is decided here from the URL — never from browser
+     * storage, which only remembers whether the sidebar is collapsed.
+     *
+     * @param ?array<string,mixed> $actor
+     * @param ?array{workspace:string,page:string,child:?string} $location
+     */
+    function ek_workspace_nav(string $basePath, ?array $actor, ?array $location, string $label = 'Workspaces'): string
+    {
+        $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+        $out = '';
+        foreach (\App\Core\Navigation\Workspaces::visible($basePath, $actor) as $ws) {
+            // Current only when this actor is offered the page they are on:
+            // a visitor who follows a link to an admin page is not "in" a
+            // workspace they cannot see.
+            $isCurrent = $location !== null && $location['workspace'] === $ws['id']
+                && in_array($location['page'], array_column($ws['pages'], 'id'), true);
+            $first = $ws['pages'][0];
+            $pagesHtml = '';
+            if ($isCurrent && count($ws['pages']) > 1) {
+                foreach ($ws['pages'] as $page) {
+                    $active = $location['page'] === $page['id'];
+                    // A sub-page (Theme under Portal appearance) is "in" the
+                    // entry rather than the entry's own page.
+                    $aria = $active ? ($location['child'] !== null ? ' aria-current="true"' : ' aria-current="page"') : '';
+                    $pagesHtml .= sprintf(
+                        '<li><a class="ek-ws-page%s" href="%s"%s>%s</a></li>',
+                        $active ? ' is-active' : '',
+                        $e((string) $page['href']),
+                        $aria,
+                        $e((string) $page['label']),
+                    );
                 }
-                $flyoutItems .= sprintf(
-                    '<a href="%s">%s<span>%s</span></a>',
-                    htmlspecialchars((string) ($item['href'] ?? ''), ENT_QUOTES, 'UTF-8'),
-                    isset($item['icon']) ? portal_icon((string) $item['icon']) : '',
-                    htmlspecialchars((string) ($item['label'] ?? ''), ENT_QUOTES, 'UTF-8'),
-                );
+                $pagesHtml = '<ul class="ek-ws-pages">' . $pagesHtml . '</ul>';
             }
-
-            $links[] = sprintf(
-                '<div class="nav-group"><a class="nav-tab" href="%s">%s<span>%s</span></a><div class="nav-flyout">%s</div></div>',
-                $firstHref,
-                isset($group['icon']) ? portal_icon((string) $group['icon']) : '',
-                htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8'),
-                $flyoutItems,
+            // A workspace offering this actor one page is that page: the head
+            // carries the page's name and is marked current itself.
+            $single = count($ws['pages']) === 1;
+            $headLabel = $single ? (string) $first['label'] : (string) $ws['label'];
+            $headCurrent = $isCurrent && $single && $location['page'] === $first['id'];
+            $out .= sprintf(
+                '<div class="ek-ws%s" data-workspace="%s">'
+                // aria-label, not hidden text: when the sidebar is collapsed to
+                // icons the visible label is gone and this is the only name.
+                . '<a class="ek-ws-head" href="%s" title="%s" aria-label="%s"%s>'
+                . '<span class="ek-ws-icon" aria-hidden="true">%s</span>'
+                . '<span class="ek-ws-label">%s</span></a>%s</div>',
+                $isCurrent ? ' is-current' : '',
+                $e((string) $ws['id']),
+                $e((string) $first['href']),
+                $e($headLabel),
+                $e($headLabel . ($isCurrent ? ' (current workspace)' : '')),
+                $headCurrent ? ' aria-current="page"' : '',
+                portal_icon((string) $ws['icon']),
+                $e($headLabel),
+                $pagesHtml,
             );
         }
 
-        return $style . '<nav class="portal-nav" aria-label="Primary">' . implode('', $links) . '</nav>';
+        return '<nav class="ek-nav" aria-label="' . $e($label) . '">' . $out . '</nav>';
+    }
+}
+
+if (!function_exists('ek_workspace_tabs')) {
+    /**
+     * Tabs across the top of a workspace page: the workspace's pages this actor
+     * may use. Nothing when there is only one. When the active page has
+     * sub-pages, a second row lists them.
+     *
+     * @param ?array<string,mixed> $actor
+     */
+    function ek_workspace_tabs(string $basePath, string $workspaceId, string $activePageId, ?array $actor, ?string $activeChildId = null): string
+    {
+        $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+        $workspace = null;
+        foreach (\App\Core\Navigation\Workspaces::visible($basePath, $actor) as $ws) {
+            if ($ws['id'] === $workspaceId) {
+                $workspace = $ws;
+                break;
+            }
+        }
+        if ($workspace === null) {
+            return '';
+        }
+
+        $html = '';
+        $activePage = null;
+        if (count($workspace['pages']) > 1) {
+            $tabs = '';
+            foreach ($workspace['pages'] as $page) {
+                $active = $page['id'] === $activePageId;
+                if ($active) {
+                    $activePage = $page;
+                }
+                $tabs .= sprintf(
+                    '<a class="ek-tab" href="%s"%s>%s</a>',
+                    $e((string) $page['href']),
+                    $active ? ($activeChildId !== null && isset($page['children']) ? ' aria-current="true"' : ' aria-current="page"') : '',
+                    $e((string) $page['label']),
+                );
+            }
+            $html .= '<nav class="ek-tabs" aria-label="' . $e((string) $workspace['label']) . '">' . $tabs . '</nav>';
+        } else {
+            foreach ($workspace['pages'] as $page) {
+                if ($page['id'] === $activePageId) {
+                    $activePage = $page;
+                }
+            }
+        }
+
+        if ($activePage !== null && count($activePage['children'] ?? []) > 1) {
+            $sub = '';
+            foreach ($activePage['children'] as $child) {
+                $sub .= sprintf(
+                    '<a class="ek-tab" href="%s"%s>%s</a>',
+                    $e((string) $child['href']),
+                    $child['id'] === $activeChildId ? ' aria-current="page"' : '',
+                    $e((string) $child['label']),
+                );
+            }
+            $html .= '<nav class="ek-tabs is-sub" aria-label="' . $e((string) $activePage['label']) . '">' . $sub . '</nav>';
+        }
+
+        return $html;
+    }
+}
+
+if (!function_exists('ek_page_header')) {
+    /**
+     * The title of a redesigned page: one h1, an optional sentence saying what
+     * the page is for, and optional actions. $actionsHtml is markup the caller
+     * built and escaped.
+     */
+    function ek_page_header(string $title, string $description = '', string $actionsHtml = ''): string
+    {
+        $e = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+
+        return '<header class="ek-page-header"><div class="ek-page-headings">'
+            . '<h1 class="ek-page-title">' . $e($title) . '</h1>'
+            . ($description !== '' ? '<p class="ek-page-desc">' . $e($description) . '</p>' : '')
+            . '</div>'
+            . ($actionsHtml !== '' ? '<div class="ek-page-actions">' . $actionsHtml . '</div>' : '')
+            . '</header>';
     }
 }
 
@@ -1068,63 +1243,18 @@ if (!function_exists('portal_header')) {
         string $loginHref = '',
         bool $includeAllCampusesOption = false,
     ): string {
-        // Pull live header overrides (brand text, primary nav) from chrome.json.
-        // Pages may pass a non-empty $navGroups and we'll respect that, but if
-        // they leave it empty (most calls do), we fall back to the configured
-        // nav so admins can edit it via /admin/header without code changes.
+        // Brand text comes from chrome.json. Navigation does not: since Phase 2
+        // the workspace map (App\Core\Navigation\Workspaces) is the single
+        // source of the portal's navigation, rendered as the sidebar on desktop
+        // and in the drawer below 1024px. $navGroups and chrome.json primaryNav
+        // are accepted for compatibility and ignored, so no page can grow a
+        // navigation of its own again.
         $chrome = portal_chrome();
-
-        // ---- Phase 1: single navigation source -------------------------------
-        // Before Phase 1, 15 views each passed a literal $navGroups array, which
-        // produced FIVE different primary navigations across the portal (audit
-        // C1) — on /people the "People" tab was missing entirely. The passed
-        // array is now deliberately IGNORED: config/chrome.json is the sole
-        // source of the primary nav, so it stays identical on every route and
-        // remains editable from /admin/header.
-        //
-        // Nothing is lost. Destinations that used to appear ad-hoc in some page
-        // navs (Availability, Printables, My Schedule, Account, Admin) are
-        // reachable from the overflow menu on desktop and the drawer on mobile,
-        // and are role-gated exactly as before.
-        $legacyNavGroups = $navGroups;   // retained for debugging/BC only
-        $navGroups = [];
-        if (!empty($chrome['header']['primaryNav']) && is_array($chrome['header']['primaryNav'])) {
-            $navGroups = array_map(static function (array $item) use ($basePath): array {
-                return [
-                    'href'  => $basePath . (string) ($item['href'] ?? '/'),
-                    'label' => (string) ($item['label'] ?? ''),
-                    'icon'  => (string) ($item['icon']  ?? 'dashboard'),
-                ];
-            }, $chrome['header']['primaryNav']);
-        }
-
-        // Secondary destinations: never shown as primary tabs, always reachable
-        // from the overflow menu (desktop) and the drawer (mobile). Events,
-        // Docs and Printables are omitted here when they already occupy a
-        // primary tab, so chrome.json cannot list the same door twice.
+        unset($navGroups);
         $isSignedIn = $actor !== null;
-        $secondaryNav = [];
-        if ($isSignedIn) {
-            $secondaryNav[] = ['href' => $basePath . '/my-schedule',  'label' => 'My Schedule',  'icon' => 'calendar'];
-            $secondaryNav[] = ['href' => $basePath . '/availability', 'label' => 'Availability', 'icon' => 'availability'];
-            // Same destination as the Ministries tab: the overflow name is the
-            // job ("Serving"), not a second product.
-            $secondaryNav[] = ['href' => $basePath . '/ministries', 'label' => 'Serving', 'icon' => 'ministry'];
-        }
-        if (!portal_nav_has_path($navGroups, $basePath, '/events')) {
-            $secondaryNav[] = ['href' => $basePath . '/events', 'label' => 'Events', 'icon' => 'events'];
-        }
-        if (!portal_nav_has_path($navGroups, $basePath, '/printables')) {
-            $secondaryNav[] = ['href' => $basePath . '/printables', 'label' => 'Printables', 'icon' => 'docs'];
-        }
-        if ($isSignedIn) {
-            $secondaryNav[] = ['href' => $basePath . '/account', 'label' => 'Account', 'icon' => 'profile'];
-        }
-        // Docs belong in overflow unless an administrator pinned them in
-        // primaryNav via /admin/header. Do not append them to the tab row.
-        if (!portal_nav_has_path($navGroups, $basePath, '/docs')) {
-            $secondaryNav[] = ['href' => $basePath . '/docs', 'label' => 'Docs', 'icon' => 'docs'];
-        }
+        $location = ek_current_location($basePath);
+        $esc = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+
         // Auto-load campuses from the service layer when the caller passes none.
         // This ensures every page gets a campus selector without per-page wiring.
         if ($campuses === []) {
@@ -1284,154 +1414,115 @@ if (!function_exists('portal_header')) {
             ? strtoupper(substr($actorFirstName, 0, 1))
             : '?';
 
-        // Build drawer body: "Quick Access" shortcuts + main grouped nav
-        $drawerQuickHtml = '';
-        $drawerMenuHtml  = '';
-        foreach ($navGroups as $group) {
-            if (isset($group['href'])) {
-                // top-level link (e.g. Home) goes straight into menu
-                $drawerMenuHtml .= sprintf(
-                    '<a class="drawer-item" href="%s"><span class="drawer-item-icon">%s</span><span class="drawer-item-label">%s</span></a>',
-                    htmlspecialchars((string) $group['href'], ENT_QUOTES, 'UTF-8'),
-                    isset($group['icon']) ? portal_icon((string) $group['icon']) : '',
-                    htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8'),
-                );
-                continue;
-            }
-            $drawerMenuHtml .= sprintf(
-                '<div class="drawer-section-title">%s</div>',
-                htmlspecialchars((string) $group['label'], ENT_QUOTES, 'UTF-8'),
-            );
-            foreach (($group['items'] ?? []) as $item) {
-                $itemLabel = strtolower((string) ($item['label'] ?? ''));
-                $itemHtml  = sprintf(
-                    '<a class="drawer-item" href="%s"><span class="drawer-item-icon">%s</span><span class="drawer-item-label">%s</span></a>',
-                    htmlspecialchars((string) ($item['href'] ?? ''), ENT_QUOTES, 'UTF-8'),
-                    isset($item['icon']) ? portal_icon((string) $item['icon']) : '',
-                    htmlspecialchars((string) ($item['label'] ?? ''), ENT_QUOTES, 'UTF-8'),
-                );
-                // Surface schedule/availability as thumb-reachable shortcuts
-                if (str_contains($itemLabel, 'schedule') || str_contains($itemLabel, 'availability')) {
-                    $drawerQuickHtml .= $itemHtml;
-                } else {
-                    $drawerMenuHtml .= $itemHtml;
+        $brandTitle = (string) ($chrome['header']['brandTitle'] ?? 'Ekklesia');
+        if (trim($brandTitle) === '') {
+            $brandTitle = 'Ekklesia';
+        }
+        // Ekklesia is the church's portal, so the church is context under the
+        // product name rather than a headline.
+        $churchName = '';
+        try {
+            $churchName = trim((string) (\App\Providers\PortalServiceProvider::makeChurchInfoService()->load()['name'] ?? ''));
+        } catch (\Throwable) {
+            $churchName = '';
+        }
+        $markStyle = "background-image:url('" . $esc($basePath) . "/images/christlikeness_colored.jpg')";
+
+        // Where you are, in words, for the top bar.
+        $contextWs = '';
+        $contextPage = '';
+        if ($location !== null) {
+            $ws = \App\Core\Navigation\Workspaces::workspace($location['workspace']);
+            foreach ($ws['pages'] ?? [] as $page) {
+                if ($page['id'] !== $location['page']) {
+                    continue;
+                }
+                $contextWs = (string) $ws['label'];
+                $contextPage = (string) $page['label'];
+                foreach ($page['children'] ?? [] as $child) {
+                    if ($child['id'] === $location['child']) {
+                        $contextPage = (string) $child['label'];
+                    }
                 }
             }
-            $drawerMenuHtml .= '<hr class="drawer-divider">';
         }
-
-        // Admin control. Hidden when logged out. For a portal-wide admin it links
-        // to the control panel; for a signed-in non-admin it shows but does nothing.
-        // Visible search trigger — mouse, keyboard and touch. Ctrl/Cmd+K still works.
-        $searchBtnHtml = '<button class="icon-btn search-btn" id="searchBtn" type="button"'
-            . ' aria-label="Search the portal" aria-keyshortcuts="Control+K" title="Search (Ctrl+K)">'
-            . portal_icon('search') . '</button>';
-
-        // Overflow menu — keeps every secondary destination reachable on desktop
-        // without lengthening the primary tab row (which used to clip silently).
-        $moreItems = '';
-        foreach ($secondaryNav as $item) {
-            $moreItems .= sprintf(
-                '<a class="more-item" role="menuitem" href="%s">%s<span>%s</span></a>',
-                htmlspecialchars((string) $item['href'], ENT_QUOTES, 'UTF-8'),
-                portal_icon((string) $item['icon']),
-                htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8'),
-            );
-        }
-
-        $settingsHref = htmlspecialchars($basePath . '/admin', ENT_QUOTES, 'UTF-8');
-        $isAdminUser = $actor !== null && (bool) ($actor['isPortalWideAdmin'] ?? false);
-        $adminIconHtml = '';
-        // Permission-aware presentation (Cursor F10): a non-admin was shown a
-        // disabled Admin control with no explanation, which reads as a broken or
-        // withheld feature. Admins get the control; everyone else simply does
-        // not see it. Authorization is unchanged — /admin and the admin APIs
-        // enforce exactly as before; this only stops advertising a destination
-        // the user cannot use.
-        if ($actor !== null && $isAdminUser) {
-            $adminIconHtml = '<a class="icon-btn settings-btn" href="' . $settingsHref . '" title="Admin" aria-label="Admin">' . portal_icon('admin') . '</a>';
-        }
-
-        if ($isAdminUser) {
-            $moreItems .= sprintf(
-                '<a class="more-item" role="menuitem" href="%s">%s<span>%s</span></a>',
-                $settingsHref, portal_icon('admin'), 'Administration',
-            );
-        }
-        $moreHtml = $moreItems === '' ? '' :
-            '<div class="more-wrap">'
-            . '<button class="icon-btn more-btn" id="moreBtn" type="button" aria-label="More destinations"'
-            . ' aria-haspopup="menu" aria-expanded="false" aria-controls="moreMenu" title="More">'
-            . portal_icon('menu') . '</button>'
-            . '<div class="more-menu" id="moreMenu" role="menu" hidden>' . $moreItems . '</div>'
+        $contextHtml = '<div class="topbar-context">'
+            . ($contextWs !== '' && $contextWs !== $contextPage ? '<span class="topbar-context-ws">' . $esc($contextWs) . '</span>' : '')
+            . ($contextPage !== '' ? '<span class="topbar-context-page">' . $esc($contextPage) . '</span>' : '')
             . '</div>';
 
-        // Surface the same destination in the drawer (admins only get a link).
-        if ($isAdminUser) {
-            $drawerMenuHtml .= '<hr class="drawer-divider">'
-                . sprintf(
-                    '<a class="drawer-item" href="%s"><span class="drawer-item-icon">%s</span><span class="drawer-item-label">%s</span></a>',
-                    $settingsHref,
-                    portal_icon('admin'),
-                    'Administration',
-                );
+        // ---- Workspace sidebar (desktop) -------------------------------------
+        $guideIcon = portal_icon('docs');
+        $collapseSvg = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+        if ($isSignedIn) {
+            $sideUser = '<div class="ek-side-user"><span class="ek-avatar" aria-hidden="true">' . $esc($avatarChar ?? '?') . '</span>'
+                . '<span class="ek-side-user-name">' . $esc((string) ($actor['displayName'] ?? $actorFirstName)) . '</span></div>'
+                . '<a class="ek-side-link" href="' . $esc($basePath . '/account') . '" aria-label="Account">' . portal_icon('profile') . '<span class="ek-side-label">Account</span></a>'
+                . '<a class="ek-side-link" href="' . $esc($basePath . '/docs') . '" aria-label="User guide">' . $guideIcon . '<span class="ek-side-label">User guide</span></a>'
+                . '<form class="ek-side-signout" method="post" action="' . $esc($basePath . '/logout') . '" data-signout>'
+                . '<button class="ek-side-link" type="submit" aria-label="Sign out">'
+                . '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5v-2H5V5h5V3Zm6.6 4.4L15.2 8.8l2.2 2.2H9v2h8.4l-2.2 2.2 1.4 1.4L21.2 12l-4.6-4.6Z"/></svg>'
+                . '<span class="ek-side-label">Sign out</span></button></form>';
+        } else {
+            $sideUser = '<a class="ek-side-link" href="' . $esc($loginHref !== '' ? $loginHref : $basePath . '/login') . '" aria-label="' . $esc($loginLabel) . '">' . portal_icon('profile') . '<span class="ek-side-label">' . $esc($loginLabel) . '</span></a>';
         }
+        $sidebarHtml = '<aside class="ek-sidebar" id="ekSidebar" aria-label="Application">'
+            . '<a class="ek-side-brand" href="' . $esc($basePath) . '/" aria-label="' . $esc($brandTitle . ' home') . '">'
+            . '<span class="portal-brand-mark" aria-hidden="true" style="' . $markStyle . '"></span>'
+            . '<span class="ek-side-brand-text"><span class="ek-side-brand-name">' . $esc($brandTitle) . '</span>'
+            . ($churchName !== '' ? '<span class="ek-side-brand-sub">' . $esc($churchName) . '</span>' : '')
+            . '</span></a>'
+            . ek_workspace_nav($basePath, $actor, $location)
+            . '<div class="ek-side-foot">' . $sideUser
+            . '<button class="ek-side-link ek-collapse" type="button" data-ek-collapse aria-controls="ekSidebar" aria-expanded="true" aria-label="Collapse navigation">'
+            . $collapseSvg . '<span class="ek-side-label">Collapse</span></button>'
+            . '</div></aside>';
 
-        // Search is reachable on touch, where Ctrl+K is not available.
+        // Collapsed-to-icons is the only thing remembered, and it is applied
+        // before the sidebar paints. Which page is current always comes from
+        // the URL, rendered above.
+        $sidebarJs = '<script>(function(){var K="ekklesia_sidebar_rail_v1",r=document.documentElement;'
+            . 'function get(){try{return localStorage.getItem(K)==="1";}catch(e){return false;}}'
+            . 'function put(v){try{localStorage.setItem(K,v?"1":"0");}catch(e){}}'
+            . 'function sync(){var b=document.querySelector("[data-ek-collapse]");if(!b)return;var on=r.classList.contains("ek-rail");'
+            . 'b.setAttribute("aria-expanded",on?"false":"true");b.setAttribute("aria-label",on?"Expand navigation":"Collapse navigation");'
+            . 'var l=b.querySelector(".ek-side-label");if(l)l.textContent=on?"Expand":"Collapse";}'
+            . 'if(get())r.classList.add("ek-rail");'
+            . 'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-ek-collapse]");if(!b)return;'
+            . 'var on=!r.classList.contains("ek-rail");r.classList.toggle("ek-rail",on);put(on);sync();});'
+            . 'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",sync);else sync();'
+            . '})();</script>';
+
+        // ---- Drawer (below 1024px): the same workspace navigation --------------
         $drawerSearchHtml = '<a class="drawer-item" id="drawerSearchBtn" href="#" role="button">'
             . '<span class="drawer-item-icon">' . portal_icon('search') . '</span>'
             . '<span class="drawer-item-label">Search</span></a>';
-
-        // Every secondary destination, so mobile hides nothing the desktop offers.
-        $drawerSecondary = '';
-        foreach ($secondaryNav as $item) {
-            $drawerSecondary .= sprintf(
-                '<a class="drawer-item" href="%s"><span class="drawer-item-icon">%s</span><span class="drawer-item-label">%s</span></a>',
-                htmlspecialchars((string) $item['href'], ENT_QUOTES, 'UTF-8'),
-                portal_icon((string) $item['icon']),
-                htmlspecialchars((string) $item['label'], ENT_QUOTES, 'UTF-8'),
-            );
+        $drawerExtra = '<hr class="drawer-divider">'
+            . '<a class="drawer-item" href="' . $esc($basePath . '/docs') . '"><span class="drawer-item-icon">' . $guideIcon . '</span><span class="drawer-item-label">User guide</span></a>';
+        if (!$isSignedIn) {
+            $drawerExtra .= '<a class="drawer-item" href="' . $esc($loginHref !== '' ? $loginHref : $basePath . '/login') . '"><span class="drawer-item-icon">' . portal_icon('profile') . '</span><span class="drawer-item-label">' . $esc($loginLabel) . '</span></a>';
         }
-        if ($drawerSecondary !== '') {
-            $drawerMenuHtml .= '<div class="drawer-section-title">More</div>' . $drawerSecondary;
-        }
+        $drawerBodyHtml = $drawerSearchHtml . '<hr class="drawer-divider">'
+            . ek_workspace_nav($basePath, $actor, $location, 'Workspaces (menu)')
+            . $drawerExtra;
 
-        $drawerMenuHtml = $drawerSearchHtml . $drawerMenuHtml;
-
-        $drawerBodyHtml = $drawerQuickHtml !== ''
-            ? '<div class="drawer-section-title">Quick Access</div>' . $drawerQuickHtml . '<hr class="drawer-divider">' . $drawerMenuHtml
-            : $drawerMenuHtml;
-
-            $drawerHtml = sprintf(
+        $drawerHtml = sprintf(
             '<div class="drawer-head">'
             . '<div class="drawer-user"><span class="drawer-avatar">%s</span><span class="drawer-uname">%s</span></div>'
             . '<button class="drawer-close" id="drawerClose" type="button" aria-label="Close navigation menu">&#x2715;</button>'
             . '</div>'
             . '<div class="drawer-body">%s</div>',
-            htmlspecialchars($avatarChar, ENT_QUOTES, 'UTF-8'),
-            htmlspecialchars($actorFirstName, ENT_QUOTES, 'UTF-8'),
+            $esc($avatarChar),
+            $esc($isSignedIn ? $actorFirstName : $brandTitle),
             $drawerBodyHtml,
         );
 
+        $searchBtnHtml = '<button class="icon-btn search-btn" id="searchBtn" type="button"'
+            . ' aria-label="Search the portal" aria-keyshortcuts="Control+K" title="Search (Ctrl+K)">'
+            . portal_icon('search') . '</button>';
+
         // Self-contained drawer JS — no per-page listener needed
-            $navFitJs = '<script>(function(){'
-                . 'function mark(){var n=document.querySelector(\'.portal-nav\');if(!n)return;'
-                . 'n.classList.toggle(\'is-scrollable\',n.scrollWidth>n.clientWidth+1);}'
-                . 'mark();window.addEventListener(\'resize\',mark);'
-                . '})();</script>';
-
-            $moreJs = '<script>(function(){'
-                . 'var mb=document.getElementById(\'moreBtn\'),mm=document.getElementById(\'moreMenu\');'
-                . 'if(!mb||!mm)return;'
-                . 'function open(){mm.hidden=false;mb.setAttribute(\'aria-expanded\',\'true\');var f=mm.querySelector(\'a\');f&&f.focus();}'
-                . 'function close(f){mm.hidden=true;mb.setAttribute(\'aria-expanded\',\'false\');if(f)mb.focus();}'
-                . 'mb.addEventListener(\'click\',function(e){e.stopPropagation();mm.hidden?open():close(false);});'
-                . 'document.addEventListener(\'click\',function(e){if(!mm.hidden&&!mm.contains(e.target)&&e.target!==mb)close(false);});'
-                . 'document.addEventListener(\'keydown\',function(e){if(e.key===\'Escape\'&&!mm.hidden)close(true);});'
-                . '})();</script>';
-
-            // Same open/close contract as the overflow menu above, so the two
-            // header menus behave identically. Arrow keys are wired because
+            // The user menu's open/close contract. Arrow keys are wired because
             // this is a role="menu" and a keyboard user is entitled to expect
             // them; Escape returns focus to the button that opened it.
             $userMenuJs = '<script>(function(){'
@@ -1599,9 +1690,8 @@ document.addEventListener('keydown',function(e){
 })();</script>
 SRCHJS;
 
-        // Header enhancement JS: mark active nav-tab and has-active parent group on load.
-        // Uses prefix matching so /ministries/123, /ministries/editor, etc. all activate
-        // the Ministries tab without requiring an exact path match.
+        // Campus persistence. (The current page is marked server-side from the
+        // workspace map, so no script guesses it from the URL any more.)
         $headerEnhanceJs = '<script>(function(){'
             // Campus persistence: write cookie when the user changes the topbar select so every
             // subsequent page load pre-selects the same campus without needing a URL param.
@@ -1619,25 +1709,6 @@ SRCHJS;
             // chose is the filter they see. Cookie remains the mechanism.
             . '    window.location.reload();'
             . '  });'
-            . '});'
-            . 'function norm(p){try{var u=new URL(p,window.location.origin);return u.pathname.replace(/\/$/,"");}catch(e){return p.replace(/\/$/,"");}}'
-            . 'var home="' . htmlspecialchars(rtrim($basePath, '/'), ENT_QUOTES, 'UTF-8') . '";'
-            . 'var path=window.location.pathname.replace(/\/$/,"");'
-            . 'document.querySelectorAll(".portal-nav .nav-tab,.nav-flyout a").forEach(function(a){'
-            . '  try{'
-            . '    var href=norm(a.getAttribute("href")||"");'
-            . '    if(!href)return;'
-            // Exact match OR prefix match (tab href is a proper prefix of current path,
-            // e.g. /church_portal/ministries matches /church_portal/ministries/123).
-            // The home tab (basePath/) only activates on exact match to avoid matching every page.
-            . '    var isHome=(href===home||href===home+"/");'
-            . '    var active=isHome?(path===home||path===home+"/"):(path===href||(path.startsWith(href)&&path[href.length]==="/"||path.startsWith(href+"//")));'
-            . '    if(active){'
-            . '      a.classList.add("is-active");'
-            . '      var g=a.closest(".nav-group");'
-            . '      if(g){var t=g.querySelector(".nav-tab");if(t)t.classList.add("has-active");}'
-            . '    }'
-            . '  }catch(e){}'
             . '});'
             . '})();</script>';
 
@@ -1724,21 +1795,19 @@ SRCHJS;
             . 'document.addEventListener("DOMContentLoaded",restore);else restore();'
             . '})();</script>';
 
-        // 3-column grid: [brand] [nav] [actions]
-        return portal_theme_style_block() . sprintf(
+        // Sidebar first (fixed, desktop only), then the slim top bar:
+        // [brand, phones only] [where you are] [campus · search · you · menu]
+        return portal_theme_style_block() . portal_shell_styles() . sprintf(
             '<a class="skip-link" href="#portal-main">Skip to main content</a>'
+            . '%s%s'
             . '<header class="topbar">'
             . '<div class="topbar-brand">'
-            . '<a class="portal-brand" href="%s/" aria-label="%s"><span class="portal-brand-mark" aria-hidden="true" style="background-image:url(\'%s/images/christlikeness_colored.jpg\')"></span></a>'
+            . '<a class="portal-brand" href="%s/" aria-label="%s"><span class="portal-brand-mark" aria-hidden="true" style="%s"></span></a>'
             . '<span class="portal-brand-text" aria-hidden="true">%s</span>'
             . '</div>'
             . '%s'
             . '<div class="topbar-actions">'
-            . '%s'
-            . '%s'
-            . '%s'
-            . '%s'
-            . '%s'
+            . '%s%s%s'
             . '<button class="icon-btn ham-btn" id="menuButton" type="button" aria-label="Open navigation menu" aria-controls="sideDrawer" aria-expanded="false">%s</button>'
             . '</div>'
             . '</header>'
@@ -1746,21 +1815,20 @@ SRCHJS;
             . '<div class="drawer-backdrop" id="drawerBackdrop"></div>'
             . '<aside class="side-drawer" id="sideDrawer" role="dialog" aria-modal="true" aria-label="Navigation menu" inert aria-hidden="true">%s</aside>'
             . '%s%s%s%s',
-            htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'),
-            htmlspecialchars((string) ($chrome['header']['brandTitle'] ?? 'Scheduler') . ' home', ENT_QUOTES, 'UTF-8'),
-            // The logo follows the base path: the app runs at a site root or under a folder.
-            htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'),
-            htmlspecialchars((string) ($chrome['header']['brandTitle'] ?? ''), ENT_QUOTES, 'UTF-8'),
-            portal_nav_bar($basePath, $navGroups),
+            $sidebarJs,
+            $sidebarHtml,
+            $esc($basePath),
+            $esc($brandTitle . ' home'),
+            $markStyle,
+            $esc($brandTitle),
+            $contextHtml,
             $campusSelectHtml,
             $searchBtnHtml,
-            $moreHtml,
-            $adminIconHtml,
             $authAction,
             portal_icon('menu'),
             $contextBarHtml,
             $drawerHtml,
-            $drawerJs . $moreJs . $userMenuJs . $navFitJs . $shellJs,
+            $drawerJs . $userMenuJs . $shellJs,
             $searchOverlayHtml . $searchJs,
             $noticeHtml . $noticeJs,
             $headerEnhanceJs,

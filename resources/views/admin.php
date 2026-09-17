@@ -20,7 +20,7 @@ $tiles = [
     ['title' => 'Dashboard',          'href' => $base . '/admin/dashboard',  'desc' => 'Home layout, guest hero, church announcements.', 'badge' => 'Live'],
     ['title' => 'Maintenance',        'href' => $base . '/admin/maintenance', 'desc' => 'Backups, archives, member import and Excel export.', 'badge' => 'Live'],
     ['title' => 'Ministry list',      'href' => $base . '/admin/ministries', 'desc' => 'Which ministry pages appear on the public site.', 'badge' => 'Beta'],
-    ['title' => 'Members & leaders',  'href' => $base . '/admin/groups-and-ministries', 'desc' => 'Create teams; manage members, roles, and leaders.', 'badge' => 'Live'],
+    ['title' => 'Members & leaders',  'href' => $base . '/ministries/members-and-leaders', 'desc' => 'Create teams; manage members, roles, and leaders.', 'badge' => 'Live'],
     ['title' => 'Calendar',           'href' => $base . '/admin/calendar',   'desc' => 'Source list, custom rules, default views.', 'badge' => 'Live'],
     ['title' => 'Events',             'href' => $base . '/admin/events',     'desc' => 'Configured events. List columns and look-ahead remain on the roadmap.', 'badge' => 'Beta'],
     ['title' => 'Member records',     'href' => $base . '/admin/people',     'desc' => 'Add, find and edit person records. The top-bar People tab is look-up only.', 'badge' => 'Beta'],

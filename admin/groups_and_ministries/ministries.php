@@ -199,7 +199,7 @@ echo admin_render_page([
     'pageTitle'          => 'Members & leaders',
     'pageSubtitle'       => 'Create teams; manage members, roles, and leaders.',
     'sectionTitle'       => 'Members & leaders',
-    'sectionDescription' => 'Create and manage ministry teams — members, serving roles, and leaders. Public visibility is Administration → Ministry list.',
+    'sectionDescription' => 'Create and manage ministry teams — members, serving roles, and leaders. Public visibility is Ministries → Manage ministries.',
     'actor'              => $actor,
     'campusSelector'     => $campusSelector,
     'isAdmin'            => $isAdmin,
@@ -253,7 +253,7 @@ echo admin_render_page([
     const slugify = (name) => String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     // loose key for matching a URL slug to a name, tolerant of -/_/space
     const slugKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
-    function ministryUrl(name) { return BASE + '/admin/groups-and-ministries/' + slugify(name); }
+    function ministryUrl(name) { return BASE + '/ministries/members-and-leaders/' + slugify(name); }
 
     // ---- state ----
     let ministries = [];
@@ -738,7 +738,7 @@ echo admin_render_page([
         });
     }
 
-    function resetUrl() { try { history.replaceState({}, '', BASE + '/admin/groups-and-ministries'); } catch (e) {} }
+    function resetUrl() { try { history.replaceState({}, '', BASE + '/ministries/members-and-leaders'); } catch (e) {} }
 
     // ---- boot ----
     fillCampusSelect(document.getElementById('gmNewCampus'), null);

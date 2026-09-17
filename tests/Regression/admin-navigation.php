@@ -136,90 +136,126 @@ $adminMe = (string) file_get_contents(__DIR__ . '/../../resources/views/admin-me
 check('Admin Me redirects to Account', str_contains($adminMe, "header('Location:") && str_contains($adminMe, '/account'));
 check('Admin Me is not a second Account editor', !str_contains($adminMe, 'Personal notes'));
 
-check('overflow helper treats Events as already a tab',
-    portal_nav_has_path([['href' => '/bp/events']], '/bp', '/events'));
-check('overflow helper does not match a different path',
-    !portal_nav_has_path([['href' => '/bp/events']], '/bp', '/docs'));
-check('overflow helper normalises a trailing slash',
-    portal_nav_has_path([['href' => '/bp/docs/']], '/bp', '/docs'));
-
-
 // ---------------------------------------------------------------------------
-// Which section you are in is a fact about the URL.
+// Workspace navigation (Phase 2).
 //
-// The sidebar marked the active link and opened its group, but nothing said
-// which *area* you were in once a group was collapsed — which is exactly when
-// it is worth saying. And nothing remembered the groups an administrator had
-// deliberately opened or shut.
-//
-// The dividing line these tests hold: the route decides where you are, browser
-// storage only remembers what the user chose to expand.
-echo "\nCurrent section, and what may be remembered\n";
-// The sidebar is permission-filtered, so it needs an actor or it renders empty
-// — which is itself the correct behaviour and worth stating.
-$adminActor = ['isPortalWideAdmin' => true, 'permissions' => []];
-// Assert on the rendered <aside>, not the whole string: the behaviour script
-// mentions .admin-side-group as a selector, which is not navigation.
-$signedOut = admin_sidebar_html('/bp', 'events', null);
-preg_match('/<aside[^>]*>(.*?)<\/aside>/s', $signedOut, $asideOut);
-check('a signed-out visitor gets no admin navigation at all',
-    trim($asideOut[1] ?? 'x') === '', $asideOut[1] ?? '(no aside)');
+// The admin area's own sidebar is gone: every page, admin or not, shows the
+// application's workspace sidebar, rendered from one map. What these tests
+// hold is the same promise as above — navigation offers what the account can
+// use, and the URL (never browser storage) decides where you are.
+echo "\nWorkspace navigation\n";
 
-$sidebar = admin_sidebar_html('/bp', 'events', $adminActor);
+use App\Core\Navigation\Workspaces;
 
-check('the group holding the active page is marked as current',
-    substr_count($sidebar, 'admin-side-group is-current') === 1,
-    (string) substr_count($sidebar, 'admin-side-group is-current'));
-check('exactly one group is open on arrival',
-    substr_count($sidebar, '<details class="admin-side-group is-current" open') === 1);
-check('and it is named for assistive tech, not marked by colour alone',
-    str_contains($sidebar, '(current section)'));
-check('every group carries a stable key to be remembered by',
-    substr_count($sidebar, 'data-group="') === substr_count($sidebar, '<details class="admin-side-group'));
-check('the active link is still marked', str_contains($sidebar, 'admin-side-item is-active'));
-check('and announced', str_contains($sidebar, 'aria-current="page"'));
+/** @return array<string,list<string>> workspace id => page ids */
+function offered(?array $actor): array
+{
+    $out = [];
+    foreach (Workspaces::visible('/bp', $actor) as $ws) {
+        $out[$ws['id']] = array_column($ws['pages'], 'id');
+    }
+    return $out;
+}
 
-// A different page must move the marker, not add a second one.
-$elsewhere = admin_sidebar_html('/bp', 'users', $adminActor);
-check('a different page marks a different group',
-    substr_count($elsewhere, 'admin-side-group is-current') === 1
-    && $elsewhere !== $sidebar);
+$anon = offered(null);
+check('a visitor is offered Home, Events & Calendar and guest sign-up only',
+    array_keys($anon) === ['home', 'events', 'visitors'], implode(' | ', array_keys($anon)));
+check('and only the public pages in them',
+    $anon['home'] === ['home'] && $anon['events'] === ['calendar', 'events'] && $anon['visitors'] === ['signup'],
+    json_encode($anon));
+check('a visitor is not offered Ministries (that belongs to the church website)', !isset($anon['ministries']));
 
-// An unknown or empty active id must not mark anything, rather than guessing.
-$none = admin_sidebar_html('/bp', '', $adminActor);
-check('no active page marks no section',
-    substr_count($none, 'admin-side-group is-current') === 0);
-check('and opens none of them',
-    substr_count($none, '<details class="admin-side-group" open') === 0);
+$memberNav = offered(actor(false, ['view_own_assignments']));
+check('a member gets their own pages and the shared ones',
+    ($memberNav['home'] ?? []) === ['home', 'my-schedule', 'availability', 'account']
+    && isset($memberNav['ministries'], $memberNav['people']), json_encode($memberNav));
+check('but no Admin workspace', !isset($memberNav['admin']));
+check('and no administrative page anywhere',
+    !in_array('records', $memberNav['people'] ?? [], true) && !in_array('manage', $memberNav['ministries'] ?? [], true));
 
-$shell = file_get_contents(__DIR__ . '/../../resources/views/_admin-shell.php');
-check('storage is never consulted for which page is active',
-    !preg_match('/localStorage[^\n]*(active|current|activeId)/i', $shell));
-check('the current group is forced open regardless of what was remembered',
-    str_contains($shell, 'if(g.dataset.current==="1"){g.open=true;return;}'));
-// Chromium fires "toggle" for a server-rendered <details open> during parse.
-// Recording that turned storage into a list of every section ever visited,
-// which then stayed open on every later page.
-check('a toggle that changed nothing is not recorded',
-    str_contains($shell, 'if(g.open===last[g.dataset.group])return;'));
-check('storage failures never break navigation',
-    substr_count($shell, 'catch(e){}') >= 1);
+$eventsLeaderNav = offered($eventsLeader);
+check('an events leader is offered New event and Calendar settings',
+    in_array('new-event', $eventsLeaderNav['events'] ?? [], true) && in_array('calendar-settings', $eventsLeaderNav['events'] ?? [], true));
+check('but not Event categories, which is admin-only', !in_array('categories', $eventsLeaderNav['events'] ?? [], true));
+check('a ministry leader is offered Manage members & leaders',
+    in_array('members', offered($ministryLeader)['ministries'] ?? [], true));
 
-check('group keys are url-safe and stable',
-    admin_side_group_key('People & families') === 'people-families',
-    admin_side_group_key('People & families'));
-check('and collapse punctuation rather than emitting empties',
-    admin_side_group_key('Calendar & events') === 'calendar-events');
+$adminWs = offered($admin);
+check('an admin is offered all seven workspaces', count($adminWs) === 7, implode(' | ', array_keys($adminWs)));
+
+// Pages later phases build are placed, but never linked before they exist.
+$allHtml = ek_workspace_nav('/bp', $admin, null);
+foreach (['/bp/people/history', '/bp/visitors', '/bp/visitors/rsvps', '/bp/visitors/access', '/bp/admin/history'] as $href) {
+    check('no link to an unbuilt page: ' . $href, !str_contains($allHtml, 'href="' . $href . '"'));
+}
+check('an unbuilt page is still placed in the map', Workspaces::locate('/people/history') === ['workspace' => 'people', 'page' => 'history', 'child' => null]);
+
+// Locating a URL.
+check('the home page is Home', Workspaces::locate('/') === ['workspace' => 'home', 'page' => 'home', 'child' => null]);
+check('a person record is in Directory', (Workspaces::locate('/people/42')['page'] ?? '') === 'directory');
+check('an exact page beats its parent wildcard', (Workspaces::locate('/events/new')['page'] ?? '') === 'new-event');
+check('an event is in Events', (Workspaces::locate('/events/12')['page'] ?? '') === 'events');
+check('member import is in People & Records, not Backups',
+    Workspaces::locate('/admin/maintenance/import') === ['workspace' => 'people', 'page' => 'import', 'child' => null]);
+check('a sub-page names its entry and itself',
+    Workspaces::locate('/admin/theme') === ['workspace' => 'admin', 'page' => 'appearance', 'child' => 'theme']);
+check('an unknown page is nowhere', Workspaces::locate('/docs') === null);
+
+// Rendering: current workspace and page come from the location given.
+$nav = ek_workspace_nav('/bp', $admin, Workspaces::locate('/admin/families/edit'));
+check('exactly one workspace is current', substr_count($nav, 'class="ek-ws is-current"') === 1);
+check('and it is named for assistive tech, not marked by colour alone', str_contains($nav, 'People &amp; Records (current workspace)'));
+check('the active page is announced', substr_count($nav, 'aria-current="page"') === 1
+    && str_contains($nav, 'href="/bp/admin/families" aria-current="page"'));
+check('only the current workspace is expanded', substr_count($nav, '<ul class="ek-ws-pages">') === 1);
+check('no location marks nothing', !str_contains(ek_workspace_nav('/bp', $admin, null), 'aria-current'));
+check('a visitor on an admin URL is not placed in a workspace they cannot see',
+    !str_contains(ek_workspace_nav('/bp', null, Workspaces::locate('/admin/outreach')), 'is-current'));
+
+$tabs = ek_workspace_tabs('/bp', 'admin', 'appearance', $admin, 'theme');
+check('workspace tabs mark the entry holding the sub-page', str_contains($tabs, 'aria-current="true">Portal appearance &amp; notices'));
+check('and a second row marks the sub-page itself', str_contains($tabs, 'is-sub') && str_contains($tabs, 'aria-current="page">Theme'));
+check('a workspace the actor cannot use renders no tabs', ek_workspace_tabs('/bp', 'admin', 'users', $member) === '');
+check('page header escapes its text', str_contains(ek_page_header('A & B', '<x>'), 'A &amp; B') && str_contains(ek_page_header('A', '<x>'), '&lt;x&gt;'));
+
+// Every admin page names a section the map knows, so none renders without tabs.
+$sections = Workspaces::adminSections();
+foreach (array_merge(glob(__DIR__ . '/../../resources/views/admin*.php') ?: [], [__DIR__ . '/../../admin/groups_and_ministries/ministries.php']) as $file) {
+    if (preg_match_all("/'activeId'\s*=>\s*'([^']+)'/", (string) file_get_contents($file), $m)) {
+        foreach ($m[1] as $id) {
+            check('admin section is placed in a workspace: ' . basename($file) . ' → ' . $id, isset($sections[$id]));
+        }
+    }
+}
+foreach ($sections as $id => [$wsId, $pageId, $childId]) {
+    $found = false;
+    foreach (Workspaces::workspace($wsId)['pages'] ?? [] as $page) {
+        if ($page['id'] === $pageId) {
+            $found = $childId === null || in_array($childId, array_column($page['children'] ?? [], 'id'), true);
+        }
+    }
+    check('section maps to a real page: ' . $id, $found);
+}
+
+$shell = (string) file_get_contents(__DIR__ . '/../../resources/views/_portal-shell.php');
+check('storage never decides which page is current',
+    !preg_match('/localStorage[^\n]*(aria-current|is-current|location)/i', $shell));
+check('storage failures never break navigation', substr_count($shell, 'catch(e){return false;}') >= 1 && str_contains($shell, 'catch(e){}'));
+
+$adminShell = (string) file_get_contents(__DIR__ . '/../../resources/views/_admin-shell.php');
+check('the admin area no longer draws a sidebar of its own', !str_contains($adminShell, 'admin-sidebar'));
+check('admin pages pin their place in the workspace map', str_contains($adminShell, 'Workspaces::setCurrent('));
+check('and keep saying plainly when the area is not yours', str_contains($adminShell, 'You do not have access to this area'));
 
 check('CRM people is labelled Member records, not People',
-    str_contains($shell, "'label' => 'Member records'")
-    && str_contains($shell, '/admin/people'));
+    str_contains($adminShell, "'label' => 'Member records'")
+    && str_contains($adminShell, '/admin/people'));
 check('ministry membership is labelled Members & leaders',
-    str_contains($shell, "'label' => 'Members & leaders'"));
+    str_contains($adminShell, "'label' => 'Members & leaders'"));
 check('public ministry visibility is labelled Ministry list',
-    str_contains($shell, "'label' => 'Ministry list'"));
+    str_contains($adminShell, "'label' => 'Ministry list'"));
 check('the old Groups & Ministries sidebar label is gone',
-    !str_contains($shell, "'label' => 'Groups & Ministries'"));
+    !str_contains($adminShell, "'label' => 'Groups & Ministries'"));
 
 $peopleDir = (string) file_get_contents(__DIR__ . '/../../resources/views/people.php');
 check('the People tab says adding a record is Member records',
