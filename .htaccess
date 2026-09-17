@@ -12,7 +12,7 @@
     # still on the server and still being served: /reports/css-debt-inventory.json
     # returned 200 to anyone. Deny it here too, so the directory being absent is
     # not the only thing keeping it private.
-    RewriteRule ^(app|bootstrap|config|migrations|reports|resources|routes|storage|tests|tools|design-system|vendor|node_modules)(/|$) - [F,L]
+    RewriteRule ^(app|bootstrap|config|database|migrations|reports|resources|routes|storage|tests|tools|design-system|vendor|node_modules)(/|$) - [F,L]
 
     # /docs/<section> is a portal route, and docs/ is also a real directory on
     # disk. Deny the real files without breaking the route, which has no
