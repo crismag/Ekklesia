@@ -17,8 +17,13 @@ SELECT area, legacy, migrated, IF(legacy = migrated, 'ok', 'CHECK') AS result FR
   UNION ALL SELECT 'people with a status', (SELECT COUNT(*) FROM {{CRM}}.person_per p JOIN {{CRM}}.list_lst l ON l.lst_ID=1 AND l.lst_OptionID=p.per_cls_ID), (SELECT COUNT(*) FROM {{MEMBERS}}.people WHERE membership_status_id IS NOT NULL)
   UNION ALL SELECT 'people with a household role', (SELECT COUNT(*) FROM {{CRM}}.person_per p JOIN {{CRM}}.list_lst l ON l.lst_ID=2 AND l.lst_OptionID=p.per_fmr_ID), (SELECT COUNT(*) FROM {{MEMBERS}}.people WHERE household_role_id IS NOT NULL)
   UNION ALL SELECT 'people with a member type', (SELECT COUNT(*) FROM {{CRM}}.person_custom WHERE c1 IS NOT NULL), (SELECT COUNT(*) FROM {{MEMBERS}}.people WHERE member_type_id IS NOT NULL)
-  UNION ALL SELECT 'ministry members', (SELECT COUNT(*) FROM (SELECT p2g2r_grp_ID, p2g2r_per_ID FROM {{CRM}}.person2group2role_p2g2r UNION SELECT ministry_group_id, person_id FROM {{PORTAL}}.ministry_leaders) x), (SELECT COUNT(*) FROM {{MEMBERS}}.ministry_members)
-  UNION ALL SELECT 'ministry leaders', (SELECT COUNT(*) FROM {{CRM}}.person2group2role_p2g2r WHERE p2g2r_rle_ID=2), (SELECT COUNT(*) FROM {{MEMBERS}}.ministry_members WHERE role='leader')
+  UNION ALL SELECT 'ministry members', (SELECT COUNT(*) FROM {{CRM}}.person2group2role_p2g2r), (SELECT COUNT(*) FROM {{MEMBERS}}.ministry_members)
+  UNION ALL SELECT 'ministry leaders (tagged or leader-named role)', (SELECT COUNT(*) FROM {{CRM}}.person2group2role_p2g2r x
+      WHERE EXISTS (SELECT 1 FROM {{CRM}}.ministry_leaders l WHERE l.ministry_group_id = x.p2g2r_grp_ID AND l.person_id = x.p2g2r_per_ID)
+         OR EXISTS (SELECT 1 FROM {{PORTAL}}.ministry_leaders l WHERE l.ministry_group_id = x.p2g2r_grp_ID AND l.person_id = x.p2g2r_per_ID)
+         OR COALESCE((SELECT o.lst_OptionName FROM {{CRM}}.group_grp g JOIN {{CRM}}.list_lst o ON o.lst_ID = g.grp_RoleListID AND o.lst_OptionID = x.p2g2r_rle_ID WHERE g.grp_ID = x.p2g2r_grp_ID LIMIT 1),
+                     (SELECT r.role_name FROM {{CRM}}.roles r WHERE r.role_id = x.p2g2r_rle_ID AND r.ministry_group_id = x.p2g2r_grp_ID LIMIT 1), '') REGEXP 'leader|head|coordinator|director|pastor'),
+    (SELECT COUNT(*) FROM {{MEMBERS}}.ministry_members WHERE role='leader')
   UNION ALL SELECT 'event types', (SELECT COUNT(*) FROM {{CRM}}.event_types), (SELECT COUNT(*) FROM {{MEMBERS}}.event_types)
   UNION ALL SELECT 'events', (SELECT COUNT(*) FROM {{CRM}}.events_event), (SELECT COUNT(*) FROM {{MEMBERS}}.events)
   UNION ALL SELECT 'repeating events', (SELECT COUNT(*) FROM {{CRM}}.event_recurrence), (SELECT COUNT(*) FROM {{MEMBERS}}.events WHERE repeat_frequency<>'none')
@@ -51,9 +56,14 @@ UNION ALL SELECT CONCAT('Access from ChurchCRM user: ', r.role), a.person_id, 1,
   FROM {{MEMBERS}}.account_roles r JOIN {{MEMBERS}}.user_accounts a ON a.id = r.account_id
   WHERE r.role IN ('admin', 'scheduler')
     AND NOT EXISTS (SELECT 1 FROM {{PORTAL}}.portal_user_roles o WHERE o.portal_user_id = r.account_id AND CONVERT(o.role USING utf8mb4) COLLATE utf8mb4_unicode_ci = CAST(r.role AS CHAR))
-UNION ALL SELECT 'Sheet person matching nobody by name', c.people_id, 1, CONCAT(c.first_name, ' ', c.last_name)
-  FROM {{PORTAL}}.christlikeness_people_tbl c
-  WHERE NOT EXISTS (SELECT 1 FROM {{MEMBERS}}.people p WHERE LOWER(TRIM(p.first_name)) = LOWER(TRIM(c.first_name)) AND LOWER(TRIM(p.last_name)) = LOWER(TRIM(c.last_name)))
+UNION ALL SELECT 'Sheet position not carried over', s.ministry_key, 1, CONCAT(c.first_name, ' ', c.last_name, ' — ', t.name, ': ', TRIM(s.member_group_associations))
+  FROM {{PORTAL}}.member_group_and_ministry_roles_tbl s
+  JOIN {{PORTAL}}.christlikeness_people_tbl c ON c.people_id = s.people_id
+  JOIN {{PORTAL}}.ministry_tbl t ON t.ministry_id = s.ministry_id
+  WHERE NULLIF(TRIM(s.member_group_associations), '') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM {{MEMBERS}}.ministry_member_positions pos JOIN {{MEMBERS}}.ministry_members mm ON mm.id = pos.ministry_member_id
+                     JOIN {{MEMBERS}}.ministries m ON m.id = mm.ministry_id JOIN {{MEMBERS}}.people p ON p.id = mm.person_id
+                     WHERE m.name = t.name AND pos.name = TRIM(s.member_group_associations) AND LOWER(TRIM(p.last_name)) = LOWER(TRIM(c.last_name)))
 UNION ALL SELECT 'Legacy event tag on a missing event', tm.event_id, 1, t.tag_label
   FROM {{CRM}}.event_tag_map tm JOIN {{CRM}}.event_tag t ON t.tag_id = tm.tag_id
   WHERE NOT EXISTS (SELECT 1 FROM {{CRM}}.events_event e WHERE e.event_id = tm.event_id);

@@ -112,35 +112,53 @@ FROM {{CRM}}.person_per p
 LEFT JOIN {{CRM}}.person_custom pc ON pc.per_ID = p.per_ID;
 
 -- -------------------------------------------------------- ministry members
--- Legacy: person2group2role_p2g2r (role 2 = Leader in the group's role list)
--- plus the portal's separate ministry_leaders tags.
+-- Legacy: person2group2role_p2g2r. The portal counted a member as a leader when
+-- they were tagged in ministry_leaders (the copy on the ChurchCRM connection is the
+-- one its code read; the portal database has one too) OR their membership role's
+-- name, from the group's role list or the ministry's roles, reads as a leader.
 INSERT INTO ministry_members (ministry_id, person_id, role, status)
-SELECT x.p2g2r_grp_ID, x.p2g2r_per_ID, CASE WHEN x.p2g2r_rle_ID = 2 THEN 'leader' ELSE 'member' END, 'confirmed'
+SELECT x.p2g2r_grp_ID, x.p2g2r_per_ID,
+       CASE WHEN EXISTS (SELECT 1 FROM {{CRM}}.ministry_leaders l
+                          WHERE l.ministry_group_id = x.p2g2r_grp_ID AND l.person_id = x.p2g2r_per_ID)
+              OR EXISTS (SELECT 1 FROM {{PORTAL}}.ministry_leaders l
+                          WHERE l.ministry_group_id = x.p2g2r_grp_ID AND l.person_id = x.p2g2r_per_ID)
+              OR COALESCE(
+                   (SELECT o.lst_OptionName FROM {{CRM}}.group_grp g
+                      JOIN {{CRM}}.list_lst o ON o.lst_ID = g.grp_RoleListID AND o.lst_OptionID = x.p2g2r_rle_ID
+                     WHERE g.grp_ID = x.p2g2r_grp_ID LIMIT 1),
+                   (SELECT r.role_name FROM {{CRM}}.roles r
+                     WHERE r.role_id = x.p2g2r_rle_ID AND r.ministry_group_id = x.p2g2r_grp_ID LIMIT 1),
+                   '') REGEXP 'leader|head|coordinator|director|pastor'
+            THEN 'leader' ELSE 'member' END,
+       'confirmed'
 FROM {{CRM}}.person2group2role_p2g2r x
 WHERE EXISTS (SELECT 1 FROM ministries m WHERE m.id = x.p2g2r_grp_ID)
   AND EXISTS (SELECT 1 FROM people p WHERE p.id = x.p2g2r_per_ID);
 
-INSERT INTO ministry_members (ministry_id, person_id, role, status)
-SELECT l.ministry_group_id, l.person_id, 'leader', 'confirmed'
-FROM {{PORTAL}}.ministry_leaders l
-WHERE EXISTS (SELECT 1 FROM ministries m WHERE m.id = l.ministry_group_id)
-  AND EXISTS (SELECT 1 FROM people p WHERE p.id = l.person_id)
-ON DUPLICATE KEY UPDATE role = 'leader';
-
 -- Positions exist only in the church's sheet (member_group_and_ministry_roles_tbl),
--- which numbers people and ministries its own way. People are matched by
--- name, ministries by name; a row that matches nothing is reported by the
--- verification, not guessed.
+-- which numbers people and ministries its own way. Ministries match by name. A
+-- person matches a member of that ministry with the same surname whose first
+-- name is the sheet's or contains it ("Cristina" → "Maria Cristina", "Anabelle"
+-- → "Anabelle Mae"), and only when exactly one member fits. Anything else is
+-- reported by the verification, not guessed.
 INSERT IGNORE INTO ministry_member_positions (ministry_member_id, name)
-SELECT mm.id, TRIM(s.member_group_associations)
-FROM {{PORTAL}}.member_group_and_ministry_roles_tbl s
-JOIN {{PORTAL}}.christlikeness_people_tbl c ON c.people_id = s.people_id
-JOIN {{PORTAL}}.ministry_tbl t              ON t.ministry_id = s.ministry_id
-JOIN ministries m                           ON m.name = t.name
-JOIN people p ON LOWER(TRIM(p.first_name)) = LOWER(TRIM(c.first_name))
-             AND LOWER(TRIM(p.last_name))  = LOWER(TRIM(c.last_name))
-JOIN ministry_members mm ON mm.ministry_id = m.id AND mm.person_id = p.id
-WHERE blank_to_null(s.member_group_associations) IS NOT NULL;
+SELECT cand.member_id, cand.position
+FROM (
+    SELECT s.ministry_key, TRIM(s.member_group_associations) AS position, MIN(mm.id) AS member_id, COUNT(DISTINCT mm.id) AS fits
+    FROM {{PORTAL}}.member_group_and_ministry_roles_tbl s
+    JOIN {{PORTAL}}.christlikeness_people_tbl c ON c.people_id = s.people_id
+    JOIN {{PORTAL}}.ministry_tbl t              ON t.ministry_id = s.ministry_id
+    JOIN ministries m                           ON m.name = t.name
+    JOIN ministry_members mm                    ON mm.ministry_id = m.id
+    JOIN people p                               ON p.id = mm.person_id
+    WHERE blank_to_null(s.member_group_associations) IS NOT NULL
+      AND LOWER(TRIM(p.last_name)) = LOWER(TRIM(c.last_name))
+      AND (LOWER(TRIM(p.first_name)) = LOWER(TRIM(c.first_name))
+           OR CONCAT(' ', LOWER(TRIM(p.first_name)), ' ') LIKE CONCAT('% ', LOWER(TRIM(c.first_name)), ' %')
+           OR LOWER(TRIM(p.first_name)) LIKE CONCAT(LOWER(TRIM(c.first_name)), '%'))
+    GROUP BY s.ministry_key, TRIM(s.member_group_associations)
+) cand
+WHERE cand.fits = 1;
 
 -- ------------------------------------------------------------- event types
 INSERT INTO event_types (id, slug, name, audience, color, sort_order, is_default, is_active)
