@@ -143,7 +143,7 @@ try {
         }
 
         $cols = array_keys($posted);
-        $cols[] = 'source'; $cols[] = 'status'; $cols[] = 'matched_person_id';
+        $cols[] = 'source'; $cols[] = 'status'; $cols[] = 'matched_person_id'; $cols[] = 'created_at'; $cols[] = 'updated_at';
         $ph = array_map(static fn ($c) => ':' . $c, $cols);
         $sql = 'INSERT INTO visitor_registrations (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $ph) . ')';
         $bind = [];
@@ -151,6 +151,7 @@ try {
         $bind[':source'] = 'signup';
         $bind[':status'] = $status;
         $bind[':matched_person_id'] = $matched;
+        $bind[':created_at'] = $bind[':updated_at'] = signup_now();
         $db->prepare($sql)->execute($bind);
         $rowId = (int) $db->lastInsertId();
     } else {
@@ -159,7 +160,8 @@ try {
             $bind = [];
             foreach ($posted as $c => $v) { $bind[':' . $c] = $v; }
             $bind[':id'] = $rowId;
-            $db->prepare("UPDATE visitor_registrations SET $sets, updated_at = datetime('now') WHERE id = :id")->execute($bind);
+            $bind[':updated_at'] = signup_now();
+            $db->prepare("UPDATE visitor_registrations SET $sets, updated_at = :updated_at WHERE id = :id")->execute($bind);
         }
     }
 } catch (Throwable $ex) {

@@ -89,10 +89,10 @@ try {
             $st = $db->prepare(
                 'INSERT INTO visitor_registrations
                     (first_name, last_name, city, email, phone, birth_year, birth_month,
-                     source, source_event_id, status, matched_person_id)
+                     source, source_event_id, status, matched_person_id, created_at, updated_at)
                  VALUES
                     (:first_name, :last_name, :city, :email, :phone, :birth_year, :birth_month,
-                     :source, :source_event_id, :status, :matched_person_id)'
+                     :source, :source_event_id, :status, :matched_person_id, :now, :now)'
             );
             $st->execute([
                 ':first_name'        => $in['first_name'],
@@ -106,6 +106,7 @@ try {
                 ':source_event_id'   => $eventId,
                 ':status'            => $status,
                 ':matched_person_id' => $possibleMatch,
+                ':now'               => rsvp_now(),
             ]);
             $registrationId = (int) $db->lastInsertId();
         }
@@ -115,11 +116,11 @@ try {
         'INSERT INTO visitor_rsvps
             (event_id, occurrence_id, visitor_registration_id, person_id,
              first_name, last_name, city, email, phone,
-             response, party_size, notes)
+             response, party_size, notes, created_at, updated_at)
          VALUES
             (:event_id, :occurrence_id, :visitor_registration_id, :person_id,
              :first_name, :last_name, :city, :email, :phone,
-             :response, :party_size, :notes)'
+             :response, :party_size, :notes, :now, :now)'
     );
     $st->execute([
         ':event_id'                => (int) $event['id'],
@@ -134,6 +135,7 @@ try {
         ':response'                => $in['response'],
         ':party_size'              => $in['party_size'],
         ':notes'                   => $in['notes'] !== '' ? $in['notes'] : null,
+        ':now'                     => rsvp_now(),
     ]);
 } catch (Throwable $ex) {
     error_log('[events_rsvp] submit failed: ' . $ex->getMessage());

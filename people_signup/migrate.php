@@ -34,9 +34,6 @@ if (!sg_admin_csrf_ok()) {
     sg_json(['ok' => false, 'error' => 'Session expired — reload the page.'], 419);
 }
 
-$ALLOWED_STATUSES = [1, 2, 3, 4, 5];            // membership_statuses ids
-$membershipStatusId = (int) ($_POST['membership_status_id'] ?? 1);
-if (!in_array($membershipStatusId, $ALLOWED_STATUSES, true)) { $membershipStatusId = 1; } // default: Member
 $force = (string) ($_POST['force'] ?? '') === '1';
 
 // Accept ids=1,2,3 or id=1
@@ -49,6 +46,12 @@ if (!$ids) {
 $db = sg_db();
 $members = sg_members_db();
 $results = [];
+
+// Membership status from the member database's own list; an unknown id falls
+// back to the first status in its order (Member).
+$statusIds = array_map('intval', $members->query('SELECT id FROM membership_statuses ORDER BY sort_order, id')->fetchAll(PDO::FETCH_COLUMN));
+$membershipStatusId = (int) ($_POST['membership_status_id'] ?? 0);
+if (!in_array($membershipStatusId, $statusIds, true)) { $membershipStatusId = $statusIds[0] ?? null; }
 
 $insertPerson = $members->prepare(
     'INSERT INTO people
@@ -67,13 +70,13 @@ $memberTypeId = $members->prepare('SELECT id FROM member_types WHERE name = :nam
 $markPromoted = $db->prepare(
     "UPDATE visitor_registrations
         SET status = 'promoted', matched_person_id = :person_id,
-            reviewed_at = datetime('now'), updated_at = datetime('now')
+            reviewed_at = :now, updated_at = :now
       WHERE id = :id"
 );
 $recordPromotion = $db->prepare(
     "INSERT INTO visitor_promotions
         (visitor_registration_id, person_id, outcome, promoted_by_account_id, promoted_at, notes)
-     VALUES (:id, :person_id, :outcome, NULL, datetime('now'), :notes)"
+     VALUES (:id, :person_id, :outcome, NULL, :now, :notes)"
 );
 
 $nullIfBlank = static fn ($v) => ($v === null || trim((string) $v) === '') ? null : $v;
@@ -178,8 +181,9 @@ foreach ($ids as $id) {
 
     try {
         $db->beginTransaction();
-        $markPromoted->execute([':person_id' => $personId, ':id' => $id]);
-        $recordPromotion->execute([':id' => $id, ':person_id' => $personId, ':outcome' => $outcome, ':notes' => $notes]);
+        $now = signup_now();
+        $markPromoted->execute([':person_id' => $personId, ':now' => $now, ':id' => $id]);
+        $recordPromotion->execute([':id' => $id, ':person_id' => $personId, ':outcome' => $outcome, ':now' => $now, ':notes' => $notes]);
         $db->commit();
         $results[] = ['id' => $id, 'ok' => true, 'person_id' => $personId, 'outcome' => $outcome];
     } catch (Throwable $ex) {

@@ -12,6 +12,7 @@ sg_admin_gate();
 
 $db = sg_db();
 $membersDb = sg_members_db();
+$membershipStatuses = $membersDb->query('SELECT id, name FROM membership_statuses ORDER BY sort_order, id')->fetchAll();
 $STATUSES = ['new', 'reviewed', 'duplicate', 'promoted', 'rejected'];
 $STATUS_LABELS = ['new' => 'New', 'reviewed' => 'Reviewed', 'duplicate' => 'Duplicate', 'promoted' => 'Promoted to member', 'rejected' => 'Rejected'];
 
@@ -107,10 +108,9 @@ function cell_num(array $r, string $field, int $w, string $ph = ''): string
   <span class="sp"></span>
   <label style="font-size:12px">as
     <select id="membership_status_id" title="Membership status for promoted people">
-      <option value="1" selected>Member</option>
-      <option value="2">Regular Attender</option>
-      <option value="3">Guest</option>
-      <option value="5">Non-Attender</option>
+      <?php foreach ($membershipStatuses as $i => $ms): ?>
+      <option value="<?= (int) $ms['id'] ?>"<?= $i === 0 ? ' selected' : '' ?>><?= e($ms['name']) ?></option>
+      <?php endforeach; ?>
     </select>
   </label>
   <button type="button" id="bulkPromote" class="tbtn">Promote selected &#9656;</button>

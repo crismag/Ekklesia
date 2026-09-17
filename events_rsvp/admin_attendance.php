@@ -21,8 +21,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '')
         $new = (string) ($_POST['attendance'] ?? '');
         if ($id > 0 && in_array($new, $ATT, true)) {
             try {
-                $st = $db->prepare("UPDATE visitor_rsvps SET attendance = :s, updated_at = datetime('now') WHERE id = :id");
-                $st->execute([':s' => $new, ':id' => $id]);
+                $st = $db->prepare('UPDATE visitor_rsvps SET attendance = :s, updated_at = :now WHERE id = :id');
+                $st->execute([':s' => $new, ':now' => rsvp_now(), ':id' => $id]);
                 $flash = "Updated #$id.";
             } catch (Throwable $ex) {
                 error_log('[events_rsvp admin] ' . $ex->getMessage());

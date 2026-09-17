@@ -64,7 +64,7 @@ if (!function_exists('rv_config')) {
         $st->execute([':m' => rv_admin_module()]);
         $r = $st->fetch();
         if (!$r) { return null; }
-        $exp = strtotime((string) $r['expires_at']);
+        $exp = rsvp_timestamp((string) $r['expires_at']);
         $active = $exp !== false && $exp >= time();
         return [
             'word' => (string) $r['code'], 'code' => rv_admin_prefix() . $r['code'],
@@ -79,10 +79,10 @@ if (!function_exists('rv_config')) {
         $word = preg_replace('/[^A-Za-z0-9]/', '', $word) ?? '';
         if ($word === '') { $word = rv_admin_gen_word(); }
         $days = max(1, min(365, $days));
-        $expires = date('Y-m-d H:i:s', time() + $days * 86400);
-        // issued_at and expires_at come from the same (PHP) clock.
+        $expires = rsvp_now($days * 86400);
+        // issued_at and expires_at are church local time (see rsvp_now()).
         $st = rv_db()->prepare('INSERT INTO visitor_admin_access_codes (module, code, issued_at, expires_at, note) VALUES (:m, :w, :i, :e, :n)');
-        $st->execute([':m' => rv_admin_module(), ':w' => $word, ':i' => date('Y-m-d H:i:s'), ':e' => $expires, ':n' => $note ?: null]);
+        $st->execute([':m' => rv_admin_module(), ':w' => $word, ':i' => rsvp_now(), ':e' => $expires, ':n' => $note ?: null]);
         return rv_admin_active();
     }
 

@@ -45,6 +45,9 @@ return (static function (): array {
         ],
         // Visitors database (SQLite): registrations, RSVPs, promotions, access
         // codes. Relative paths are resolved from the Ekklesia root.
+        // Local time zone for visitor timestamps and access-code expiry. No
+        // campus or app time zone is known to the module; the church is in Toronto.
+        'time_zone' => 'America/Toronto',
         'visitors_db_path' => $get('VISITORS_DB_PATH', 'storage/private/database/visitors.sqlite'),
         // Gate for the admin review pages (?token=...). Override via SIGNUP_ADMIN_TOKEN.
         'admin_token' => $get('SIGNUP_ADMIN_TOKEN', 'change-me-people_signup-admin'),

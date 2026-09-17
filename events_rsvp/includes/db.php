@@ -74,3 +74,34 @@ if (!function_exists('rsvp_members_db')) {
         return $pdo;
     }
 }
+
+if (!function_exists('rsvp_time_zone')) {
+    /**
+     * The church's local time zone. Visitor timestamps are written in it, from
+     * PHP, so they compare with the rows migrated from the legacy database
+     * (which were local time) rather than SQLite's UTC datetime('now').
+     */
+    function rsvp_time_zone(): DateTimeZone
+    {
+        static $tz = null;
+        return $tz ??= new DateTimeZone((string) (rsvp_secure()['time_zone'] ?? 'America/Toronto'));
+    }
+
+    /** Now, in the church's local time, as stored in the visitors database. */
+    function rsvp_now(int $plusSeconds = 0): string
+    {
+        return (new DateTimeImmutable('now', rsvp_time_zone()))
+            ->modify(($plusSeconds >= 0 ? '+' : '') . $plusSeconds . ' seconds')
+            ->format('Y-m-d H:i:s');
+    }
+
+    /** Unix time of a stored local timestamp, or false when unparseable. */
+    function rsvp_timestamp(string $local): int|false
+    {
+        try {
+            return (new DateTimeImmutable($local, rsvp_time_zone()))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+}

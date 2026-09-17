@@ -74,3 +74,34 @@ if (!function_exists('signup_members_db')) {
         return $pdo;
     }
 }
+
+if (!function_exists('signup_time_zone')) {
+    /**
+     * The church's local time zone. Visitor timestamps are written in it, from
+     * PHP, so they compare with the rows migrated from the legacy database
+     * (which were local time) rather than SQLite's UTC datetime('now').
+     */
+    function signup_time_zone(): DateTimeZone
+    {
+        static $tz = null;
+        return $tz ??= new DateTimeZone((string) (signup_secure()['time_zone'] ?? 'America/Toronto'));
+    }
+
+    /** Now, in the church's local time, as stored in the visitors database. */
+    function signup_now(int $plusSeconds = 0): string
+    {
+        return (new DateTimeImmutable('now', signup_time_zone()))
+            ->modify(($plusSeconds >= 0 ? '+' : '') . $plusSeconds . ' seconds')
+            ->format('Y-m-d H:i:s');
+    }
+
+    /** Unix time of a stored local timestamp, or false when unparseable. */
+    function signup_timestamp(string $local): int|false
+    {
+        try {
+            return (new DateTimeImmutable($local, signup_time_zone()))->getTimestamp();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+}

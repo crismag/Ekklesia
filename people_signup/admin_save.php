@@ -105,9 +105,9 @@ try {
     $db = sg_db();
     // $field is from the whitelist above, never from the request as-is.
     // A status change is a review decision: stamp reviewed_at.
-    $reviewed = $field === 'status' && $store !== 'new' ? ", reviewed_at = datetime('now')" : '';
-    $stmt = $db->prepare("UPDATE visitor_registrations SET \"$field\" = :v, updated_at = datetime('now')$reviewed WHERE id = :id");
-    $stmt->execute([':v' => $store, ':id' => $id]);
+    $reviewed = $field === 'status' && $store !== 'new' ? ', reviewed_at = :now' : '';
+    $stmt = $db->prepare("UPDATE visitor_registrations SET \"$field\" = :v, updated_at = :now$reviewed WHERE id = :id");
+    $stmt->execute([':v' => $store, ':now' => signup_now(), ':id' => $id]);
 } catch (Throwable $ex) {
     error_log('[people_signup admin_save] ' . $ex->getMessage());
     sg_json(['ok' => false, 'error' => 'Save failed.'], 500);
