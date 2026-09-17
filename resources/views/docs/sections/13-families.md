@@ -46,7 +46,7 @@ The commonest data problem, and it takes several shapes:
 - one person split off from their parents and siblings,
 - a surname typed two ways, so nothing groups the records together.
 
-**People & families → Families → Review duplicates** groups these and — this is
+**People & Records → Households → Review duplicates** groups these and — this is
 the part that matters — ranks them by whether anything agrees *beyond* what
 grouped them. Sharing a surname is not evidence. Sharing an address is not
 evidence. What counts is agreement that would not happen by chance: the same

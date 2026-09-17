@@ -1,13 +1,15 @@
 # Import, Export & Backups
 
 Everything to do with getting records in, out, and safely copied. Only a
-**portal administrator** can use these. Find them under **Data & maintenance**.
+**portal administrator** can use these. Importing and exporting member records
+is People & Records → **Import & export**; backups are Admin → **Backups &
+maintenance**.
 
 ## Import members from a spreadsheet
 
 Bring a campus roster in from Excel instead of typing every person by hand.
 
-1. **Data & maintenance → Import members.**
+1. **People & Records → Import & export**, then **Import a campus roster**.
 2. Choose the **campus** this roster belongs to and a **preset** (North York or Scarborough). The primary sheet is enough; a secondary sheet is optional.
 3. Upload an **.xlsx** file or paste a Google Sheets link. CSV is refused, because a household address merged down a family in Excel survives only on the first row of a CSV export.
 4. **Check the staged rows.** Nothing has touched a member record yet.
@@ -43,9 +45,11 @@ them before applying.
 
 ## Download member records
 
-Builds a fresh Excel workbook from the database, one sheet per campus or a
+On **Import & export**, **Export member records** builds a fresh Excel workbook from the database, one sheet per campus or a
 single campus if you choose one. This is generated from current records, not a
-copy of the original Drive file.
+copy of the original Drive file. A copy is kept in the private archive; the
+latest exports are listed beside the button, and all of them under **Recent
+backups & exports** on Backups & maintenance.
 
 ## Back up church data
 

@@ -33,8 +33,8 @@ campus and/or a ministry:
 | Build / edit schedules | | ✓ | ✓ (in scope) | ✓ |
 | Manage a ministry's people & roles | | | ✓ (in scope) | ✓ |
 | See Ministry & Leadership events | | | ✓ | ✓ |
-| Member records, Families, Member types, Campuses | | | | ✓ |
-| Maintenance (backup, import, export) | | | | ✓ |
+| Member records, Households, Record history, Record settings, Import & export, Campuses | | | | ✓ |
+| Backups & maintenance | | | | ✓ |
 | Create accounts & assign roles | | | | ✓ |
 | Church Info, Appearance, Site settings | | | | ✓ |
 

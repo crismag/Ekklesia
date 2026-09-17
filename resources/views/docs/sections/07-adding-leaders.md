@@ -57,7 +57,7 @@ matching role:
 ## Editing the role options themselves
 
 The list of **group roles** and **family roles** (and member types) is editable
-on the **Member types** page. You can rename, reorder, or add options there. An option
+on the **Record settings** page (People & Records). You can rename, reorder, or add options there. An option
 that's still assigned to people can't be deleted until they're reassigned.
 
 > **Best Practice:** Keep the number of leaders per ministry small and scoped to the right campus. It keeps schedules clean and access easy to reason about.

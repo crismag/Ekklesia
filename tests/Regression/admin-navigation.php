@@ -277,7 +277,7 @@ check('the nav guide splits People lookup from Member records',
     && str_contains($navGuide, 'Member records'));
 $peopleGuide = (string) file_get_contents(__DIR__ . '/../../resources/views/docs/sections/05-people-management.md');
 check('the people guide sends add/edit to Member records, not the People tab',
-    str_contains($peopleGuide, 'Administration → **Member records**')
+    str_contains($peopleGuide, 'People & Records → **Member records**')
     && str_contains($peopleGuide, 'look-up only')
     && !str_contains($peopleGuide, 'People dashboard'));
 $leadersGuide = (string) file_get_contents(__DIR__ . '/../../resources/views/docs/sections/07-adding-leaders.md');
