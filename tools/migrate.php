@@ -3,24 +3,17 @@
 declare(strict_types=1);
 
 /**
- * Portal migration runner.
+ * Member database migration runner.
  *
- * Why this exists: migration 007 was in the repository but had never been
- * applied to the deployed database, because the import service used to create
- * its staging tables at runtime. When that runtime DDL was removed — schema
- * belongs to migrations, not to request handlers — the gap became visible as a
- * hard failure. Nothing recorded which migrations had been applied, so nothing
- * could have told us.
+ * The schema starts from database/members/001_schema.sql (a fresh install, or
+ * database/migrate/run.sh when moving legacy data). Every later change is a file
+ * in database/members/migrations/, applied in filename order by this runner.
  *
- * Design:
- *  - migrations/portal/*.sql, applied in filename order.
- *  - Each file declares "-- @connection: portal|churchcrm" in its header.
- *    migrations/portal/ holds migrations for BOTH databases: portal_* tables in
- *    the portal database, member import staging and events alongside person_per
- *    in the ChurchCRM database. The directory name does not tell you which.
- *  - History lives in ONE place, portal_schema_migrations in the portal
- *    database, so there is a single answer to "what has been applied".
+ * Why it exists: a migration once sat in the repository, unapplied, on the
+ * deployed database, because nothing recorded what had been applied. So:
+ *  - History lives in schema_migrations in the member database.
  *  - A migration is recorded only after it succeeds. A failure stops the run.
+ *  - A checksum is kept, so a migration edited after it ran is visible.
  *
  * Usage:
  *   php tools/migrate.php --status     what is applied, what is pending
@@ -34,8 +27,8 @@ require __DIR__ . '/../app/Core/Config/EnvLoader.php';
 require __DIR__ . '/../app/Core/Migrations/SqlStatements.php';
 App\Core\Config\EnvLoader::loadOnce(__DIR__ . '/../.env');
 
-const MIGRATION_DIR = __DIR__ . '/../migrations/portal';
-const HISTORY_TABLE = 'portal_schema_migrations';
+const MIGRATION_DIR = __DIR__ . '/../database/members/migrations';
+const HISTORY_TABLE = 'schema_migrations';
 
 $opts = [];
 foreach (array_slice($argv, 1) as $arg) {
@@ -57,28 +50,19 @@ function env(string ...$keys): string
     return '';
 }
 
-/** @return array{0:PDO,1:string} connection and its database name */
-function connect(string $which): array
+/** @return array{0:PDO,1:string} the member database connection and its name */
+function connect(): array
 {
-    if ($which === 'churchcrm') {
-        $host = env('CHURCHCRM_DB_HOST', 'DB_HOST');
-        $name = env('CHURCHCRM_DB_DATABASE', 'DB_DATABASE');
-        $user = env('CHURCHCRM_DB_USERNAME', 'DB_USERNAME');
-        $pass = env('CHURCHCRM_DB_PASSWORD', 'DB_PASSWORD');
-    } else {
-        $host = env('PORTAL_DB_HOST', 'DB_HOST');
-        $name = env('PORTAL_DB_DATABASE', 'DB_DATABASE');
-        $user = env('PORTAL_DB_USERNAME', 'DB_USERNAME');
-        $pass = env('PORTAL_DB_PASSWORD', 'DB_PASSWORD');
-    }
+    $host = env('MEMBERS_DB_HOST') ?: '127.0.0.1';
+    $port = env('MEMBERS_DB_PORT') ?: '3306';
+    $name = env('MEMBERS_DB_DATABASE');
     if ($name === '') {
-        throw new RuntimeException("No database configured for the '{$which}' connection.");
+        throw new RuntimeException('MEMBERS_DB_DATABASE is not configured.');
     }
-    $port = env($which === 'churchcrm' ? 'CHURCHCRM_DB_PORT' : 'PORTAL_DB_PORT', 'DB_PORT') ?: '3306';
     $pdo = new PDO(
         "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4",
-        $user,
-        $pass,
+        env('MEMBERS_DB_USERNAME'),
+        env('MEMBERS_DB_PASSWORD'),
         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
     );
 
@@ -108,22 +92,14 @@ function statements(string $sql): array
 }
 
 
-function targetOf(string $sql): string
-{
-    if (preg_match('/^\s*--\s*@connection:\s*([a-z]+)/mi', $sql, $m) === 1) {
-        return strtolower(trim($m[1]));
-    }
-
-    return 'portal';
-}
-
 // ---------------------------------------------------------------- history
 
-[$historyPdo, $historyDb] = connect('portal');
+[$pdo, $dbName] = connect();
+$historyPdo = $pdo;
+$historyDb = $dbName;
 $historyPdo->exec(
     'CREATE TABLE IF NOT EXISTS `' . HISTORY_TABLE . '` (
         `filename`   VARCHAR(190) NOT NULL,
-        `connection` VARCHAR(32)  NOT NULL,
         `checksum`   CHAR(64)     NOT NULL,
         `applied_at` DATETIME     NOT NULL,
         `adopted`    TINYINT(1)   NOT NULL DEFAULT 0,
@@ -145,7 +121,6 @@ $pending = [];
 foreach ($files as $path) {
     $name = basename($path);
     $sql = (string) file_get_contents($path);
-    $target = targetOf($sql);
     $sum = hash('sha256', $sql);
     $state = 'pending';
     if (isset($applied[$name])) {
@@ -153,9 +128,9 @@ foreach ($files as $path) {
             ? ((int) $applied[$name]['adopted'] === 1 ? 'adopted' : 'applied')
             : 'CHANGED SINCE APPLIED';
     } else {
-        $pending[] = ['path' => $path, 'name' => $name, 'sql' => $sql, 'target' => $target, 'sum' => $sum];
+        $pending[] = ['path' => $path, 'name' => $name, 'sql' => $sql, 'sum' => $sum];
     }
-    printf("  %-34s %-10s %s\n", $name, $target, $state);
+    printf("  %-40s %s\n", $name, $state);
 }
 
 if ($pending === []) {
@@ -173,25 +148,19 @@ if ($mode === 'status') {
 // ------------------------------------------------------------------ apply
 
 $record = $historyPdo->prepare(
-    'INSERT INTO `' . HISTORY_TABLE . '` (filename, connection, checksum, applied_at, adopted)
-     VALUES (:f, :c, :s, NOW(), :a)
+    'INSERT INTO `' . HISTORY_TABLE . '` (filename, checksum, applied_at, adopted)
+     VALUES (:f, :s, NOW(), :a)
      ON DUPLICATE KEY UPDATE checksum = VALUES(checksum), applied_at = VALUES(applied_at), adopted = VALUES(adopted)'
 );
 
-$conns = [];
 foreach ($pending as $m) {
     if ($mode === 'baseline') {
-        $record->execute([':f' => $m['name'], ':c' => $m['target'], ':s' => $m['sum'], ':a' => 1]);
+        $record->execute([':f' => $m['name'], ':s' => $m['sum'], ':a' => 1]);
         echo "  adopted (not run): {$m['name']}\n";
         continue;
     }
 
-    if (!isset($conns[$m['target']])) {
-        $conns[$m['target']] = connect($m['target']);
-    }
-    [$pdo, $dbName] = $conns[$m['target']];
-
-    echo "  applying {$m['name']} -> {$m['target']} ({$dbName})\n";
+    echo "  applying {$m['name']} ({$dbName})\n";
     try {
         foreach (statements($m['sql']) as $stmt) {
             $pdo->exec($stmt);
@@ -202,7 +171,7 @@ foreach ($pending as $m) {
         fwrite(STDERR, "  Stopping. Nothing after this was attempted, and this migration was not recorded.\n\n");
         exit(1);
     }
-    $record->execute([':f' => $m['name'], ':c' => $m['target'], ':s' => $m['sum'], ':a' => 0]);
+    $record->execute([':f' => $m['name'], ':s' => $m['sum'], ':a' => 0]);
     echo "    ok\n";
 }
 

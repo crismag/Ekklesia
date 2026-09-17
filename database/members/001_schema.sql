@@ -584,6 +584,15 @@ CREATE TABLE audit_log (
   CONSTRAINT fk_audit_log_person FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Which files in database/members/migrations have been applied (tools/migrate.php).
+CREATE TABLE schema_migrations (
+  filename    VARCHAR(190) NOT NULL,
+  checksum    CHAR(64) NOT NULL,
+  applied_at  DATETIME NOT NULL,
+  adopted     TINYINT(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (filename)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE settings (
   `key`       VARCHAR(100) NOT NULL,
   value       JSON NOT NULL,

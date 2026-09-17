@@ -35,10 +35,10 @@ if (!function_exists('maintenance_describe_archive')) {
     /**
      * Turn an archive filename into something an administrator can read.
      *
-     * The list used to print the stored path — "2026/08/mysql.portal.08_25.2345.sql"
+     * The list used to print the stored path — "2026/08/mysql.members.08_25.2345.sql"
      * — and leave the reader to work out what was in it. Someone deciding which
      * backup to restore should not have to parse a filename to find out whether
-     * it holds member records or portal accounts.
+     * it holds member records or visitor sign-ups.
      *
      * The filename is still available, under Technical details.
      *
@@ -49,14 +49,11 @@ if (!function_exists('maintenance_describe_archive')) {
         $name = basename($relative);
 
         if (str_starts_with($name, 'mysql.')) {
-            $part = explode('.', $name)[1] ?? '';
-            $contents = match ($part) {
-                'people' => 'Member records',
-                'portal' => 'Portal accounts & settings',
-                default  => 'Church database',
-            };
+            return ['contents' => 'Member database', 'kind' => 'Database backup'];
+        }
 
-            return ['contents' => $contents, 'kind' => 'Database backup'];
+        if (str_starts_with($name, 'sqlite.')) {
+            return ['contents' => 'Visitor sign-ups & RSVPs', 'kind' => 'Database backup'];
         }
 
         if (str_starts_with($name, 'state.')) {
@@ -166,7 +163,7 @@ ob_start();
 <article class="admin-card">
   <div class="admin-card-head"><div>
     <h2>Back up church data</h2>
-    <p>Create a safe copy of current church records and portal information.</p>
+    <p>Create a safe copy of church records, logins, and visitor sign-ups.</p>
   </div></div>
   <div class="admin-card-body">
     <p class="mt-help">Keep a copy before a large import, or before anything else that changes many
@@ -174,7 +171,7 @@ ob_start();
        from the web.</p>
     <form method="post" action="<?= $base ?>/admin/maintenance/backup" class="mt-actions">
       <input type="hidden" name="kind" value="mysql">
-      <button class="mt-btn" type="submit" name="target" value="both">Create backup</button>
+      <button class="mt-btn" type="submit" name="target" value="all">Create backup</button>
     </form>
 
     <!-- Progressive disclosure rather than removal: the separate database
@@ -183,12 +180,12 @@ ob_start();
     <details class="mt-advanced">
       <summary>Advanced backup options</summary>
       <div class="mt-advanced-body">
-        <p class="mt-help">"Create backup" above copies both databases together, which is what is
-           normally wanted. These back up one part at a time.</p>
+        <p class="mt-help">"Create backup" above copies the member database and the visitor sign-ups
+           together, which is what is normally wanted. These back up one at a time.</p>
         <form method="post" action="<?= $base ?>/admin/maintenance/backup" class="mt-actions">
           <input type="hidden" name="kind" value="mysql">
-          <button class="mt-btn sec" type="submit" name="target" value="people">Member records only</button>
-          <button class="mt-btn sec" type="submit" name="target" value="portal">Portal accounts &amp; settings only</button>
+          <button class="mt-btn sec" type="submit" name="target" value="members">Member database only</button>
+          <button class="mt-btn sec" type="submit" name="target" value="visitors">Visitor sign-ups only</button>
         </form>
         <p class="mt-help" style="margin-top:12px">Snapshots write the current events, schedules and
            member records as separate data files, useful when comparing what changed between two

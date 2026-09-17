@@ -2661,32 +2661,22 @@ $webRoutes['POST /admin/maintenance/backup'] = function (array $req) use ($resol
     $target = (string) ($req['target'] ?? '');
     $svc = \App\Providers\PortalServiceProvider::makeMaintenanceBackupService();
     try {
-        $people = null;
-        $portal = null;
-        try { $people = \App\Core\Database\MembersConnection::get(); } catch (\Throwable) {}
-        try { $portal = \App\Core\Database\MembersConnection::get(); } catch (\Throwable) {}
+        $members = \App\Core\Database\MembersConnection::get();
         $saved = [];
         if ($kind === 'state') {
-            foreach ($svc->backupStates($people, $portal) as $file) {
+            foreach ($svc->backupStates($members) as $file) {
                 $saved[] = $file['relative'];
             }
         } else {
-            if ($target === 'people' || $target === 'both') {
-                if (!$people) {
-                    throw new \RuntimeException('People database is not configured.');
-                }
-                $name = \App\Core\Config\EnvLoader::get('CHURCHCRM_DB_DATABASE', \App\Core\Config\EnvLoader::get('DB_DATABASE', 'people'));
-                $saved[] = $svc->backupMysql($people, 'people', (string) $name)['relative'];
+            if ($target === 'members' || $target === 'all') {
+                $name = \App\Core\Config\EnvLoader::get('MEMBERS_DB_DATABASE', 'members');
+                $saved[] = $svc->backupMysql($members, 'members', (string) $name)['relative'];
             }
-            if ($target === 'portal' || $target === 'both') {
-                if (!$portal) {
-                    throw new \RuntimeException('Portal database is not configured.');
-                }
-                $name = \App\Core\Config\EnvLoader::get('PORTAL_DB_DATABASE', 'portal');
-                $saved[] = $svc->backupMysql($portal, 'portal', (string) $name)['relative'];
+            if ($target === 'visitors' || $target === 'all') {
+                $saved[] = $svc->backupVisitors(\App\Core\Database\VisitorsConnection::get())['relative'];
             }
             if ($saved === []) {
-                throw new \InvalidArgumentException('Choose a MySQL backup target.');
+                throw new \InvalidArgumentException('Choose what to back up.');
             }
         }
         $_SESSION['maintenance_flash'] = 'Saved: ' . implode(', ', $saved);

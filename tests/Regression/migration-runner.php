@@ -5,14 +5,14 @@ declare(strict_types=1);
 /**
  * Migration runner behaviour.
  *
- * Written after migration 007 sat in the repository, unapplied, on the deployed
+ * Written after a migration sat in the repository, unapplied, on the deployed
  * database — invisible because nothing recorded what had been applied. These
  * assertions cover the properties that make that impossible to repeat.
  *
- * Parsing is tested directly against the real migration files, because the two
- * bugs that actually occurred were both parsing bugs: a comment block sharing a
- * semicolon-chunk with the statement after it, and a comment containing a
- * semicolon.
+ * Parsing is tested directly against the real schema and migration files,
+ * because the two bugs that actually occurred were both parsing bugs: a comment
+ * block sharing a semicolon-chunk with the statement after it, and a comment
+ * containing a semicolon.
  */
 
 require __DIR__ . '/../../app/Core/Config/EnvLoader.php';
@@ -36,8 +36,8 @@ function check(string $label, bool $ok): void
 // test fails if the implementation changes shape.
 $runner = file_get_contents(__DIR__ . '/../../tools/migrate.php');
 check('migration runner exists', $runner !== false && $runner !== '');
-check('runner records history in a table', str_contains($runner, 'portal_schema_migrations'));
-check('runner reads a per-file @connection target', str_contains($runner, '@connection'));
+check('runner records history in a table', str_contains($runner, 'schema_migrations'));
+check('runner applies files from database/members/migrations', str_contains($runner, 'database/members/migrations'));
 check('runner supports --status, --apply and --baseline',
     str_contains($runner, '--status') && str_contains($runner, '--apply') && str_contains($runner, '--baseline'));
 check('a failed migration is not recorded as applied',
@@ -45,32 +45,27 @@ check('a failed migration is not recorded as applied',
 check('runner stores a checksum so an edited migration is visible',
     str_contains($runner, 'checksum') && str_contains($runner, "hash('sha256'"));
 
-// --- parsing, against the real files ---------------------------------------
-$dir = __DIR__ . '/../../migrations/portal';
-$files = glob($dir . '/*.sql') ?: [];
-check('portal migrations are present', count($files) >= 8);
-
-// Parse with the production splitter, not a copy of it.
-//
-// These closures used to reimplement it — and reproduced its bug exactly, so
-// the test agreed with the runner that a semicolon inside a COMMENT ended a
-// statement. Both were wrong together, which is the failure mode a duplicated
-// implementation is for.
-$statements = static fn (string $sql): array => SqlStatements::parse($sql);
+// --- parsing, against the real schema and migration files ------------------
+// Parse with the production splitter, not a copy of it: a duplicated splitter
+// once agreed with the runner's bug instead of catching it.
+$root = __DIR__ . '/../../database/members';
+$files = array_merge(glob($root . '/*.sql') ?: [], glob($root . '/migrations/*.sql') ?: []);
+check('the member schema files are present', in_array($root . '/001_schema.sql', $files, true));
 
 $allSql = '';
+$migrationSql = '';
 foreach ($files as $f) {
     $sql = (string) file_get_contents($f);
     $allSql .= $sql;
+    if (str_contains($f, '/migrations/')) {
+        $migrationSql .= $sql;
+    }
     $name = basename($f);
-
-    check("{$name} declares its target database", preg_match('/^\s*--\s*@connection:\s*(portal|churchcrm)\s*$/mi', $sql) === 1);
-
-    $stmts = $statements($sql);
+    $stmts = SqlStatements::parse($sql);
     check("{$name} parses into at least one statement", $stmts !== []);
     foreach ($stmts as $stmt) {
         // Every statement must begin with SQL, never with prose left behind by
-        // a mis-split comment — the exact failure mode that broke 001.
+        // a mis-split comment.
         if (preg_match('/^(CREATE|ALTER|INSERT|UPDATE|DROP|SET|DELETE|RENAME)\b/i', $stmt) !== 1) {
             check("{$name}: statement starts with SQL, not comment text (" . substr($stmt, 0, 40) . ')', false);
         }
@@ -79,68 +74,23 @@ foreach ($files as $f) {
 check('no parsed statement begins with stray comment prose', true);
 
 // --- destructive-operation guard -------------------------------------------
-// 005 legitimately drops an abandoned table that never held data, and it has
-// already run — rewriting an applied migration would be worse than the drop.
-// So the guard is not "never drop": it is that any drop is guarded by IF
-// EXISTS, that nothing truncates, and that no drop creeps into a later
-// migration unnoticed.
-$unguardedDrop = preg_match('/\bDROP\s+TABLE\s+(?!IF\s+EXISTS)/i', $allSql) === 1;
-check('every DROP TABLE is guarded by IF EXISTS', !$unguardedDrop);
-check('no portal migration truncates', preg_match('/\bTRUNCATE\b/i', $allSql) !== 1);
-$dropFiles = [];
-foreach ($files as $f) {
-    if (preg_match('/\bDROP\s+TABLE\b/i', (string) file_get_contents($f)) === 1) {
-        $dropFiles[] = basename($f);
-    }
-}
-check('only the known migration drops anything (' . (implode(', ', $dropFiles) ?: 'none') . ')',
-    $dropFiles === ['005-create-roster-schedules.sql']);
+check('every DROP in a migration is guarded by IF EXISTS',
+    preg_match('/\bDROP\s+(TABLE|VIEW|INDEX|COLUMN)\s+(?!IF\s+EXISTS)/i', $migrationSql) !== 1);
+check('no migration truncates', preg_match('/\bTRUNCATE\b/i', $migrationSql) !== 1);
 
-// Migration 009 gives event types their portal identity. The audience values
-// it seeds are the same strings EventAudience compares against, so a typo here
-// would silently make leader-only events visible to everyone.
-$m009 = (string) file_get_contents($dir . '/009-event-type-portal-metadata.sql');
-check('009 targets the churchcrm connection', str_contains($m009, '-- @connection: churchcrm'));
-check('009 is idempotent', substr_count(strtoupper($m009), 'IF NOT EXISTS') >= 6);
-check('009 avoids PREPARE/EXECUTE (breaks the semicolon splitter)',
-    preg_match('/\bPREPARE\s+stmt\b|\bEXECUTE\s+stmt\b/i', $m009) !== 1);
-foreach (['portal_slug', 'portal_label', 'portal_audience', 'portal_color', 'portal_is_default'] as $col) {
-    check("009 defines event_types.{$col}", str_contains($m009, '`' . $col . '`'));
-}
-check('009 seeds the leader-audience layers', str_contains($m009, "'leadership'") && str_contains($m009, "'ministry'"));
-check('009 backfills dangling event_type ids', str_contains($m009, 'UPDATE `events_event`'));
-
-// Migration 007 must create what the import adapter actually uses.
-$m007 = (string) file_get_contents($dir . '/007-member-import-staging.sql');
-$adapter = (string) file_get_contents(__DIR__ . '/../../app/Adapters/ChurchCRM/ChurchCrmMemberImportAdapter.php');
-check('007 creates member_import_batch', str_contains($m007, 'member_import_batch'));
-check('007 creates member_import_row', str_contains($m007, 'member_import_row'));
-check('007 is idempotent', substr_count(strtoupper($m007), 'IF NOT EXISTS') >= 2);
-check('import adapter refuses rather than creating schema',
-    !preg_match('/CREATE\s+TABLE/i', $adapter) && str_contains($adapter, 'assertSchemaReady'));
-check('refusal names the database and the migrate command',
-    str_contains($adapter, 'SELECT DATABASE()') && str_contains($adapter, 'tools/migrate.php'));
-
-// Columns the adapter binds must exist in the migration.
-foreach (['campus_id', 'status', 'source_label', 'duplicate_report', 'created_by'] as $col) {
-    check("007 defines member_import_batch.{$col}", str_contains($m007, '`' . $col . '`'));
-}
-foreach (['batch_id', 'last_name', 'filled_from', 'matched_person_id'] as $col) {
-    check("007 defines member_import_row.{$col}", str_contains($m007, '`' . $col . '`'));
-}
-
-// Every column the application reads must be created by a migration, or it
+// Every table the application relies on must be created by the schema, or it
 // exists only on machines where someone happened to add it by hand. The
-// calendar broke in production because event_types.portal_audience arrived in
-// application code with a migration that had not been applied there.
-$audienceInMigrations = false;
-foreach ($files as $f) {
-    if (str_contains((string) file_get_contents($f), 'portal_audience')) {
-        $audienceInMigrations = true;
-    }
+// calendar once broke in production for exactly that reason.
+$schema = (string) file_get_contents($root . '/001_schema.sql');
+foreach (['people', 'households', 'household_links', 'ministries', 'ministry_members', 'ministry_member_positions',
+          'serving_roles', 'events', 'event_occurrences', 'assignments', 'rosters', 'user_accounts', 'account_roles',
+          'account_sessions', 'member_import_batches', 'member_import_rows', 'audit_log', 'schema_migrations'] as $table) {
+    check("the schema creates {$table}", preg_match('/CREATE TABLE ' . $table . ' \(/', $schema) === 1);
 }
-check('event_types.portal_audience is created by a migration', $audienceInMigrations);
-
+check('event_types.audience is created by the schema', preg_match("/\baudience\s+ENUM\('public','members','leaders'\)/", $schema) === 1);
+foreach (['campus_id', 'status', 'source_label', 'duplicate_report', 'created_by_account_id', 'hub_sheet'] as $col) {
+    check("the schema defines member_import_batches.{$col}", preg_match('/CREATE TABLE member_import_batches \([^;]*\b' . $col . '\b/s', $schema) === 1);
+}
 
 // ---------------------------------------------------------------------------
 // A semicolon inside a quoted string is not a statement terminator.

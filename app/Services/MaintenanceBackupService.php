@@ -7,8 +7,8 @@ namespace App\Services;
 use PDO;
 
 /**
- * Backup MySQL databases and JSON snapshots of events / schedules / members
- * into the private archive store.
+ * Back up the member database (MySQL), the visitors database (SQLite), and JSON
+ * snapshots of events / schedules / members into the private archive store.
  */
 final class MaintenanceBackupService
 {
@@ -37,32 +37,49 @@ final class MaintenanceBackupService
     }
 
     /**
+     * Copy the visitors SQLite database into the archive.
+     *
+     * VACUUM INTO writes a consistent copy even while sign-ups are being saved,
+     * which copying the file directly would not guarantee.
+     *
+     * @return array{relative:string,filename:string,bytes:int}
+     */
+    public function backupVisitors(PDO $visitors): array
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'visitors-backup-');
+        if ($tmp === false) {
+            throw new \RuntimeException('Could not create a temporary file for the visitors backup.');
+        }
+        @unlink($tmp);
+        try {
+            $visitors->exec('VACUUM INTO ' . $visitors->quote($tmp));
+            $bytes = file_get_contents($tmp);
+            if ($bytes === false) {
+                throw new \RuntimeException('Could not read the visitors backup copy.');
+            }
+            $slot = $this->store->write('sqlite', 'visitors', 'sqlite', $bytes);
+        } finally {
+            @unlink($tmp);
+        }
+        return [
+            'relative' => $slot['relative'],
+            'filename' => $slot['filename'],
+            'bytes' => (int) ($slot['bytes'] ?? strlen($bytes)),
+        ];
+    }
+
+    /**
      * @return list<array{relative:string,filename:string,bytes:int,kind:string}>
      */
-    public function backupStates(?PDO $people, ?PDO $portal): array
+    public function backupStates(PDO $members): array
     {
-        $out = [];
-        if ($people instanceof PDO) {
-            $events = $this->snapshotTables($people, [
-                'events_event', 'event_occurrence', 'events_event_campus',
-            ]);
-            $members = $this->snapshotMembers($people);
-            $e = $this->store->write('state', 'events', 'json', $this->encode('events', $events));
-            $m = $this->store->write('state', 'members', 'json', $this->encode('members', $members));
-            $out[] = $this->meta($e, 'events');
-            $out[] = $this->meta($m, 'members');
-        }
-        if ($portal instanceof PDO) {
-            $schedules = $this->snapshotTables($portal, [
-                'schedule_roster', 'schedule_roster_slot', 'schedule_roster_assignment',
-            ]);
-            $s = $this->store->write('state', 'schedules', 'json', $this->encode('schedules', $schedules));
-            $out[] = $this->meta($s, 'schedules');
-        }
-        if ($out === []) {
-            throw new \RuntimeException('No database connection was available for a state backup.');
-        }
-        return $out;
+        $events = $this->snapshotTables($members, ['events', 'event_occurrences', 'event_campuses', 'event_tags']);
+        $e = $this->store->write('state', 'events', 'json', $this->encode('events', $events));
+        $m = $this->store->write('state', 'members', 'json', $this->encode('members', $this->snapshotMembers($members)));
+        $schedules = $this->snapshotTables($members, ['assignments', 'rosters', 'roster_slots', 'roster_assignments']);
+        $s = $this->store->write('state', 'schedules', 'json', $this->encode('schedules', $schedules));
+
+        return [$this->meta($e, 'events'), $this->meta($m, 'members'), $this->meta($s, 'schedules')];
     }
 
     /**
@@ -118,6 +135,17 @@ final class MaintenanceBackupService
             }
             $buf .= "\n";
         }
+        // Views (the spreadsheet-shaped sheet_* views) after every table they read.
+        // The DEFINER is dropped so the dump restores under whichever account runs it.
+        $views = $pdo->query("SHOW FULL TABLES WHERE Table_type = 'VIEW'")->fetchAll(PDO::FETCH_NUM) ?: [];
+        foreach ($views as $row) {
+            $view = str_replace('`', '', (string) $row[0]);
+            $create = $pdo->query('SHOW CREATE VIEW `' . $view . '`')->fetch(PDO::FETCH_ASSOC) ?: [];
+            $ddl = (string) preg_replace('/\sDEFINER=`[^`]*`@`[^`]*`/', '', (string) ($create['Create View'] ?? ''));
+            if ($ddl !== '') {
+                $buf .= 'DROP VIEW IF EXISTS `' . $view . "`;\n" . $ddl . ";\n\n";
+            }
+        }
         $buf .= "SET FOREIGN_KEY_CHECKS=1;\n";
         return $buf;
     }
@@ -145,14 +173,12 @@ final class MaintenanceBackupService
     {
         try {
             return $pdo->query(
-                'SELECT p.per_ID, p.per_FirstName, p.per_MiddleName, p.per_LastName, p.per_Email,
-                        p.per_CellPhone, p.per_Address1, p.per_City, p.per_State, p.per_Zip, p.per_Country,
-                        p.per_BirthMonth, p.per_BirthDay, p.per_BirthYear, p.per_MembershipDate, p.per_cls_ID,
-                        pca.campus_id, pc.c1 AS member_type_id
-                   FROM person_per p
-                   LEFT JOIN person_campus_affiliation pca ON pca.person_id = p.per_ID AND pca.is_primary = 1
-                   LEFT JOIN person_custom pc ON pc.per_ID = p.per_ID
-               ORDER BY p.per_LastName, p.per_FirstName'
+                'SELECT p.id, p.first_name, p.middle_name, p.last_name, p.email, p.mobile_phone,
+                        p.address_line1, p.city, p.region, p.postal_code, p.country,
+                        p.birth_month, p.birth_day, p.birth_year, p.member_since, p.membership_status_id,
+                        p.campus_id, p.member_type_id, p.household_id
+                   FROM people p
+               ORDER BY p.last_name, p.first_name'
             )->fetchAll(PDO::FETCH_ASSOC) ?: [];
         } catch (\Throwable) {
             return [];

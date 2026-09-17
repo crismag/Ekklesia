@@ -312,7 +312,7 @@ final class AdminDashboardService
             'APP_DEBUG' => $get('APP_DEBUG'),
             'PORTAL_BASE_PATH' => $get('PORTAL_BASE_PATH'),
             'PORTAL_SOURCE_OF_TRUTH' => $get('PORTAL_SOURCE_OF_TRUTH'),
-            'CHURCHCRM_DB' => $get('CHURCHCRM_DB_DATABASE'),
+            'MEMBERS_DB' => $get('MEMBERS_DB_DATABASE'),
             'PHP' => PHP_VERSION,
         ];
     }
