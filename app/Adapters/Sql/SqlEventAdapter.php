@@ -1014,15 +1014,16 @@ final class SqlEventAdapter implements EventAdapter
     }
 
     /**
-     * A date differs from its series when it was moved or says something of
-     * its own. Derived, never stored, so it cannot disagree with the row.
+     * A date is "modified" when it says something of its own (a title or
+     * details override). Moving a date's time is not a modification, as it
+     * never was: retiming a series would otherwise mark every date after it.
+     * Derived, never stored, so it cannot disagree with the row.
      *
      * @param array<string,mixed> $row
      */
     private static function isModified(array $row): bool
     {
-        return (string) ($row['starts_at'] ?? '') !== (string) ($row['original_starts_at'] ?? $row['starts_at'] ?? '')
-            || ($row['title_override'] ?? '') !== ''
+        return ($row['title_override'] ?? '') !== ''
             || ($row['details_override'] ?? '') !== '';
     }
 

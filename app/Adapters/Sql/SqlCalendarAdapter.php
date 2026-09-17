@@ -153,9 +153,9 @@ final class SqlCalendarAdapter implements CalendarAdapter
                 : (string) $row['title'];
 
             $cancelled = (string) ($row['status'] ?? 'scheduled') === 'cancelled';
-            // Modified is derived: the date was moved, or says something of its own.
-            $modified = $start !== (string) $row['original_starts_at']
-                || ($row['title_override'] ?? '') !== ''
+            // Modified is derived: the date says something of its own. A moved
+            // time is not an edit, as it never was.
+            $modified = ($row['title_override'] ?? '') !== ''
                 || ($row['details_override'] ?? '') !== '';
             $meta = $this->formatOccurrenceMeta(
                 $start,

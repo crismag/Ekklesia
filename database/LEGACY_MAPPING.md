@@ -114,7 +114,7 @@ Membership roles in code and in the browser are the strings `member` and
 | `occurrence_id`, `occurrence_start`, `occurrence_end` | `id`, `starts_at`, `ends_at` |
 | — | `original_starts_at`: set to `starts_at` when the date is created, never changed |
 | `is_cancelled` | `status = 'cancelled'` (else `'scheduled'`) |
-| `is_modified` | derived: `starts_at <> original_starts_at` or an override is set |
+| `is_modified` | derived: a title or details override is set (a moved time is not a modification, as before) |
 | `override_title`, `override_desc` | `title_override`, `details_override` |
 | `assignment` | `assignments` |
 | `assignment_id`, `role_id` | `id`, `serving_role_id` |
