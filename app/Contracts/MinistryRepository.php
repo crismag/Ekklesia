@@ -151,6 +151,11 @@ interface MinistryRepository
     public function updateMinistryRole(int $roleId, array $data): array;
 
     /**
+     * The ministry a serving role belongs to; null when there is no such role.
+     */
+    public function findMinistryIdForRole(int $roleId): ?int;
+
+    /**
      * Delete a role.
      */
     public function deleteMinistryRole(int $roleId): bool;

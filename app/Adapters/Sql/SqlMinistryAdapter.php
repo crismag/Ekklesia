@@ -1477,6 +1477,19 @@ final class SqlMinistryAdapter implements MinistryAdapter
         ];
     }
 
+    public function findMinistryIdForRole(int $roleId): ?int
+    {
+        if ($this->connection === null) {
+            return null;
+        }
+        $stmt = $this->connection->prepare('SELECT ministry_id FROM serving_roles WHERE id = :role_id LIMIT 1');
+        $stmt->bindValue(':role_id', $roleId, PDO::PARAM_INT);
+        $stmt->execute();
+        $id = $stmt->fetchColumn();
+
+        return $id === false || $id === null ? null : (int) $id;
+    }
+
     public function deleteMinistryRole(int $roleId): bool
     {
         if ($this->connection === null) {

@@ -457,6 +457,11 @@ final class FakeMinistryRepository implements MinistryRepository
         // satisfying the interface without asserting fake data as truth.
         return [];
     }
+    public function findMinistryIdForRole(int $roleId): ?int
+    {
+        return null;
+    }
+
     public function deleteMinistryRole(int $roleId): bool
     {
         // Contract stub: the boundary tests exercise service-layer rules, not

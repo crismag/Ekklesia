@@ -123,6 +123,7 @@ final class FakeWorkspaceMinistries implements MinistryRepository
     public function fetchMinistryLeaders(int $ministryId, DateTimeImmutable $since, ?int $campusId = null): array { return []; }
     public function createMinistryRole(int $ministryId, array $data): array { return []; }
     public function updateMinistryRole(int $roleId, array $data): array { return []; }
+    public function findMinistryIdForRole(int $roleId): ?int { return [5 => 4, 6 => 1][$roleId] ?? null; }
     public function deleteMinistryRole(int $roleId): bool { return true; }
     public function assignPersonToRole(int $personId, int $roleId): bool { return true; }
     public function removePersonFromRole(int $personId, int $roleId): bool { return true; }
@@ -213,6 +214,18 @@ check('someone who is not a member is reported, not added', $service->setMemberP
 throws(ValidationFailed::class, static fn () => $service->setMemberPositions($leader4, 4, 953, [['nested']]), 'a position must be a name');
 throws(ValidationFailed::class, static fn () => $service->setMemberPositions($leader4, 4, 953, [str_repeat('x', 61)]), 'a position name is at most 60 characters');
 throws(ValidationFailed::class, static fn () => $service->setMemberPositions($leader4, 4, 953, array_fill(0, 21, 'x')), 'at most 20 positions');
+
+echo "Role-by-id writes are held to the role's ministry\n";
+// Role 5 belongs to Victuals (4), role 6 to Psalmist (1).
+throws(PermissionDenied::class, static fn () => $service->updateRole($leader4, 6, ['name' => 'X']), 'a leader of A cannot rename a role of B');
+throws(PermissionDenied::class, static fn () => $service->deleteRole($leader4, 6), 'a leader of A cannot delete a role of B');
+throws(PermissionDenied::class, static fn () => $service->assignPersonToRole($leader4, 953, 6), 'a leader of A cannot assign into a role of B');
+throws(PermissionDenied::class, static fn () => $service->removePersonFromRole($leader4, 953, 6), 'a leader of A cannot unassign from a role of B');
+check('a leader of A still deletes a role of A', $service->deleteRole($leader4, 5) === true);
+check('and assigns and unassigns in it', $service->assignPersonToRole($leader4, 953, 5) && $service->removePersonFromRole($leader4, 953, 5));
+check('an administrator may delete a role of any ministry', $service->deleteRole($admin, 6) === true);
+throws(ValidationFailed::class, static fn () => $service->deleteRole($admin, 999), 'an unknown role is refused, not silently ignored');
+throws(PermissionDenied::class, static fn () => $service->deleteRole($member, 5), 'a member still cannot delete roles');
 
 echo "Old addresses\n";
 check('a name finds its ministry however it is written', $service->findMinistryIdBySlug('victuals') === 4 && $service->findMinistryIdBySlug('VICTUALS') === 4);

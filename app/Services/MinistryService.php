@@ -560,6 +560,8 @@ final readonly class MinistryService
             throw new PermissionDenied('Actor lacks permission to manage ministry roles.');
         }
 
+        $this->assertRoleInScope($context, $roleId);
+
         $roleData = [];
         if (isset($data['name']) && trim($data['name']) !== '') {
             $roleData['name'] = trim($data['name']);
@@ -602,6 +604,8 @@ final readonly class MinistryService
             throw new PermissionDenied('Actor lacks permission to manage ministry roles.');
         }
 
+        $this->assertRoleInScope($context, $roleId);
+
         return $this->ministryRepository->deleteMinistryRole($roleId);
     }
 
@@ -622,6 +626,8 @@ final readonly class MinistryService
             throw new PermissionDenied('Actor lacks permission to manage role assignments.');
         }
 
+        $this->assertRoleInScope($context, $roleId);
+
         return $this->ministryRepository->assignPersonToRole($personId, $roleId);
     }
 
@@ -641,6 +647,8 @@ final readonly class MinistryService
         if (!$context->hasPermission(PortalPermission::ManageSchedules)) {
             throw new PermissionDenied('Actor lacks permission to manage role assignments.');
         }
+
+        $this->assertRoleInScope($context, $roleId);
 
         return $this->ministryRepository->removePersonFromRole($personId, $roleId);
     }
@@ -1167,6 +1175,22 @@ final readonly class MinistryService
         }
 
         return [$mine, $led];
+    }
+
+    /**
+     * A role-by-id write acts on the role's ministry, so it is held to that
+     * ministry's scope exactly like the ministry-scoped writes. An unknown role
+     * is a validation failure, not a silent no-op.
+     */
+    private function assertRoleInScope(ActorContext $context, int $roleId): void
+    {
+        $ministryId = $this->ministryRepository->findMinistryIdForRole($roleId);
+        if ($ministryId === null) {
+            throw new ValidationFailed('Serving role not found.');
+        }
+        if (!$context->canAccessMinistry($ministryId)) {
+            throw new PermissionDenied('Actor is outside the requested ministry scope.');
+        }
     }
 
     private function assertCanManageMembers(ActorContext $context, int $ministryId, int $personId): void

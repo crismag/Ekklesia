@@ -328,6 +328,7 @@ final class FakeMinistryNamesRepository implements MinistryRepository
     public function fetchMinistryLeaders(int $ministryId, DateTimeImmutable $since, ?int $campusId = null): array { return []; }
     public function createMinistryRole(int $ministryId, array $data): array { return []; }
     public function updateMinistryRole(int $roleId, array $data): array { return []; }
+    public function findMinistryIdForRole(int $roleId): ?int { return null; }
     public function deleteMinistryRole(int $roleId): bool { return true; }
     public function assignPersonToRole(int $personId, int $roleId): bool { return true; }
     public function removePersonFromRole(int $personId, int $roleId): bool { return true; }
