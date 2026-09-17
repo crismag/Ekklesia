@@ -343,7 +343,8 @@ final class FakeMinistryNamesRepository implements MinistryRepository
         return [];
     }
 
-    public function setMemberRole(int $personId, int $ministryId, int $roleId): bool { return true; }
+    public function setMemberRole(int $personId, int $ministryId, string $role): bool { return true; }
+    public function setMemberPositions(int $personId, int $ministryId, array $positions): bool { return true; }
     public function removeMemberFromMinistry(int $personId, int $ministryId): bool { return true; }
     public function addMinistryLeader(int $ministryId, int $personId): bool { return true; }
     public function removeMinistryLeader(int $ministryId, int $personId): bool { return true; }

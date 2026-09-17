@@ -527,11 +527,16 @@ final class FakeMinistryRepository implements MinistryRepository
         return [];
     }
 
-    public function setMemberRole(int $personId, int $ministryId, int $roleId): bool
+    public function setMemberRole(int $personId, int $ministryId, string $role): bool
     {
         // Contract stub: the boundary tests exercise service-layer rules, not
         // repository behaviour. Returning an inert value keeps the fake
         // satisfying the interface without asserting fake data as truth.
+        return true;
+    }
+    public function setMemberPositions(int $personId, int $ministryId, array $positions): bool
+    {
+        // Contract stub, as above.
         return true;
     }
     public function removeMemberFromMinistry(int $personId, int $ministryId): bool

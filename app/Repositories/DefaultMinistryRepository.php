@@ -13,8 +13,8 @@ use DateTimeImmutable;
  * Source-agnostic ministry repository.
  *
  * Composes a MinistryAdapter (the source-specific data layer) into the shape
- * the service expects. Zero SQL. When ChurchCRM is replaced, swap the adapter
- * binding; this repository is unchanged.
+ * the service expects. Zero SQL: a different data source is a different
+ * adapter binding; this repository is unchanged.
  */
 final class DefaultMinistryRepository implements MinistryRepository
 {
@@ -203,9 +203,14 @@ final class DefaultMinistryRepository implements MinistryRepository
         return $this->adapter->listMinistryIdsForPeople($personIds);
     }
 
-    public function setMemberRole(int $personId, int $ministryId, int $roleId): bool
+    public function setMemberRole(int $personId, int $ministryId, string $role): bool
     {
-        return $this->adapter->setMemberRole($personId, $ministryId, $roleId);
+        return $this->adapter->setMemberRole($personId, $ministryId, $role);
+    }
+
+    public function setMemberPositions(int $personId, int $ministryId, array $positions): bool
+    {
+        return $this->adapter->setMemberPositions($personId, $ministryId, $positions);
     }
 
     public function removeMemberFromMinistry(int $personId, int $ministryId): bool
