@@ -332,7 +332,7 @@ CREATE TABLE event_occurrences (
   created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_event_occurrences_date (event_id, original_starts_at),
+  KEY ix_event_occurrences_original (event_id, original_starts_at),
   KEY ix_event_occurrences_starts (starts_at),
   CONSTRAINT fk_event_occurrences_event FOREIGN KEY (event_id) REFERENCES events (id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -341,8 +341,10 @@ CREATE TABLE assignments (
   id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
   occurrence_id     INT UNSIGNED NOT NULL,
   serving_role_id   INT UNSIGNED NOT NULL,
-  -- NULL means the role is still open on that date.
+  -- NULL with no assignee_name means the role is still open on that date.
   person_id         INT UNSIGNED NULL,
+  -- A helper who is not in the database, typed on the serving grid.
+  assignee_name     VARCHAR(255) NULL,
   status            ENUM('open','assigned','confirmed','declined','completed') NOT NULL DEFAULT 'open',
   notes             TEXT NULL,
   assigned_at       DATETIME NULL,

@@ -198,10 +198,11 @@ SELECT o.occurrence_id, o.event_id, o.occurrence_start, o.occurrence_start, o.oc
 FROM {{CRM}}.event_occurrence o
 WHERE EXISTS (SELECT 1 FROM events e WHERE e.id = o.event_id);
 
-INSERT INTO assignments (id, occurrence_id, serving_role_id, person_id, status, notes, assigned_at)
+INSERT INTO assignments (id, occurrence_id, serving_role_id, person_id, assignee_name, status, notes, assigned_at)
 SELECT a.assignment_id, a.occurrence_id, a.role_id,
        (SELECT p.id FROM people p WHERE p.id = a.person_id),
-       CASE WHEN a.person_id IS NULL THEN 'open' ELSE a.status END,
+       blank_to_null(a.assignee_name),
+       CASE WHEN a.person_id IS NULL AND blank_to_null(a.assignee_name) IS NULL THEN 'open' ELSE a.status END,
        blank_to_null(a.notes), a.assigned_at
 FROM {{CRM}}.assignment a
 WHERE EXISTS (SELECT 1 FROM event_occurrences o WHERE o.id = a.occurrence_id)

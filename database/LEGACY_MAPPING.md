@@ -119,7 +119,7 @@ Membership roles in code and in the browser are the strings `member` and
 | `assignment` | `assignments` |
 | `assignment_id`, `role_id` | `id`, `serving_role_id` |
 | `status` (`open`, `assigned`, `declined`, `completed`) | same values, plus `confirmed` |
-| `assignee_name` | dropped (never used) |
+| `assignee_name` | `assignee_name` (a typed-in helper who is not in the database) |
 | `portal_unavailability` | `unavailability` (`unavailability_id` → `id`, `created_by_portal_user_id` → `created_by_account_id`) |
 | `schedule_roster` | `rosters` (`roster_id` → `id`, `created_by` → `created_by_account_id`) |
 | `schedule_roster_slot` | `roster_slots` (`slot_id` → `id`, `slot_dow` → `slot_weekday`, `role_id` → `serving_role_id`, `display_order` → `sort_order`) |
