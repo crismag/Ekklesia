@@ -1,12 +1,12 @@
 # Roles, Leaders & Members
 
 This section explains the two kinds of "role" in the portal and how to make
-someone a member, teacher, or leader of a ministry — and how to give a leader
+someone a member or leader of a ministry — and how to give a leader
 the access they need.
 
 ## Two kinds of role (don't mix them up)
 
-- **Group role** — a person's standing on a ministry team: **Member**, **Teacher**, or **Leader**. Managed in **Members & leaders**.
+- **Group role** — a person's standing on a ministry team: **Member** or **Leader**. Managed on the ministry's **Members & leaders** tab.
 - **Account role** — what a login can do in the portal: **admin**, **leader**, **scheduler**, **member**. Managed in **Users & access**.
 
 > **Tip:** Group role = standing on a team. Account role = permissions for a login. A person can be a **Leader** on a team (group role) without a portal account, and an account can have the **leader** role scoped to a ministry.
@@ -23,15 +23,14 @@ family, and nobody needs nominating as its head.
 
 ## Adding a member to a ministry
 
-1. Open Administration → **Members & leaders** and choose the ministry.
-2. Add the person to the team. Their default group role is **Member**.
-3. Save. They now appear on the ministry's roster and can be scheduled.
+1. Open **Ministries**, choose the ministry, and open its **Members & leaders** tab.
+2. Under **Add someone**, type the person's name, pick them, and keep **Member**.
+3. Select **Add**. They now appear on the ministry's roster and can be scheduled.
 
-## Promoting to Teacher or Leader
+## Promoting to Leader
 
-1. On the same **Members & leaders** view, find the person on the team.
-2. Change their group role to **Teacher** or **Leader**.
-3. Save.
+1. On the same **Members & leaders** tab, find the person on the team.
+2. Select **Make leader**. (**Make member** reverses it.)
 
 **Leaders** are surfaced on the ministry page and are filtered by campus, so a
 leader assigned to one campus is shown only under that campus.

@@ -153,6 +153,11 @@ final class DefaultMinistryRepository implements MinistryRepository
         return $this->adapter->updateMinistryRole($roleId, $data);
     }
 
+    public function findMinistryIdForRole(int $roleId): ?int
+    {
+        return $this->adapter->findMinistryIdForRole($roleId);
+    }
+
     public function deleteMinistryRole(int $roleId): bool
     {
         return $this->adapter->deleteMinistryRole($roleId);

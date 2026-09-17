@@ -177,8 +177,16 @@ $eventsLeaderNav = offered($eventsLeader);
 check('an events leader is offered New event and Calendar settings',
     in_array('new-event', $eventsLeaderNav['events'] ?? [], true) && in_array('calendar-settings', $eventsLeaderNav['events'] ?? [], true));
 check('but not Event categories, which is admin-only', !in_array('categories', $eventsLeaderNav['events'] ?? [], true));
-check('a ministry leader is offered Manage members & leaders',
-    in_array('members', offered($ministryLeader)['ministries'] ?? [], true));
+check('Members & leaders is a tab of each ministry, not a page of its own',
+    !in_array('members', offered($ministryLeader)['ministries'] ?? [], true)
+    && in_array('members', array_column(Workspaces::ministryTabs(), 'id'), true));
+check('each ministry has Overview, Members & leaders, Serving roles and Schedule tabs',
+    array_column(Workspaces::ministryTabs(), 'label') === ['Overview', 'Members & leaders', 'Serving roles', 'Schedule']);
+check('a ministry and its tabs are in the Ministries workspace',
+    (Workspaces::locate('/ministries/4/members')['page'] ?? '') === 'ministries'
+    && (Workspaces::locate('/ministry/victuals')['workspace'] ?? '') === 'ministries');
+check('Manage ministries stays admin-only', !in_array('manage', offered($ministryLeader)['ministries'] ?? [], true)
+    && in_array('manage', offered($admin)['ministries'] ?? [], true));
 
 $adminWs = offered($admin);
 check('an admin is offered all seven workspaces', count($adminWs) === 7, implode(' | ', array_keys($adminWs)));
@@ -228,7 +236,7 @@ check('page header escapes its text', str_contains(ek_page_header('A & B', '<x>'
 
 // Every admin page names a section the map knows, so none renders without tabs.
 $sections = Workspaces::adminSections();
-foreach (array_merge(glob(__DIR__ . '/../../resources/views/admin*.php') ?: [], [__DIR__ . '/../../admin/groups_and_ministries/ministries.php']) as $file) {
+foreach (glob(__DIR__ . '/../../resources/views/admin*.php') ?: [] as $file) {
     if (preg_match_all("/'activeId'\s*=>\s*'([^']+)'/", (string) file_get_contents($file), $m)) {
         foreach ($m[1] as $id) {
             check('admin section is placed in a workspace: ' . basename($file) . ' → ' . $id, isset($sections[$id]));
@@ -269,11 +277,14 @@ $peopleDir = (string) file_get_contents(__DIR__ . '/../../resources/views/people
 check('the People tab says adding a record is Member records',
     str_contains($peopleDir, 'Member records')
     && str_contains($peopleDir, 'not this page'));
-$groups = (string) file_get_contents(__DIR__ . '/../../admin/groups_and_ministries/ministries.php');
-check('the membership workspace is titled Members & leaders',
-    str_contains($groups, "'sectionTitle'       => 'Members & leaders'"));
-check('that workspace no longer titles itself Groups & Ministries',
-    !str_contains($groups, "'sectionTitle'       => 'Groups & Ministries'"));
+check('the old membership editor page is gone (its addresses redirect to each ministry)',
+    !is_file(__DIR__ . '/../../admin/groups_and_ministries/ministries.php'));
+$ministryWorkspace = (string) file_get_contents(__DIR__ . '/../../resources/views/ministry-workspace.php');
+check('the ministry workspace renders its tabs from the map', str_contains($ministryWorkspace, 'Workspaces::ministryTabs()'));
+check('and never says Groups & Ministries', !str_contains($ministryWorkspace, 'Groups & Ministries'));
+$manageMinistries = (string) file_get_contents(__DIR__ . '/../../resources/views/admin-ministries.php');
+check('Manage ministries renders one page, not two shells',
+    substr_count($manageMinistries, 'echo admin_render_page(') === 2 && str_contains($manageMinistries, "return;\n}"));
 $navGuide = (string) file_get_contents(__DIR__ . '/../../resources/views/docs/sections/03-site-navigation.md');
 check('the nav guide splits People lookup from Member records',
     str_contains($navGuide, 'Look someone up')

@@ -340,6 +340,97 @@ $visitorsAction = static function (array $req, string $back, callable $act): str
     return '';
 };
 
+/**
+ * The campus a Ministries page counts people for: ?campus=<id> (or "all"),
+ * otherwise the header selector. A campus outside the actor's scope is ignored
+ * rather than refused — ministries are not campus-scoped reading.
+ *
+ * @param array<string,mixed> $req
+ */
+$ministriesCampus = static function (array $req): ?int {
+    if (($req['campus'] ?? '') === 'all') {
+        return null;
+    }
+
+    return _campusContext($req);
+};
+
+/**
+ * One ministry's workspace: Overview, Members & leaders, Serving roles or
+ * Schedule. Signed-in only; the service decides what each tab may show.
+ */
+$renderMinistryWorkspace = static function (array $req, string $tab) use ($resolvePortalActor, $resolveCampusSelector, $ministriesCampus): string {
+    $basePath = (string) ($req['_base_path'] ?? '');
+    $rawId = (string) ($req['id'] ?? '');
+    $service = \App\Providers\PortalServiceProvider::makeMinistryService();
+
+    // /ministries/victuals/members and the like: an old name-based address.
+    if (!ctype_digit($rawId)) {
+        $found = $service->findMinistryIdBySlug($rawId);
+        header('Location: ' . $basePath . '/ministries' . ($found !== null ? '/' . $found : ''), true, 302);
+
+        return '';
+    }
+
+    $actor = $resolvePortalActor($req);
+    $campusSelector = $resolveCampusSelector($req);
+    $ministryId = (int) $rawId;
+    $overview = null;
+    $members = [];
+    $roles = [];
+    $servingDates = null;
+    $scheduleError = '';
+    $campusId = $ministriesCampus($req);
+
+    if ($actor !== null) {
+        $context = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
+        try {
+            $overview = $service->getWorkspaceOverview($context, $ministryId, $campusId, new DateTimeImmutable('today'));
+        } catch (\App\Exceptions\PermissionDenied) {
+            $campusId = null;
+            $overview = $service->getWorkspaceOverview($context, $ministryId, null, new DateTimeImmutable('today'));
+        }
+        if ($overview === null) {
+            http_response_code(404);
+        } else {
+            $access = $overview['access'];
+            $countCampus = $overview['countCampusId'];
+            if ($tab === 'members' && $access['canViewPeople']) {
+                $members = $service->getMinistryMembers($context, $ministryId, $countCampus);
+            }
+            if ($tab === 'roles' && $access['canViewPeople']) {
+                $roles = array_map(static fn ($r): array => $r->toArray(), $service->getMinistryRoles($context, $ministryId));
+            }
+            if ($tab === 'schedule') {
+                try {
+                    $start = new DateTimeImmutable('today');
+                    $grid = \App\Providers\PortalServiceProvider::makeScheduleService()
+                        ->getScheduleGrid($context, $ministryId, $start, $start->modify('+56 days'));
+                    $servingDates = \App\Services\Ministry\ServingDates::fromGrid($grid->toArray());
+                } catch (\App\Exceptions\PermissionDenied) {
+                    $scheduleError = 'Your account cannot read this ministry\'s schedule.';
+                } catch (\Throwable) {
+                    $scheduleError = 'The schedule could not be loaded just now.';
+                }
+            }
+        }
+    }
+
+    ob_start();
+    require __DIR__ . '/../resources/views/ministry-workspace.php';
+    return (string) ob_get_clean();
+};
+
+/** Old member-editor addresses → the ministry's Members & leaders tab. */
+$redirectToMembersTab = static function (array $req): string {
+    $basePath = (string) ($req['_base_path'] ?? '');
+    $slug = (string) ($req['slug'] ?? '');
+    $found = $slug !== '' ? \App\Providers\PortalServiceProvider::makeMinistryService()->findMinistryIdBySlug($slug) : null;
+    header('Location: ' . $basePath . '/ministries' . ($found !== null ? '/' . $found . '/members' : ''), true, 302);
+
+    return '';
+};
+
 $webRoutes = [
     'GET /login' => function (array $req): string {
         /** @var string $basePath used by the template */
@@ -745,49 +836,28 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
 
-    // /ministries is the ministry chooser (approved ministry-first direction).
-    // The assignment board that used to live here is UNCHANGED and served at
-    // /schedule-board below. Deep links /ministries/{id} and /ministry/{slug}
-    // already resolved to the ministry workspace and are untouched.
-    'GET /ministries' => function (array $req) use ($resolvePortalActor, $resolveAvailableMinistries, $resolveAllMinistries, $resolveCampusSelector): string {
-        /** @var string $basePath used by the template */
+    // The ministries directory: every ministry for a signed-in member, their
+    // own first, with campus, size, leaders (where they may see people),
+    // whether it schedules and its next serving date. The assignment board that
+    // used to live at this address is unchanged at /schedule-board.
+    'GET /ministries' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector, $ministriesCampus): string {
         $basePath = (string) ($req['_base_path'] ?? '');
-        /** @var ?array<string, mixed> $actor used by the template */
         $actor = $resolvePortalActor($req);
-        /** @var array<int, array<string, mixed>> $availableMinistries used by the template */
-        $availableMinistries = $resolveAvailableMinistries($req);
-        /** @var array<int, array<string, mixed>> $allMinistries used by the template */
-        $allMinistries = $resolveAllMinistries($req);
-        // listAllMinistries() returns [] unless the actor holds
-        // ViewMinistrySchedule / ManageSchedules / ManageEvents — which a plain
-        // member does not. Anonymous visitors only saw the full list because the
-        // resolver's catch block substitutes an elevated fallback context, so a
-        // signed-in member saw LESS than a signed-out visitor and the chooser
-        // rendered empty. Fall back to the same public list anonymous users
-        // already receive from /api/public/ministries. No permission is widened:
-        // this data is public either way.
-        if ($allMinistries === []) {
+        $campusSelector = $resolveCampusSelector($req);
+        $campusId = $ministriesCampus($req);
+        $directory = [];
+        if ($actor !== null) {
+            $context = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
+            $service = \App\Providers\PortalServiceProvider::makeMinistryService();
             try {
-                $campusId = isset($req['current_campus_id']) && (int) $req['current_campus_id'] > 0
-                    ? (int) $req['current_campus_id'] : null;
-                $public = \App\Providers\PortalServiceProvider::makeMinistryService()->listMinistriesPublic($campusId);
-                $allMinistries = array_map(static fn (array $m): array => [
-                    'ministryId'         => (int) ($m['ministry_id'] ?? $m['ministryId'] ?? 0),
-                    'name'               => (string) ($m['name'] ?? ''),
-                    'campusId'           => isset($m['campus_id']) && $m['campus_id'] !== null ? (int) $m['campus_id'] : null,
-                    'icon'               => 'ministry',
-                    'canViewPeople'      => false,
-                    'canManageSchedules' => false,
-                    'canManageEvents'    => false,
-                ], $public);
-            } catch (\Throwable) {
-                $allMinistries = [];
+                $directory = $service->listDirectory($context, $campusId, new DateTimeImmutable('today'));
+            } catch (\App\Exceptions\PermissionDenied) {
+                $campusId = null;
+                $directory = $service->listDirectory($context, null, new DateTimeImmutable('today'));
             }
         }
-        /** @var array<string, mixed> $campusSelector used by the template */
-        $campusSelector = $resolveCampusSelector($req);
         ob_start();
-        require __DIR__ . '/../resources/views/ministry-chooser.php';
+        require __DIR__ . '/../resources/views/ministries-directory.php';
         return (string) ob_get_clean();
     },
 
@@ -807,63 +877,17 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
 
-    'GET /ministries/{id}' => function (array $req) use ($resolvePortalActor, $resolveAvailableMinistries, $resolveAllMinistries, $resolveCampusSelector): string {
-        /** @var string $basePath used by the template */
+    'GET /ministries/{id}' => fn (array $req): string => $renderMinistryWorkspace($req, 'overview'),
+    'GET /ministries/{id}/members' => fn (array $req): string => $renderMinistryWorkspace($req, 'members'),
+    'GET /ministries/{id}/roles' => fn (array $req): string => $renderMinistryWorkspace($req, 'roles'),
+    'GET /ministries/{id}/schedule' => fn (array $req): string => $renderMinistryWorkspace($req, 'schedule'),
+    // Friendly name alias: /ministry/victuals → /ministries/4
+    'GET /ministry/{slug}' => function (array $req): string {
         $basePath = (string) ($req['_base_path'] ?? '');
-        /** @var ?array<string, mixed> $actor used by the template */
-        $actor = $resolvePortalActor($req);
-        /** @var array<int, array<string, mixed>> $availableMinistries used by the template */
-        $availableMinistries = $resolveAvailableMinistries($req);
-        /** @var array<string, mixed> $campusSelector used by the template */
-        $campusSelector = $resolveCampusSelector($req);
-        /** @var int $ministryId used by the template */
-        $ministryId = (int) ($req['id'] ?? 0);
-        /** @var string $ministryName used by the template */
-        $ministryName = '';
-        foreach ($resolveAllMinistries($req) as $m) {
-            if ((int) ($m['ministryId'] ?? 0) === $ministryId) {
-                $ministryName = (string) ($m['name'] ?? '');
-                break;
-            }
-        }
-        ob_start();
-        require __DIR__ . '/../resources/views/ministry-dashboard.php';
-        return (string) ob_get_clean();
-    },
-    // Friendly slug alias: /ministry/victuals → the same view as /ministries/4
-    'GET /ministry/{slug}' => function (array $req) use ($resolvePortalActor, $resolveAvailableMinistries, $resolveAllMinistries, $resolveCampusSelector): string {
-        /** @var string $basePath used by the template */
-        $basePath = (string) ($req['_base_path'] ?? '');
-        /** @var ?array<string, mixed> $actor used by the template */
-        $actor = $resolvePortalActor($req);
-        /** @var array<int, array<string, mixed>> $availableMinistries used by the template */
-        $availableMinistries = $resolveAvailableMinistries($req);
-        /** @var array<string, mixed> $campusSelector used by the template */
-        $campusSelector = $resolveCampusSelector($req);
+        $found = \App\Providers\PortalServiceProvider::makeMinistryService()->findMinistryIdBySlug((string) ($req['slug'] ?? ''));
+        header('Location: ' . $basePath . '/ministries' . ($found !== null ? '/' . $found : ''), true, 302);
 
-        // Resolve the slug to a ministry by comparing normalized names
-        // (lowercase, separators stripped) so "gift_and_arrows",
-        // "gift-and-arrows" and "Gift and Arrows" all match.
-        $norm = static fn (string $s): string => preg_replace('/[^a-z0-9]+/', '', strtolower($s)) ?? '';
-        $want = $norm((string) ($req['slug'] ?? ''));
-        /** @var int $ministryId used by the template */
-        $ministryId = 0;
-        /** @var string $ministryName used by the template */
-        $ministryName = '';
-        foreach ($resolveAllMinistries($req) as $m) {
-            if ($norm((string) ($m['name'] ?? '')) === $want && $want !== '') {
-                $ministryId = (int) ($m['ministryId'] ?? 0);
-                $ministryName = (string) ($m['name'] ?? '');
-                break;
-            }
-        }
-        if ($ministryId <= 0) {
-            header('Location: ' . $basePath . '/ministries');
-            return '';
-        }
-        ob_start();
-        require __DIR__ . '/../resources/views/ministry-dashboard.php';
-        return (string) ob_get_clean();
+        return '';
     },
 
     'GET /people' => function (array $req) use ($resolvePortalActor, $resolveAllMinistries, $resolveCampusSelector): string {
@@ -1186,40 +1210,13 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
     'GET /admin/ministries' => fn (array $req) => _adminSectionRender($req, 'admin-ministries.php', $resolvePortalActor, $resolveCampusSelector),
-    // Members & leaders moves into the Ministries workspace (surfaces.md). The
-    // editor itself is unchanged and kept whole at its new address until each
-    // ministry has its own Members & leaders tab; the old admin address sends
-    // people to the Ministries workspace, and deep links keep their ministry.
-    'GET /ministries/members-and-leaders' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
-        $basePath = (string) ($req['_base_path'] ?? '');
-        $actor = $resolvePortalActor($req);
-        $campusSelector = $resolveCampusSelector($req);
-        $slug = '';
-        ob_start();
-        require __DIR__ . '/../admin/groups_and_ministries/ministries.php';
-        return (string) ob_get_clean();
-    },
-    // Deep link to a specific ministry, e.g. /ministries/members-and-leaders/victuals
-    'GET /ministries/members-and-leaders/{slug}' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
-        $basePath = (string) ($req['_base_path'] ?? '');
-        $actor = $resolvePortalActor($req);
-        $campusSelector = $resolveCampusSelector($req);
-        $slug = (string) ($req['slug'] ?? '');
-        ob_start();
-        require __DIR__ . '/../admin/groups_and_ministries/ministries.php';
-        return (string) ob_get_clean();
-    },
-    'GET /admin/groups-and-ministries' => function (array $req): string {
-        header('Location: ' . ((string) ($req['_base_path'] ?? '')) . '/ministries', true, 302);
-
-        return '';
-    },
-    'GET /admin/groups-and-ministries/{slug}' => function (array $req): string {
-        header('Location: ' . ((string) ($req['_base_path'] ?? '')) . '/ministries/members-and-leaders/'
-            . rawurlencode((string) ($req['slug'] ?? '')), true, 302);
-
-        return '';
-    },
+    // Members & leaders is a tab of each ministry (surfaces.md). The editor's
+    // old addresses keep working: with a ministry name they open that
+    // ministry's tab, without one the directory to choose from.
+    'GET /ministries/members-and-leaders' => $redirectToMembersTab,
+    'GET /ministries/members-and-leaders/{slug}' => $redirectToMembersTab,
+    'GET /admin/groups-and-ministries' => $redirectToMembersTab,
+    'GET /admin/groups-and-ministries/{slug}' => $redirectToMembersTab,
     'GET /admin/calendar'   => fn (array $req) => _adminSectionRender($req, 'admin-calendar.php',   $resolvePortalActor, $resolveCampusSelector),
     'GET /admin/events'     => fn (array $req) => _adminSectionRender($req, 'admin-events.php',     $resolvePortalActor, $resolveCampusSelector),
     // People management — dashboard + searchable list.
