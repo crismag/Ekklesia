@@ -71,7 +71,7 @@ test.describe('Authorization: HTML render ≠ API permission', () => {
           kind: 'api-5xx',
           severity: 'info',
           route: path,
-          message: `Public GET ${path} returned ${res.status()} (often missing ChurchCRM/portal DB).`,
+          message: `Public GET ${path} returned ${res.status()} (often a missing member database).`,
         });
       }
     });

@@ -54,7 +54,7 @@ function throws(string $class, callable $fn, string $label): void
     }
 }
 
-/** Stands in for the assignment → roles → group_grp source. */
+/** Stands in for the assignments → serving_roles → ministries source. */
 final class FakeScheduleRepository implements ScheduleRepository
 {
     /** @var list<array<string,mixed>> */

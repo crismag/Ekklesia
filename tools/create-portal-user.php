@@ -16,7 +16,7 @@ declare(strict_types=1);
  * Pass `0` for any optional positional argument you want to skip while still
  * setting one further to the right.
  *
- * Reads DB credentials from .env (PORTAL_DB_*).
+ * Reads DB credentials from .env (MEMBERS_DB_*).
  */
 
 spl_autoload_register(function (string $class): void {

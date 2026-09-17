@@ -30,9 +30,9 @@ $content = '<style>
     . '<article class="admin-card">'
     . '<div class="admin-card-head"><div><h2>Guest Sign-Up</h2><p>New-people registration (not for existing members).</p></div></div>'
     . '<div class="admin-card-body"><div class="oc-grid">'
-    . $link($signup . '/admin_review.php', 'Review sign-ups →', 'Spreadsheet of staged guests; edit, match & migrate to ChurchCRM', 'primary')
+    . $link($signup . '/admin_review.php', 'Review sign-ups →', 'Spreadsheet of staged guests; edit, match & promote to members', 'primary')
     . $link($signup . '/index.php', 'Public sign-up form', 'Share this link with first-time & returning guests')
-    . $link($signup . '/advanced.php', 'Full registration form', 'Longer form with all ChurchCRM-style fields')
+    . $link($signup . '/advanced.php', 'Full registration form', 'Longer form with address, background and contact details')
     . $link($signup . '/admin_access.php', 'Access code', 'Set / rotate the WORD ID and its validity window')
     . '</div></div></article>'
 
@@ -42,7 +42,7 @@ $content = '<style>
     . $link($rsvp . '/admin_attendance.php', 'RSVP & attendance →', 'Per-event tallies and check-in / no-show', 'primary')
     . $link($rsvp . '/admin_access.php', 'Access code', 'Set / rotate the WORD ID and its validity window')
     . '</div>'
-    . '<p class="oc-note">Share an event RSVP link as <span class="code">' . $rsvp . '/event.php?event_id=&lt;id&gt;</span> (the event id from ChurchCRM or the RSVP events table).</p>'
+    . '<p class="oc-note">Share an event RSVP link as <span class="code">' . $rsvp . '/event.php?event_id=&lt;id&gt;</span> (the event id from the church calendar).</p>'
     . '</div></article>'
 
     . '<article class="admin-card">'

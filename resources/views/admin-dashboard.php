@@ -78,7 +78,7 @@ $groups = [
             ['label' => 'Church info', 'desc' => 'Name, contact details, service times.', 'href' => $base . '/admin/church-info', 'badge' => 'live'],
             ['label' => 'Campuses', 'desc' => 'Locations and the main campus.', 'href' => $base . '/admin/campuses', 'badge' => 'live'],
             ['label' => 'Ministries', 'desc' => 'Ministry catalog and visibility.', 'href' => $base . '/admin/ministries', 'badge' => 'live'],
-            ['label' => 'Groups & ministries', 'desc' => 'Group roles and ChurchCRM sync.', 'href' => $base . '/admin/groups-and-ministries', 'badge' => 'beta'],
+            ['label' => 'Groups & ministries', 'desc' => 'Ministry members, leaders and serving roles.', 'href' => $base . '/admin/groups-and-ministries', 'badge' => 'beta'],
             ['label' => 'Calendar settings', 'desc' => 'Calendar sources and custom rules.', 'href' => $base . '/admin/calendar', 'badge' => 'live'],
             ['label' => 'Events', 'desc' => 'Configured events, occurrences and recurrence.', 'href' => $base . '/admin/events', 'badge' => 'live'],
         ],

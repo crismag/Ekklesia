@@ -1,7 +1,7 @@
 <?php
 /**
  * Admin · Church Info — portal-owned identity/contact/location settings.
- * Data from ChurchInfoService (config/church-info.json); no ChurchCRM dependency.
+ * Data from ChurchInfoService (config/church-info.json).
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor

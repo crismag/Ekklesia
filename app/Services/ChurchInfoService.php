@@ -11,8 +11,7 @@ use RuntimeException;
  * Read/write the church identity + contact + location info.
  *
  * Storage is a portal-owned JSON file (config/church-info.json) — deliberately
- * self-contained with NO dependency on ChurchCRM's config_cfg or any ChurchCRM
- * PHP, so it keeps working once ChurchCRM is decommissioned.
+ * self-contained: stored in config/church-info.json, not in the database.
  */
 final class ChurchInfoService
 {

@@ -1057,7 +1057,7 @@ $adminCampuses = $ministryService->getCampusSelector($adminCtx);
 // one congregation as the default for every user with no campus of their own,
 // which is why the dashboard, docs and every admin page opened scoped to a
 // single campus and "All campuses" would not stick. Which campus leads is
-// configuration (church_campus.is_main); with none chosen, All campuses is the
+// configuration (campuses.is_main); with none chosen, All campuses is the
 // honest answer rather than a guess.
 assert_true(
     $adminCampuses['defaultCampusId'] === null,

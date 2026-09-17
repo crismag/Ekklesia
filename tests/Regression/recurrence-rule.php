@@ -102,7 +102,7 @@ $leaks = array_filter($sentences, static fn (string $s): bool =>
 check('no sentence leaks the stored representation', $leaks === [], json_encode(array_values($leaks)));
 check('every sentence is non-empty', count(array_filter($sentences)) === count($sentences));
 
-// A type the editor never offers may still be in the column from ChurchCRM.
+// A type the editor never offers may still be in the column from migrated data.
 check('a yearly rule read back from the database is still described',
     RecurrenceRule::describe(['repeat_frequency' => 'yearly']) === 'Every year');
 check('an unrecognised type degrades to "Repeats" rather than to nothing',

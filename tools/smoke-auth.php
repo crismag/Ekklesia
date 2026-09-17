@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Smoke check: portal auth round-trip.
  *
  * Usage:
- *   PORTAL_DB_USERNAME=...  PORTAL_DB_PASSWORD=...   \
+ *   MEMBERS_DB_USERNAME=... MEMBERS_DB_PASSWORD=...   \
  *   php tools/smoke-auth.php <email> <password>
  *
  * Steps:

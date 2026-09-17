@@ -177,7 +177,7 @@ final class PortalServiceProvider
 
     /**
      * Church identity/contact/location info, stored in portal-owned JSON
-     * (config/church-info.json). No ChurchCRM dependency.
+     * (config/church-info.json).
      */
     public static function makeChurchInfoService(): \App\Services\ChurchInfoService
     {
@@ -283,7 +283,7 @@ final class PortalServiceProvider
 
     /**
      * System user administration (user_accounts + role assignments). Direct-PDO on
-     * the portal DB, using the same PasswordHasher as login. No ChurchCRM dependency.
+     * the member database, using the same PasswordHasher as login.
      */
     public static function makeSystemUserService(): \App\Services\SystemUserService
     {

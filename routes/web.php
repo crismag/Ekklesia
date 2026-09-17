@@ -1134,7 +1134,7 @@ $webRoutes = [
     },
     'GET /admin/calendar'   => fn (array $req) => _adminSectionRender($req, 'admin-calendar.php',   $resolvePortalActor, $resolveCampusSelector),
     'GET /admin/events'     => fn (array $req) => _adminSectionRender($req, 'admin-events.php',     $resolvePortalActor, $resolveCampusSelector),
-    // People management — dashboard + searchable list (self-contained, no ChurchCRM).
+    // People management — dashboard + searchable list.
     'GET /admin/people' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         $basePath = (string) ($req['_base_path'] ?? '');

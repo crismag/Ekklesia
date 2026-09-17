@@ -1,6 +1,6 @@
 {
   "name": "christlikeness/church-portal",
-  "description": "Operational leader and member portal layered over ChurchCRM data.",
+  "description": "Ekklesia: people, ministries, calendar, serving schedules and visitor sign-ups for Christlikeness Church.",
   "type": "project",
   "license": "proprietary",
   "require": {

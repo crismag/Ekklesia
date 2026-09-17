@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Bootstrap a portal admin user.
  *
  * Usage:
- *   PORTAL_DB_USERNAME=...  PORTAL_DB_PASSWORD=...   \
+ *   MEMBERS_DB_USERNAME=... MEMBERS_DB_PASSWORD=...   \
  *   php tools/create-admin-user.php <email> <password> [<displayName>] [<personId>]
  *
  * Creates the user, assigns the 'admin' role (no scope = portal-wide admin),

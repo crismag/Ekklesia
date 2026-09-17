@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 /**
- * Product-invariant regression checks that do not need ChurchCRM.
+ * Product-invariant regression checks that do not need a database.
  *
  * Run: php tests/Regression/run.php
  */

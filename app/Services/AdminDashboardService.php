@@ -44,8 +44,8 @@ final class AdminDashboardService
         $family = $this->attempt(static fn () => PortalServiceProvider::makeFamilyAdminService()->stats(), []);
         $campus = $this->attempt(static fn () => PortalServiceProvider::makeCampusAdminService()->stats(), []);
         $users = $this->attempt(static fn () => PortalServiceProvider::makeSystemUserService()->list(), []);
-        // duplicateGroupCount() counts families sharing an identical fam_Name,
-        // which for ChurchCRM is essentially the surname — so it flags surname
+        // duplicateGroupCount() counts households sharing an identical name,
+        // which is essentially the surname — so it flags surname
         // collision, not duplication. Investigated against this data: all 37
         // flagged groups had disjoint member sets, no shared address and no
         // shared email. Reporting that as "37 possible duplicates" sends an
@@ -310,7 +310,6 @@ final class AdminDashboardService
             'APP_ENV' => $get('APP_ENV'),
             'APP_DEBUG' => $get('APP_DEBUG'),
             'PORTAL_BASE_PATH' => $get('PORTAL_BASE_PATH'),
-            'PORTAL_SOURCE_OF_TRUTH' => $get('PORTAL_SOURCE_OF_TRUTH'),
             'MEMBERS_DB' => $get('MEMBERS_DB_DATABASE'),
             'PHP' => PHP_VERSION,
         ];
