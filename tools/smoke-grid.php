@@ -10,10 +10,7 @@ declare(strict_types=1);
  * full permissions for the requested ministry.
  *
  * Usage:
- *   CHURCHCRM_DB_HOST=...   \
- *   CHURCHCRM_DB_DATABASE=... \
- *   CHURCHCRM_DB_USERNAME=... \
- *   CHURCHCRM_DB_PASSWORD=... \
+ *   MEMBERS_DB_DATABASE=... MEMBERS_DB_USERNAME=... MEMBERS_DB_PASSWORD=... \
  *   php tools/smoke-grid.php [ministryId=4] [start=YYYY-MM-DD] [end=YYYY-MM-DD]
  *
  * Falls back to .env in the project root if env vars aren't already set.

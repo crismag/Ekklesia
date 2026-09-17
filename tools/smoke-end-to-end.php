@@ -12,8 +12,7 @@ declare(strict_types=1);
  *   SqlScheduleAdapter (member DB) ← ScheduleService.getScheduleGrid
  *
  * Usage:
- *   PORTAL_DB_USERNAME=...    PORTAL_DB_PASSWORD=...   \
- *   CHURCHCRM_DB_USERNAME=... CHURCHCRM_DB_PASSWORD=...   \
+ *   MEMBERS_DB_USERNAME=... MEMBERS_DB_PASSWORD=... \
  *   php tools/smoke-end-to-end.php <email> <password> <ministryId> <start> <end>
  *
  * Example:
