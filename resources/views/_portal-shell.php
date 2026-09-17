@@ -643,7 +643,11 @@ if (!function_exists('portal_shell_styles')) {
 @media(max-width:640px){.portal-brand-text{display:none}}
 /* On desktop the sidebar carries the brand; the bar says where you are. */
 @media(min-width:1024px){.topbar-brand{display:none}}
-.topbar-context{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:0 14px;line-height:1.2}
+.topbar-brand{grid-column:1}
+/* Explicit columns: on desktop the brand cell is hidden, and auto-placement
+   would otherwise slide the actions into the flexible middle column. */
+.topbar-context{grid-column:2;display:flex;flex-direction:column;justify-content:center;min-width:0;padding:0 14px;line-height:1.2}
+.topbar-actions{grid-column:3}
 .topbar-context-ws{font-size:12px;font-weight:700;letter-spacing:.03em;color:rgba(248,255,251,.72);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar-context-page{font-size:15px;font-weight:800;color:#f8fffb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -942,14 +946,14 @@ html.ek-rail .ek-collapse svg{transform:scaleX(-1)}
 .ek-page-desc{margin:var(--sp-1,4px) 0 0;font-size:14px;line-height:1.5;color:var(--muted,#627169);max-width:72ch}
 .ek-page-actions{display:flex;flex-wrap:wrap;gap:var(--sp-2,8px)}
 
-.ek-tabs{display:flex;gap:var(--sp-1,4px);overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--line,#d9e4dd);min-width:0}
+.ek-tabs{display:flex;gap:var(--sp-1,4px);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;box-shadow:inset 0 -1px 0 var(--line,#d9e4dd);min-width:0}
 .ek-tabs::-webkit-scrollbar{display:none}
 .ek-tab{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:40px;padding:0 var(--sp-3,12px);
-  margin-bottom:-1px;border-bottom:2px solid transparent;color:var(--muted,#627169);font-size:13px;font-weight:650;
+  border-bottom:2px solid transparent;color:var(--muted,#627169);font-size:13px;font-weight:650;
   text-decoration:none;white-space:nowrap}
 .ek-tab:hover{color:var(--ink,#17211b)}
 .ek-tab[aria-current]{color:var(--teal-ink,#117b6d);border-bottom-color:var(--teal,#117b6d)}
-.ek-tabs.is-sub{border-bottom:0;gap:var(--sp-2,8px)}
+.ek-tabs.is-sub{box-shadow:none;gap:var(--sp-2,8px);padding:1px 0}
 .ek-tabs.is-sub .ek-tab{min-height:32px;margin:0;border:1px solid var(--line,#d9e4dd);border-radius:var(--radius-full,999px);background:var(--paper,#fff)}
 .ek-tabs.is-sub .ek-tab[aria-current]{background:var(--soft,#eef4f0);border-color:var(--teal,#117b6d)}
 
