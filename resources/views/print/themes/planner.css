@@ -1,0 +1,47 @@
+/*
+ * Planner — a calendar with room left to write on.
+ *
+ * The reference was a warm, almost empty monthly planner: cream paper, a clean
+ * geometric title, and cells that are visibly *space* rather than containers of
+ * information. That is a genuine use — a family or a ministry lead prints the
+ * month and fills it in by hand — but it is not an excuse to hide the events
+ * that are already known, so the grid still sets everything it is given and
+ * simply leaves the day's lower half clear.
+ */
+
+.theme-planner .sheet { background: #fdf7f0; }
+.theme-planner .masthead {
+  border-bottom: 0; margin-bottom: 12pt; padding-bottom: 0;
+}
+.theme-planner .church {
+  font-size: 9pt; letter-spacing: .2em; font-weight: 800;
+}
+.theme-planner .period {
+  font-size: 30pt; font-weight: 800; letter-spacing: -.015em; text-transform: uppercase;
+}
+.theme-planner .period small { letter-spacing: .16em; font-size: 7.5pt; }
+
+.theme-planner .cal th {
+  border-bottom: 0; letter-spacing: .16em; color: #8a6a55;
+  font-size: calc(7pt * var(--ts, 1)); padding-bottom: 6pt;
+}
+/* Open rectangles on the paper colour: the cell reads as somewhere to write. */
+.theme-planner .cal td { border: .6pt solid #e2cdbb; background: #fffdfa; }
+.theme-planner .cal td.out { background: #f7ece2; }
+.theme-planner .cal td.wknd { background: #fffdfa; }
+.theme-planner .num { font-weight: 700; color: #8a5a3c; }
+.theme-planner .cal td.out .num { color: #ceb6a4; }
+
+/* Entries sit at the top of the cell whatever the tier, so the space below
+   them stays a usable, predictable writing area rather than a gap in a
+   centred composition. */
+.theme-planner .s-sparse .ents { justify-content: flex-start; }
+.theme-planner .t-showcase .ent { text-align: left; }
+.theme-planner .ent { border-left-width: 3pt; }
+.theme-planner .colophon { border-top: .6pt solid #e2cdbb; color: #8a6a55; }
+.theme-planner .doc-info { background: #fffdfa; border-color: #e2cdbb; }
+
+/* Room below the footer for the theme's foot decoration; see celebration.css. */
+
+/* See celebration.css: the band is reserved by the theme's safe zone. */
+.theme-planner .art { --art-h: 0.66in; --art-t: 8pt; --art-b: 2pt; }

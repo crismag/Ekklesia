@@ -1,0 +1,3064 @@
+{
+  "generatedAt": "2026-08-25T15:19:27.246Z",
+  "scanRoots": [
+    "resources/views",
+    "resources/css",
+    "printable",
+    "people_signup",
+    "events_rsvp",
+    "admin"
+  ],
+  "totals": {
+    "filesScanned": 102,
+    "htmlPages": 40,
+    "inlineStyleBlocks": 49,
+    "hardcodedColorLiterals": 1479,
+    "uniqueColorLiterals": 295,
+    "uniqueBreakpointPxValues": 59,
+    "minWidthDeclarations": 92,
+    "outlineNoneDeclarations": 12,
+    "focusSelectors": 33,
+    "pagesWithOwnViewportMeta": 39,
+    "pagesInheritingViewportMeta": 1,
+    "pagesMissingViewportMeta": 0,
+    "colorLiteralsCollidingWithThemeTokens": 14,
+    "colorLiteralOccurrencesCollidingWithThemeTokens": 416,
+    "neutralColorLiterals": 26,
+    "oneOffColorLiterals": 255,
+    "outlineNonePaired": 14,
+    "outlineNoneUnpaired": 1,
+    "classesUsedInFourOrMoreFiles": 50
+  },
+  "pagesMissingViewportMeta": [],
+  "pagesInheritingViewportMeta": [
+    "resources/views/admin.php"
+  ],
+  "colorClasses": {
+    "themeCollision": [
+      {
+        "value": "#fff",
+        "count": 215,
+        "matches": [
+          "--paper (forest)",
+          "--on-teal (forest)",
+          "--on-rose (forest)",
+          "--on-blue (forest)"
+        ]
+      },
+      {
+        "value": "#eef4f0",
+        "count": 38,
+        "matches": [
+          "--soft (forest)",
+          "--soft (compact)"
+        ]
+      },
+      {
+        "value": "#117b6d",
+        "count": 34,
+        "matches": [
+          "--teal (forest)",
+          "--teal-ink (forest)"
+        ]
+      },
+      {
+        "value": "#123b31",
+        "count": 28,
+        "matches": [
+          "--deep (forest)",
+          "--gradient-mid (forest)",
+          "--deep (compact)",
+          "--gradient-mid (compact)"
+        ]
+      },
+      {
+        "value": "#d9e4dd",
+        "count": 25,
+        "matches": [
+          "--line (forest)",
+          "--line (compact)"
+        ]
+      },
+      {
+        "value": "#17211b",
+        "count": 25,
+        "matches": [
+          "--ink (forest)",
+          "--ink (compact)"
+        ]
+      },
+      {
+        "value": "#0c2f28",
+        "count": 20,
+        "matches": [
+          "--gradient-top (forest)",
+          "--gradient-top (compact)"
+        ]
+      },
+      {
+        "value": "#627169",
+        "count": 15,
+        "matches": [
+          "--muted (forest)",
+          "--muted (compact)"
+        ]
+      },
+      {
+        "value": "#f7faf8",
+        "count": 5,
+        "matches": [
+          "--bg (forest)"
+        ]
+      },
+      {
+        "value": "#b84957",
+        "count": 4,
+        "matches": [
+          "--rose (forest)",
+          "--rose-ink (forest)"
+        ]
+      },
+      {
+        "value": "#92651c",
+        "count": 3,
+        "matches": [
+          "--gold-ink (forest)"
+        ]
+      },
+      {
+        "value": "#c48725",
+        "count": 2,
+        "matches": [
+          "--gold (forest)",
+          "--gold (warm)"
+        ]
+      },
+      {
+        "value": "#ffffff",
+        "count": 1,
+        "matches": [
+          "--paper (forest)",
+          "--on-teal (forest)",
+          "--on-rose (forest)",
+          "--on-blue (forest)"
+        ]
+      },
+      {
+        "value": "#276a9f",
+        "count": 1,
+        "matches": [
+          "--blue (forest)",
+          "--blue-ink (forest)"
+        ]
+      }
+    ],
+    "neutral": [
+      {
+        "value": "#fbfdfc",
+        "count": 33
+      },
+      {
+        "value": "#edf2ef",
+        "count": 25
+      },
+      {
+        "value": "#000",
+        "count": 10
+      },
+      {
+        "value": "#f1f3f5",
+        "count": 10
+      },
+      {
+        "value": "#f8fafb",
+        "count": 7
+      },
+      {
+        "value": "#f7fbf9",
+        "count": 3
+      },
+      {
+        "value": "#fafafa",
+        "count": 3
+      },
+      {
+        "value": "#f6f8fa",
+        "count": 3
+      },
+      {
+        "value": "#eef0f2",
+        "count": 2
+      },
+      {
+        "value": "#fcfdfc",
+        "count": 2
+      },
+      {
+        "value": "#fbfdfb",
+        "count": 1
+      },
+      {
+        "value": "#f2f7f4",
+        "count": 1
+      },
+      {
+        "value": "#f1f6f3",
+        "count": 1
+      },
+      {
+        "value": "#f5f9f7",
+        "count": 1
+      },
+      {
+        "value": "#eee",
+        "count": 1
+      },
+      {
+        "value": "#ccc",
+        "count": 1
+      },
+      {
+        "value": "#c8c8c8",
+        "count": 1
+      },
+      {
+        "value": "#fafdfb",
+        "count": 1
+      },
+      {
+        "value": "#e5e7ea",
+        "count": 1
+      },
+      {
+        "value": "#fafbfc",
+        "count": 1
+      },
+      {
+        "value": "#f7f8fa",
+        "count": 1
+      },
+      {
+        "value": "#333",
+        "count": 1
+      },
+      {
+        "value": "#bbb",
+        "count": 1
+      },
+      {
+        "value": "#eef1ef",
+        "count": 1
+      },
+      {
+        "value": "#fafcfb",
+        "count": 1
+      },
+      {
+        "value": "#fbfdff",
+        "count": 1
+      }
+    ],
+    "oneOff": [
+      {
+        "value": "#f8fffb",
+        "count": 44
+      },
+      {
+        "value": "#b3261e",
+        "count": 40
+      },
+      {
+        "value": "#0c5a45",
+        "count": 37
+      },
+      {
+        "value": "#5c6b63",
+        "count": 33
+      },
+      {
+        "value": "#1a7a3a",
+        "count": 30
+      },
+      {
+        "value": "#c7d4cd",
+        "count": 25
+      },
+      {
+        "value": "#1b2a24",
+        "count": 20
+      },
+      {
+        "value": "rgba(255,255,255,.1)",
+        "count": 19
+      },
+      {
+        "value": "#e6f7ec",
+        "count": 19
+      },
+      {
+        "value": "#fdecea",
+        "count": 19
+      },
+      {
+        "value": "rgba(255,255,255,.24)",
+        "count": 18
+      },
+      {
+        "value": "#eef2f5",
+        "count": 18
+      },
+      {
+        "value": "#dbe4ec",
+        "count": 16
+      },
+      {
+        "value": "#0f4e97",
+        "count": 16
+      },
+      {
+        "value": "#f3c0bb",
+        "count": 13
+      },
+      {
+        "value": "#b7e3c6",
+        "count": 12
+      },
+      {
+        "value": "#137a5f",
+        "count": 12
+      },
+      {
+        "value": "#57606a",
+        "count": 12
+      },
+      {
+        "value": "rgba(255,255,255,.22)",
+        "count": 11
+      },
+      {
+        "value": "rgba(27,50,40,.08)",
+        "count": 10
+      },
+      {
+        "value": "rgba(255,255,255,.12)",
+        "count": 10
+      },
+      {
+        "value": "#66756d",
+        "count": 9
+      },
+      {
+        "value": "rgba(248,255,251,.78)",
+        "count": 8
+      },
+      {
+        "value": "rgba(248,255,251,.72)",
+        "count": 7
+      },
+      {
+        "value": "rgba(28,48,39,.08)",
+        "count": 7
+      },
+      {
+        "value": "#e8f1fb",
+        "count": 7
+      },
+      {
+        "value": "rgba(27,50,40,.06)",
+        "count": 6
+      },
+      {
+        "value": "#0e6a5e",
+        "count": 6
+      },
+      {
+        "value": "#0e3528",
+        "count": 6
+      },
+      {
+        "value": "#8a5a00",
+        "count": 6
+      },
+      {
+        "value": "#8ef0c6",
+        "count": 6
+      },
+      {
+        "value": "rgba(142,240,198,.12)",
+        "count": 6
+      },
+      {
+        "value": "#82071e",
+        "count": 6
+      },
+      {
+        "value": "rgba(27,50,40,.1)",
+        "count": 6
+      },
+      {
+        "value": "#5b6d8a",
+        "count": 6
+      },
+      {
+        "value": "#8c959f",
+        "count": 6
+      },
+      {
+        "value": "#1a6b4a",
+        "count": 5
+      },
+      {
+        "value": "#7a5400",
+        "count": 5
+      },
+      {
+        "value": "#fff8e6",
+        "count": 5
+      },
+      {
+        "value": "#ecdcc8",
+        "count": 5
+      },
+      {
+        "value": "#f0c3bd",
+        "count": 5
+      },
+      {
+        "value": "rgba(248,255,251,.8)",
+        "count": 5
+      },
+      {
+        "value": "#ffebe9",
+        "count": 5
+      },
+      {
+        "value": "#ffc1ba",
+        "count": 5
+      },
+      {
+        "value": "rgba(28,48,39,.16)",
+        "count": 5
+      },
+      {
+        "value": "#d0d7de",
+        "count": 5
+      },
+      {
+        "value": "#1f2328",
+        "count": 5
+      },
+      {
+        "value": "#eaeef2",
+        "count": 5
+      },
+      {
+        "value": "#bcd6f5",
+        "count": 5
+      },
+      {
+        "value": "#7a1c16",
+        "count": 5
+      },
+      {
+        "value": "#fff4d4",
+        "count": 4
+      },
+      {
+        "value": "#fff5f5",
+        "count": 4
+      },
+      {
+        "value": "#f3c7c7",
+        "count": 4
+      },
+      {
+        "value": "rgba(17,123,109,.18)",
+        "count": 4
+      },
+      {
+        "value": "rgba(255,255,255,.14)",
+        "count": 4
+      },
+      {
+        "value": "#f0f7f3",
+        "count": 4
+      },
+      {
+        "value": "#fffaf2",
+        "count": 4
+      },
+      {
+        "value": "#dfcbb3",
+        "count": 4
+      },
+      {
+        "value": "#eceff3",
+        "count": 4
+      },
+      {
+        "value": "#5a6b7b",
+        "count": 4
+      },
+      {
+        "value": "#eafaf3",
+        "count": 4
+      },
+      {
+        "value": "rgba(3,20,13,.16)",
+        "count": 4
+      },
+      {
+        "value": "#b64d4d",
+        "count": 4
+      },
+      {
+        "value": "#e6efe8",
+        "count": 4
+      },
+      {
+        "value": "#0f2f28",
+        "count": 4
+      },
+      {
+        "value": "rgba(28,48,39,.07)",
+        "count": 4
+      },
+      {
+        "value": "#c8d0da",
+        "count": 4
+      },
+      {
+        "value": "#1e40af",
+        "count": 4
+      },
+      {
+        "value": "#dbeafe",
+        "count": 4
+      },
+      {
+        "value": "#10003",
+        "count": 4
+      },
+      {
+        "value": "#c2d2c9",
+        "count": 4
+      },
+      {
+        "value": "#f3e0a8",
+        "count": 3
+      },
+      {
+        "value": "#7c5b07",
+        "count": 3
+      },
+      {
+        "value": "rgba(255,255,255,.18)",
+        "count": 3
+      },
+      {
+        "value": "#dde8e2",
+        "count": 3
+      },
+      {
+        "value": "rgba(255,255,255,.26)",
+        "count": 3
+      },
+      {
+        "value": "#7b2445",
+        "count": 3
+      },
+      {
+        "value": "#765f4b",
+        "count": 3
+      },
+      {
+        "value": "#10227",
+        "count": 3
+      },
+      {
+        "value": "rgba(255,255,255,.13)",
+        "count": 3
+      },
+      {
+        "value": "rgba(255,255,255,.25)",
+        "count": 3
+      },
+      {
+        "value": "rgba(255,255,255,.82)",
+        "count": 3
+      },
+      {
+        "value": "rgba(248,255,251,.82)",
+        "count": 3
+      },
+      {
+        "value": "#e8eef6",
+        "count": 3
+      },
+      {
+        "value": "#254d74",
+        "count": 3
+      },
+      {
+        "value": "#0969da",
+        "count": 3
+      },
+      {
+        "value": "#f5faff",
+        "count": 3
+      },
+      {
+        "value": "#93c5fd",
+        "count": 3
+      },
+      {
+        "value": "#78350f",
+        "count": 3
+      },
+      {
+        "value": "#fef9c3",
+        "count": 3
+      },
+      {
+        "value": "#991b1b",
+        "count": 3
+      },
+      {
+        "value": "#fee2e2",
+        "count": 3
+      },
+      {
+        "value": "#d9e2ec",
+        "count": 3
+      },
+      {
+        "value": "#9656",
+        "count": 3
+      },
+      {
+        "value": "#5a6976",
+        "count": 2
+      },
+      {
+        "value": "rgba(12,40,30,.18)",
+        "count": 2
+      },
+      {
+        "value": "#4ade80",
+        "count": 2
+      },
+      {
+        "value": "rgba(255,255,255,.07)",
+        "count": 2
+      },
+      {
+        "value": "rgba(9,25,20,.22)",
+        "count": 2
+      },
+      {
+        "value": "#1a2e26",
+        "count": 2
+      },
+      {
+        "value": "rgba(255,255,255,.2)",
+        "count": 2
+      },
+      {
+        "value": "rgba(255,255,255,.38)",
+        "count": 2
+      },
+      {
+        "value": "#fff4e6",
+        "count": 2
+      },
+      {
+        "value": "#fffbe6",
+        "count": 2
+      },
+      {
+        "value": "#f0a500",
+        "count": 2
+      },
+      {
+        "value": "#128247",
+        "count": 2
+      },
+      {
+        "value": "#8a5d9d",
+        "count": 2
+      },
+      {
+        "value": "#8b6a35",
+        "count": 2
+      },
+      {
+        "value": "rgba(248,255,251,.65)",
+        "count": 2
+      },
+      {
+        "value": "#c8d7d0",
+        "count": 2
+      },
+      {
+        "value": "#f4fffb",
+        "count": 2
+      },
+      {
+        "value": "#1c5b49",
+        "count": 2
+      },
+      {
+        "value": "#f0c4c4",
+        "count": 2
+      },
+      {
+        "value": "#7a2222",
+        "count": 2
+      },
+      {
+        "value": "#dff5e8",
+        "count": 2
+      },
+      {
+        "value": "#8dd2ad",
+        "count": 2
+      },
+      {
+        "value": "#166534",
+        "count": 2
+      },
+      {
+        "value": "#1f6feb",
+        "count": 2
+      },
+      {
+        "value": "#e7f3ff",
+        "count": 2
+      },
+      {
+        "value": "#cf222e",
+        "count": 2
+      },
+      {
+        "value": "#5b21b6",
+        "count": 2
+      },
+      {
+        "value": "#ede9fe",
+        "count": 2
+      },
+      {
+        "value": "#f59e0b",
+        "count": 2
+      },
+      {
+        "value": "#fca5a5",
+        "count": 2
+      },
+      {
+        "value": "#6b7a72",
+        "count": 2
+      },
+      {
+        "value": "#c5d2de",
+        "count": 2
+      },
+      {
+        "value": "#e5c76b",
+        "count": 2
+      },
+      {
+        "value": "#e6f6ee",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.12)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.4)",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.3)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.45)",
+        "count": 1
+      },
+      {
+        "value": "#1c6642",
+        "count": 1
+      },
+      {
+        "value": "rgba(9,25,20,.28)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.15)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.28)",
+        "count": 1
+      },
+      {
+        "value": "rgba(248,255,251,.62)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.09)",
+        "count": 1
+      },
+      {
+        "value": "rgba(9,25,20,.52)",
+        "count": 1
+      },
+      {
+        "value": "#6b8077",
+        "count": 1
+      },
+      {
+        "value": "rgba(9,25,20,.62)",
+        "count": 1
+      },
+      {
+        "value": "rgba(9,25,20,.3)",
+        "count": 1
+      },
+      {
+        "value": "rgba(9,25,20,.24)",
+        "count": 1
+      },
+      {
+        "value": "#fef3c7",
+        "count": 1
+      },
+      {
+        "value": "#92400e",
+        "count": 1
+      },
+      {
+        "value": "#fdf0d5",
+        "count": 1
+      },
+      {
+        "value": "#f0d48a",
+        "count": 1
+      },
+      {
+        "value": "#8a1f17",
+        "count": 1
+      },
+      {
+        "value": "#8599",
+        "count": 1
+      },
+      {
+        "value": "rgba(15,40,30,.14)",
+        "count": 1
+      },
+      {
+        "value": "#9662",
+        "count": 1
+      },
+      {
+        "value": "#9998",
+        "count": 1
+      },
+      {
+        "value": "#128065",
+        "count": 1
+      },
+      {
+        "value": "#128106",
+        "count": 1
+      },
+      {
+        "value": "#128465",
+        "count": 1
+      },
+      {
+        "value": "#128172",
+        "count": 1
+      },
+      {
+        "value": "#d6e4dc",
+        "count": 1
+      },
+      {
+        "value": "rgba(248,255,251,.75)",
+        "count": 1
+      },
+      {
+        "value": "#fff0f0",
+        "count": 1
+      },
+      {
+        "value": "rgba(0,0,0,.08)",
+        "count": 1
+      },
+      {
+        "value": "rgba(3,20,13,.12)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.08)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.06)",
+        "count": 1
+      },
+      {
+        "value": "#2b1d08",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.2)",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.4)",
+        "count": 1
+      },
+      {
+        "value": "#0d7c52",
+        "count": 1
+      },
+      {
+        "value": "#a64a13",
+        "count": 1
+      },
+      {
+        "value": "#1f5fa6",
+        "count": 1
+      },
+      {
+        "value": "#1f2c25",
+        "count": 1
+      },
+      {
+        "value": "#effaf3",
+        "count": 1
+      },
+      {
+        "value": "#fdf3ec",
+        "count": 1
+      },
+      {
+        "value": "#eef4fc",
+        "count": 1
+      },
+      {
+        "value": "#5d6c64",
+        "count": 1
+      },
+      {
+        "value": "#b8c8bf",
+        "count": 1
+      },
+      {
+        "value": "#1a4a3e",
+        "count": 1
+      },
+      {
+        "value": "#dffbed",
+        "count": 1
+      },
+      {
+        "value": "#bcd2c4",
+        "count": 1
+      },
+      {
+        "value": "rgba(27,50,40,.09)",
+        "count": 1
+      },
+      {
+        "value": "#dce9e3",
+        "count": 1
+      },
+      {
+        "value": "#d6f4e8",
+        "count": 1
+      },
+      {
+        "value": "#0e5c34",
+        "count": 1
+      },
+      {
+        "value": "#eef6ff",
+        "count": 1
+      },
+      {
+        "value": "#b3d4f0",
+        "count": 1
+      },
+      {
+        "value": "#1a4a77",
+        "count": 1
+      },
+      {
+        "value": "rgba(0,0,0,.12)",
+        "count": 1
+      },
+      {
+        "value": "rgba(12,40,30,.06)",
+        "count": 1
+      },
+      {
+        "value": "rgba(248,255,251,.9)",
+        "count": 1
+      },
+      {
+        "value": "rgba(244,255,251,.7)",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.22)",
+        "count": 1
+      },
+      {
+        "value": "rgba(55,43,31,.08)",
+        "count": 1
+      },
+      {
+        "value": "rgba(55,43,31,.14)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.48)",
+        "count": 1
+      },
+      {
+        "value": "#f5eadb",
+        "count": 1
+      },
+      {
+        "value": "rgba(248,255,251,.74)",
+        "count": 1
+      },
+      {
+        "value": "#2026",
+        "count": 1
+      },
+      {
+        "value": "rgba(27,50,40,.12)",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.78)",
+        "count": 1
+      },
+      {
+        "value": "#9fb3a8",
+        "count": 1
+      },
+      {
+        "value": "#7d9689",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.28)",
+        "count": 1
+      },
+      {
+        "value": "#f1f9f3",
+        "count": 1
+      },
+      {
+        "value": "#bee3c8",
+        "count": 1
+      },
+      {
+        "value": "#1f6135",
+        "count": 1
+      },
+      {
+        "value": "rgba(255,255,255,.84)",
+        "count": 1
+      },
+      {
+        "value": "#6f2b47",
+        "count": 1
+      },
+      {
+        "value": "#9aa9a1",
+        "count": 1
+      },
+      {
+        "value": "rgba(27,50,40,.07)",
+        "count": 1
+      },
+      {
+        "value": "#f8e8e8",
+        "count": 1
+      },
+      {
+        "value": "#8a2a2a",
+        "count": 1
+      },
+      {
+        "value": "#f8efe2",
+        "count": 1
+      },
+      {
+        "value": "#7c5417",
+        "count": 1
+      },
+      {
+        "value": "#7a4d00",
+        "count": 1
+      },
+      {
+        "value": "#821212",
+        "count": 1
+      },
+      {
+        "value": "rgba(9, 105, 218, 0.18)",
+        "count": 1
+      },
+      {
+        "value": "#1a7f37",
+        "count": 1
+      },
+      {
+        "value": "#0d6359",
+        "count": 1
+      },
+      {
+        "value": "#c4b5fd",
+        "count": 1
+      },
+      {
+        "value": "#6e7781",
+        "count": 1
+      },
+      {
+        "value": "#bfdbfe",
+        "count": 1
+      },
+      {
+        "value": "#9a6700",
+        "count": 1
+      },
+      {
+        "value": "#fff8c5",
+        "count": 1
+      },
+      {
+        "value": "#d4a72c",
+        "count": 1
+      },
+      {
+        "value": "rgba(9, 105, 218, 0.14)",
+        "count": 1
+      },
+      {
+        "value": "#1f2933",
+        "count": 1
+      },
+      {
+        "value": "#52606d",
+        "count": 1
+      },
+      {
+        "value": "#edf2f7",
+        "count": 1
+      },
+      {
+        "value": "#eef2f6",
+        "count": 1
+      },
+      {
+        "value": "#edf7ff",
+        "count": 1
+      },
+      {
+        "value": "#2680c2",
+        "count": 1
+      },
+      {
+        "value": "#fff7e6",
+        "count": 1
+      },
+      {
+        "value": "#f0b429",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.14)",
+        "count": 1
+      },
+      {
+        "value": "#86b6a3",
+        "count": 1
+      },
+      {
+        "value": "#d0dbd4",
+        "count": 1
+      },
+      {
+        "value": "#2a3a33",
+        "count": 1
+      },
+      {
+        "value": "#eaf1fb",
+        "count": 1
+      },
+      {
+        "value": "#d9e8fb",
+        "count": 1
+      },
+      {
+        "value": "#cdd8d2",
+        "count": 1
+      },
+      {
+        "value": "rgba(240,250,245,.85)",
+        "count": 1
+      },
+      {
+        "value": "rgba(12,40,30,.12)",
+        "count": 1
+      },
+      {
+        "value": "#86a9d6",
+        "count": 1
+      },
+      {
+        "value": "#eef2f7",
+        "count": 1
+      },
+      {
+        "value": "#41506a",
+        "count": 1
+      },
+      {
+        "value": "rgba(238,245,255,.85)",
+        "count": 1
+      },
+      {
+        "value": "rgba(15,40,80,.14)",
+        "count": 1
+      },
+      {
+        "value": "rgba(17,123,109,.15)",
+        "count": 1
+      },
+      {
+        "value": "#128197",
+        "count": 1
+      },
+      {
+        "value": "#128336",
+        "count": 1
+      },
+      {
+        "value": "#128205",
+        "count": 1
+      },
+      {
+        "value": "#c2ccc7",
+        "count": 1
+      },
+      {
+        "value": "#b8860b",
+        "count": 1
+      },
+      {
+        "value": "#b3bbb6",
+        "count": 1
+      },
+      {
+        "value": "rgba(27,50,40,.16)",
+        "count": 1
+      },
+      {
+        "value": "rgba(12,47,40,.3)",
+        "count": 1
+      }
+    ]
+  },
+  "outlineNoneUnpaired": [
+    {
+      "file": "resources/views/_portal-shell.php",
+      "selector": "#portal-main"
+    }
+  ],
+  "breakpoints": [
+    {
+      "pixels": 24,
+      "occurrences": 2,
+      "files": [
+        "resources/views/ministries.php",
+        "printable/_printable-shell.php"
+      ]
+    },
+    {
+      "pixels": 36,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    },
+    {
+      "pixels": 44,
+      "occurrences": 3,
+      "files": [
+        "resources/views/calendar.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "pixels": 52,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    },
+    {
+      "pixels": 56,
+      "occurrences": 1,
+      "files": [
+        "resources/views/calendar.php"
+      ]
+    },
+    {
+      "pixels": 64,
+      "occurrences": 2,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-options.php"
+      ]
+    },
+    {
+      "pixels": 70,
+      "occurrences": 2,
+      "files": [
+        "resources/views/admin-people-import.php",
+        "people_signup/admin_review.php"
+      ]
+    },
+    {
+      "pixels": 78,
+      "occurrences": 2,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "pixels": 84,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    },
+    {
+      "pixels": 90,
+      "occurrences": 1,
+      "files": [
+        "resources/views/admin-people-import.php"
+      ]
+    },
+    {
+      "pixels": 96,
+      "occurrences": 3,
+      "files": [
+        "resources/views/admin-person-view.php",
+        "events_rsvp/admin_attendance.php",
+        "events_rsvp/assets/rsvp.css"
+      ]
+    },
+    {
+      "pixels": 100,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    },
+    {
+      "pixels": 104,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    },
+    {
+      "pixels": 110,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    },
+    {
+      "pixels": 120,
+      "occurrences": 4,
+      "files": [
+        "resources/views/admin-families.php",
+        "resources/views/admin-people.php",
+        "resources/views/schedule-editor.php",
+        "printable/_printable-shell.php"
+      ]
+    },
+    {
+      "pixels": 130,
+      "occurrences": 3,
+      "files": [
+        "resources/views/admin-users.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 132,
+      "occurrences": 4,
+      "files": [
+        "resources/views/calendar-settings.php",
+        "resources/views/events-list.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php"
+      ]
+    },
+    {
+      "pixels": 140,
+      "occurrences": 2,
+      "files": [
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-people-import.php"
+      ]
+    },
+    {
+      "pixels": 148,
+      "occurrences": 1,
+      "files": [
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 150,
+      "occurrences": 2,
+      "files": [
+        "resources/views/people.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "pixels": 160,
+      "occurrences": 4,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 180,
+      "occurrences": 9,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/events-list.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 188,
+      "occurrences": 4,
+      "files": [
+        "resources/views/calendar.php",
+        "resources/views/events-list.php",
+        "resources/views/index.php",
+        "resources/views/ministry-dashboard.php"
+      ]
+    },
+    {
+      "pixels": 190,
+      "occurrences": 2,
+      "files": [
+        "resources/views/admin-person-view.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 200,
+      "occurrences": 5,
+      "files": [
+        "resources/views/admin-options.php",
+        "resources/views/person-detail.php",
+        "resources/views/schedule-editor.php",
+        "printable/birthdays.php"
+      ]
+    },
+    {
+      "pixels": 220,
+      "occurrences": 6,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/roster-editor.php",
+        "printable/_printable-shell.php",
+        "printable/events.php",
+        "people_signup/admin_review.php"
+      ]
+    },
+    {
+      "pixels": 230,
+      "occurrences": 2,
+      "files": [
+        "resources/views/person-detail.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "pixels": 240,
+      "occurrences": 1,
+      "files": [
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 320,
+      "occurrences": 1,
+      "files": [
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "pixels": 360,
+      "occurrences": 1,
+      "files": [
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 420,
+      "occurrences": 3,
+      "files": [
+        "resources/views/ministry-chooser.php",
+        "resources/css/app.css",
+        "people_signup/assets/signup.css"
+      ]
+    },
+    {
+      "pixels": 480,
+      "occurrences": 1,
+      "files": [
+        "resources/views/admin-person-edit.php"
+      ]
+    },
+    {
+      "pixels": 520,
+      "occurrences": 3,
+      "files": [
+        "resources/views/calendar.php",
+        "resources/views/ministry-chooser.php",
+        "resources/views/password-change.php"
+      ]
+    },
+    {
+      "pixels": 540,
+      "occurrences": 1,
+      "files": [
+        "resources/views/events-detail.php"
+      ]
+    },
+    {
+      "pixels": 560,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_admin-shell.php"
+      ]
+    },
+    {
+      "pixels": 600,
+      "occurrences": 1,
+      "files": [
+        "resources/views/admin-family-edit.php"
+      ]
+    },
+    {
+      "pixels": 640,
+      "occurrences": 14,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-outreach.php",
+        "resources/views/admin-users.php",
+        "resources/views/index.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php",
+        "resources/views/schedule-editor.php",
+        "events_rsvp/admin_attendance.php"
+      ]
+    },
+    {
+      "pixels": 650,
+      "occurrences": 2,
+      "files": [
+        "resources/views/index.php",
+        "resources/views/login.php"
+      ]
+    },
+    {
+      "pixels": 670,
+      "occurrences": 1,
+      "files": [
+        "resources/views/ministry-dashboard.php"
+      ]
+    },
+    {
+      "pixels": 700,
+      "occurrences": 2,
+      "files": [
+        "resources/views/availability.php",
+        "resources/views/ministry-dashboard.php"
+      ]
+    },
+    {
+      "pixels": 720,
+      "occurrences": 8,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-people.php",
+        "resources/views/admin-person-edit.php",
+        "resources/views/availability.php",
+        "resources/views/events-list.php",
+        "resources/views/my-schedule.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "pixels": 760,
+      "occurrences": 13,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/ministry-chooser.php",
+        "resources/views/people.php",
+        "resources/views/person-detail.php"
+      ]
+    },
+    {
+      "pixels": 800,
+      "occurrences": 3,
+      "files": [
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "pixels": 820,
+      "occurrences": 12,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/account.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/index.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "pixels": 821,
+      "occurrences": 2,
+      "files": [
+        "resources/views/calendar.php",
+        "resources/views/index.php"
+      ]
+    },
+    {
+      "pixels": 840,
+      "occurrences": 1,
+      "files": [
+        "resources/views/admin-hero.php"
+      ]
+    },
+    {
+      "pixels": 860,
+      "occurrences": 2,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/events-detail.php"
+      ]
+    },
+    {
+      "pixels": 880,
+      "occurrences": 6,
+      "files": [
+        "resources/views/_admin-shell.php",
+        "resources/views/_portal-shell.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/docs.php"
+      ]
+    },
+    {
+      "pixels": 900,
+      "occurrences": 7,
+      "files": [
+        "resources/views/_admin-shell.php",
+        "resources/views/_portal-shell.php",
+        "resources/views/ministries.php",
+        "resources/views/ministry-dashboard.php"
+      ]
+    },
+    {
+      "pixels": 920,
+      "occurrences": 1,
+      "files": [
+        "resources/views/my-schedule.php"
+      ]
+    },
+    {
+      "pixels": 980,
+      "occurrences": 4,
+      "files": [
+        "resources/views/docs/leader.php",
+        "resources/views/docs/member.php",
+        "resources/views/docs/shortcuts.php",
+        "resources/views/iot.php"
+      ]
+    },
+    {
+      "pixels": 1000,
+      "occurrences": 2,
+      "files": [
+        "resources/views/index.php",
+        "resources/views/ministry-dashboard.php"
+      ]
+    },
+    {
+      "pixels": 1023,
+      "occurrences": 4,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/docs.php",
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "pixels": 1024,
+      "occurrences": 1,
+      "files": [
+        "resources/views/docs.php"
+      ]
+    },
+    {
+      "pixels": 1080,
+      "occurrences": 3,
+      "files": [
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php"
+      ]
+    },
+    {
+      "pixels": 1100,
+      "occurrences": 2,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/index.php"
+      ]
+    },
+    {
+      "pixels": 1120,
+      "occurrences": 1,
+      "files": [
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "pixels": 1180,
+      "occurrences": 2,
+      "files": [
+        "resources/views/index.php",
+        "resources/css/app.css"
+      ]
+    },
+    {
+      "pixels": 1200,
+      "occurrences": 1,
+      "files": [
+        "resources/views/_portal-shell.php"
+      ]
+    }
+  ],
+  "topColorLiterals": [
+    {
+      "value": "#fff",
+      "count": 215
+    },
+    {
+      "value": "#f8fffb",
+      "count": 44
+    },
+    {
+      "value": "#b3261e",
+      "count": 40
+    },
+    {
+      "value": "#eef4f0",
+      "count": 38
+    },
+    {
+      "value": "#0c5a45",
+      "count": 37
+    },
+    {
+      "value": "#117b6d",
+      "count": 34
+    },
+    {
+      "value": "#fbfdfc",
+      "count": 33
+    },
+    {
+      "value": "#5c6b63",
+      "count": 33
+    },
+    {
+      "value": "#1a7a3a",
+      "count": 30
+    },
+    {
+      "value": "#123b31",
+      "count": 28
+    },
+    {
+      "value": "#d9e4dd",
+      "count": 25
+    },
+    {
+      "value": "#17211b",
+      "count": 25
+    },
+    {
+      "value": "#c7d4cd",
+      "count": 25
+    },
+    {
+      "value": "#edf2ef",
+      "count": 25
+    },
+    {
+      "value": "#0c2f28",
+      "count": 20
+    },
+    {
+      "value": "#1b2a24",
+      "count": 20
+    },
+    {
+      "value": "rgba(255,255,255,.1)",
+      "count": 19
+    },
+    {
+      "value": "#e6f7ec",
+      "count": 19
+    },
+    {
+      "value": "#fdecea",
+      "count": 19
+    },
+    {
+      "value": "rgba(255,255,255,.24)",
+      "count": 18
+    },
+    {
+      "value": "#eef2f5",
+      "count": 18
+    },
+    {
+      "value": "#dbe4ec",
+      "count": 16
+    },
+    {
+      "value": "#0f4e97",
+      "count": 16
+    },
+    {
+      "value": "#627169",
+      "count": 15
+    },
+    {
+      "value": "#f3c0bb",
+      "count": 13
+    },
+    {
+      "value": "#b7e3c6",
+      "count": 12
+    },
+    {
+      "value": "#137a5f",
+      "count": 12
+    },
+    {
+      "value": "#57606a",
+      "count": 12
+    },
+    {
+      "value": "rgba(255,255,255,.22)",
+      "count": 11
+    },
+    {
+      "value": "rgba(27,50,40,.08)",
+      "count": 10
+    },
+    {
+      "value": "rgba(255,255,255,.12)",
+      "count": 10
+    },
+    {
+      "value": "#000",
+      "count": 10
+    },
+    {
+      "value": "#f1f3f5",
+      "count": 10
+    },
+    {
+      "value": "#66756d",
+      "count": 9
+    },
+    {
+      "value": "rgba(248,255,251,.78)",
+      "count": 8
+    },
+    {
+      "value": "rgba(248,255,251,.72)",
+      "count": 7
+    },
+    {
+      "value": "rgba(28,48,39,.08)",
+      "count": 7
+    },
+    {
+      "value": "#f8fafb",
+      "count": 7
+    },
+    {
+      "value": "#e8f1fb",
+      "count": 7
+    },
+    {
+      "value": "rgba(27,50,40,.06)",
+      "count": 6
+    }
+  ],
+  "duplicatedClassNames": [
+    {
+      "className": "admin-card",
+      "fileCount": 24,
+      "files": [
+        "resources/views/admin-calendar.php",
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-dashboard.php",
+        "resources/views/admin-events.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-links.php",
+        "resources/views/admin-maintenance.php"
+      ]
+    },
+    {
+      "className": "admin-card-body",
+      "fileCount": 24,
+      "files": [
+        "resources/views/admin-calendar.php",
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-dashboard.php",
+        "resources/views/admin-events.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-links.php",
+        "resources/views/admin-maintenance.php"
+      ]
+    },
+    {
+      "className": "admin-card-head",
+      "fileCount": 22,
+      "files": [
+        "resources/views/admin-calendar.php",
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-dashboard.php",
+        "resources/views/admin-events.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-links.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-me.php"
+      ]
+    },
+    {
+      "className": "shell",
+      "fileCount": 21,
+      "files": [
+        "resources/views/_admin-shell.php",
+        "resources/views/account.php",
+        "resources/views/admin-hero.php",
+        "resources/views/availability.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/docs.php",
+        "resources/views/events-detail.php",
+        "resources/views/events-list.php",
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/ministries.php"
+      ]
+    },
+    {
+      "className": "secondary",
+      "fileCount": 19,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/account.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/availability.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/ministries.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php",
+        "resources/views/person-detail.php",
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "className": "button",
+      "fileCount": 18,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/account.php",
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/admin-ministries.php",
+        "resources/views/admin-theme.php",
+        "resources/views/availability.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/ministries.php",
+        "resources/views/ministry-dashboard.php"
+      ]
+    },
+    {
+      "className": "panel",
+      "fileCount": 15,
+      "files": [
+        "resources/views/account.php",
+        "resources/views/admin-hero.php",
+        "resources/views/availability.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/events-detail.php",
+        "resources/views/events-list.php",
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php",
+        "resources/views/password-change.php"
+      ]
+    },
+    {
+      "className": "field",
+      "fileCount": 15,
+      "files": [
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/events-detail.php",
+        "resources/views/roster-editor.php",
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "events_rsvp/admin_access.php"
+      ]
+    },
+    {
+      "className": "card",
+      "fileCount": 15,
+      "files": [
+        "resources/views/docs/leader.php",
+        "resources/views/docs/member.php",
+        "resources/views/docs/shortcuts.php",
+        "resources/views/iot.php",
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "people_signup/submit_signup.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/admin_attendance.php"
+      ]
+    },
+    {
+      "className": "<?=",
+      "fileCount": 14,
+      "files": [
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/admin-people.php",
+        "resources/views/admin-person-edit.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/admin-users.php"
+      ]
+    },
+    {
+      "className": "muted",
+      "fileCount": 13,
+      "files": [
+        "resources/views/account.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-people.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/availability.php",
+        "resources/views/calendar.php",
+        "resources/views/events-list.php",
+        "resources/views/people.php",
+        "resources/views/person-detail.php"
+      ]
+    },
+    {
+      "className": "code",
+      "fileCount": 13,
+      "files": [
+        "resources/views/admin-calendar.php",
+        "resources/views/admin-dashboard.php",
+        "resources/views/admin-events.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-links.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-me.php",
+        "resources/views/admin-ministries.php",
+        "resources/views/admin-outreach.php",
+        "resources/views/admin-theme.php",
+        "resources/views/admin.php",
+        "people_signup/admin_access.php"
+      ]
+    },
+    {
+      "className": "$cls",
+      "fileCount": 12,
+      "files": [
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/admin-people.php",
+        "resources/views/admin-person-edit.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/admin-users.php"
+      ]
+    },
+    {
+      "className": "?>",
+      "fileCount": 12,
+      "files": [
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-church-info.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/admin-people.php",
+        "resources/views/admin-person-edit.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/admin-users.php"
+      ]
+    },
+    {
+      "className": "brand",
+      "fileCount": 12,
+      "files": [
+        "resources/views/calendar-settings.php",
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "people_signup/submit_signup.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/admin_attendance.php",
+        "events_rsvp/confirmation.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "wrap",
+      "fileCount": 12,
+      "files": [
+        "resources/views/schedule-editor.php",
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "people_signup/submit_signup.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/admin_attendance.php",
+        "events_rsvp/confirmation.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "btn",
+      "fileCount": 11,
+      "files": [
+        "resources/views/events-detail.php",
+        "resources/views/roster-editor.php",
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "people_signup/submit_signup.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "danger",
+      "fileCount": 10,
+      "files": [
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/admin-users.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/roster-editor.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "className": "alert",
+      "fileCount": 10,
+      "files": [
+        "resources/views/events-detail.php",
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/admin_attendance.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "?",
+      "fileCount": 9,
+      "files": [
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-hero.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/admin-theme.php",
+        "resources/views/calendar.php",
+        "resources/views/docs.php",
+        "resources/views/people.php",
+        "people_signup/admin_review.php",
+        "events_rsvp/event.php"
+      ]
+    },
+    {
+      "className": "hint",
+      "fileCount": 9,
+      "files": [
+        "people_signup/admin_access.php",
+        "people_signup/admin_review.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "sub",
+      "fileCount": 8,
+      "files": [
+        "resources/views/_admin-shell.php",
+        "resources/views/admin-hero.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/ministries.php",
+        "resources/views/password-change.php",
+        "printable/_printable-shell.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "className": "panel-head",
+      "fileCount": 8,
+      "files": [
+        "resources/views/account.php",
+        "resources/views/admin-hero.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/events-detail.php",
+        "resources/views/index.php",
+        "resources/views/my-schedule.php",
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "className": "empty",
+      "fileCount": 8,
+      "files": [
+        "resources/views/availability.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/index.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php",
+        "resources/views/people.php",
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "className": "card-body",
+      "fileCount": 8,
+      "files": [
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "foot",
+      "fileCount": 8,
+      "files": [
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/index.php",
+        "people_signup/submit_signup.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/confirmation.php",
+        "events_rsvp/event.php"
+      ]
+    },
+    {
+      "className": "portal-footer",
+      "fileCount": 7,
+      "files": [
+        "resources/views/_portal-shell.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/events-detail.php",
+        "resources/views/events-list.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/my-schedule.php"
+      ]
+    },
+    {
+      "className": "primary",
+      "fileCount": 7,
+      "files": [
+        "resources/views/admin-campuses.php",
+        "resources/views/admin-families.php",
+        "resources/views/admin-ministries.php",
+        "resources/views/admin-options.php",
+        "resources/views/admin-people.php",
+        "resources/views/admin-person-view.php",
+        "resources/views/admin-users.php"
+      ]
+    },
+    {
+      "className": "panel-body",
+      "fileCount": 6,
+      "files": [
+        "resources/views/account.php",
+        "resources/views/admin-hero.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/events-detail.php",
+        "resources/views/ministry-dashboard.php",
+        "resources/views/roster-editor.php"
+      ]
+    },
+    {
+      "className": "tile",
+      "fileCount": 6,
+      "files": [
+        "resources/views/admin-calendar.php",
+        "resources/views/admin-dashboard.php",
+        "resources/views/admin-events.php",
+        "resources/views/admin-me.php",
+        "resources/views/admin-ministries.php",
+        "resources/views/admin.php"
+      ]
+    },
+    {
+      "className": "tile-cta",
+      "fileCount": 6,
+      "files": [
+        "resources/views/admin-calendar.php",
+        "resources/views/admin-dashboard.php",
+        "resources/views/admin-events.php",
+        "resources/views/admin-me.php",
+        "resources/views/admin-ministries.php",
+        "resources/views/admin.php"
+      ]
+    },
+    {
+      "className": "pulse-dot",
+      "fileCount": 6,
+      "files": [
+        "resources/views/admin-hero.php",
+        "resources/views/availability.php",
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/my-schedule.php",
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "className": "meta",
+      "fileCount": 6,
+      "files": [
+        "resources/views/calendar.php",
+        "resources/views/my-schedule.php",
+        "resources/views/roster-editor.php",
+        "printable/_printable-shell.php",
+        "people_signup/admin_access.php",
+        "events_rsvp/admin_access.php"
+      ]
+    },
+    {
+      "className": "card-head",
+      "fileCount": 6,
+      "files": [
+        "people_signup/admin_access.php",
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/index.php",
+        "events_rsvp/admin_access.php",
+        "events_rsvp/event.php"
+      ]
+    },
+    {
+      "className": "error",
+      "fileCount": 6,
+      "files": [
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/includes/admin_auth.php",
+        "people_signup/index.php",
+        "events_rsvp/event.php",
+        "events_rsvp/includes/admin_auth.php"
+      ]
+    },
+    {
+      "className": "grid",
+      "fileCount": 5,
+      "files": [
+        "resources/views/account.php",
+        "resources/views/availability.php",
+        "resources/views/calendar-settings.php",
+        "resources/views/person-detail.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "className": "sec",
+      "fileCount": 5,
+      "files": [
+        "resources/views/admin-family-duplicates.php",
+        "resources/views/admin-family-edit.php",
+        "resources/views/admin-maintenance.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/admin-person-edit.php"
+      ]
+    },
+    {
+      "className": "read-only-banner",
+      "fileCount": 5,
+      "files": [
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/admin-theme.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "className": "actions-bar",
+      "fileCount": 5,
+      "files": [
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/admin-theme.php",
+        "admin/groups_and_ministries/ministries.php"
+      ]
+    },
+    {
+      "className": "hero",
+      "fileCount": 5,
+      "files": [
+        "resources/views/availability.php",
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/my-schedule.php",
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "className": "toolbar",
+      "fileCount": 5,
+      "files": [
+        "resources/views/calendar-settings.php",
+        "resources/views/calendar.php",
+        "resources/views/my-schedule.php",
+        "resources/views/people.php",
+        "resources/views/schedule-editor.php"
+      ]
+    },
+    {
+      "className": "field-row",
+      "fileCount": 4,
+      "files": [
+        "resources/views/account.php",
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php"
+      ]
+    },
+    {
+      "className": "tile-grid",
+      "fileCount": 4,
+      "files": [
+        "resources/views/admin-events.php",
+        "resources/views/admin-me.php",
+        "resources/views/admin-ministries.php",
+        "resources/views/admin.php"
+      ]
+    },
+    {
+      "className": "toast",
+      "fileCount": 4,
+      "files": [
+        "resources/views/admin-footer.php",
+        "resources/views/admin-header.php",
+        "resources/views/admin-hero.php",
+        "resources/views/admin-theme.php"
+      ]
+    },
+    {
+      "className": "===",
+      "fileCount": 4,
+      "files": [
+        "resources/views/admin-hero.php",
+        "resources/views/admin-people-import.php",
+        "resources/views/admin-theme.php",
+        "people_signup/admin_review.php"
+      ]
+    },
+    {
+      "className": "actions",
+      "fileCount": 4,
+      "files": [
+        "resources/views/calendar-settings.php",
+        "people_signup/admin_access.php",
+        "people_signup/submit_signup.php",
+        "events_rsvp/admin_access.php"
+      ]
+    },
+    {
+      "className": "hero-copy",
+      "fileCount": 4,
+      "files": [
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/my-schedule.php",
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "className": "lead",
+      "fileCount": 4,
+      "files": [
+        "resources/views/index.php",
+        "resources/views/login.php",
+        "resources/views/my-schedule.php",
+        "resources/views/people.php"
+      ]
+    },
+    {
+      "className": "pr-card",
+      "fileCount": 4,
+      "files": [
+        "printable/birthdays.php",
+        "printable/events.php",
+        "printable/index.php",
+        "printable/schedules.php"
+      ]
+    },
+    {
+      "className": "row2",
+      "fileCount": 4,
+      "files": [
+        "people_signup/advanced.php",
+        "people_signup/extra.php",
+        "people_signup/index.php",
+        "events_rsvp/event.php"
+      ]
+    }
+  ],
+  "heaviestFiles": [
+    {
+      "file": "resources/views/_portal-shell.php",
+      "styleBlocks": 4,
+      "hardcodedColors": 185,
+      "mediaQueries": 15,
+      "minWidthDeclarations": 12,
+      "outlineNone": 7,
+      "focusSelectors": 14,
+      "cssVariablesWithHex": 1
+    },
+    {
+      "file": "resources/views/schedule-editor.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 132,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 12,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/ministry-dashboard.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 68,
+      "mediaQueries": 4,
+      "minWidthDeclarations": 4,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/calendar.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 60,
+      "mediaQueries": 6,
+      "minWidthDeclarations": 8,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/index.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 56,
+      "mediaQueries": 4,
+      "minWidthDeclarations": 6,
+      "outlineNone": 0,
+      "focusSelectors": 1,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-person-view.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 49,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 3,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "people_signup/admin_review.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 49,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 3,
+      "outlineNone": 1,
+      "focusSelectors": 2,
+      "cssVariablesWithHex": 3
+    },
+    {
+      "file": "resources/views/admin-people-import.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 41,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 4,
+      "outlineNone": 0,
+      "focusSelectors": 2,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-users.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 39,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/people.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 37,
+      "mediaQueries": 4,
+      "minWidthDeclarations": 6,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-campuses.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 36,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/calendar-settings.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 35,
+      "mediaQueries": 3,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/roster-editor.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 35,
+      "mediaQueries": 3,
+      "minWidthDeclarations": 2,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-family-edit.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 33,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "events_rsvp/assets/rsvp.css",
+      "styleBlocks": 0,
+      "hardcodedColors": 33,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 0,
+      "outlineNone": 1,
+      "focusSelectors": 3,
+      "cssVariablesWithHex": 9
+    },
+    {
+      "file": "resources/views/admin-people.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 32,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-hero.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 31,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/my-schedule.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 29,
+      "mediaQueries": 2,
+      "minWidthDeclarations": 2,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-families.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 28,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/docs.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 28,
+      "mediaQueries": 4,
+      "minWidthDeclarations": 2,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 3
+    },
+    {
+      "file": "resources/views/ministries.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 28,
+      "mediaQueries": 4,
+      "minWidthDeclarations": 3,
+      "outlineNone": 0,
+      "focusSelectors": 1,
+      "cssVariablesWithHex": 11
+    },
+    {
+      "file": "resources/views/password-change.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 27,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 0,
+      "outlineNone": 1,
+      "focusSelectors": 1,
+      "cssVariablesWithHex": 8
+    },
+    {
+      "file": "people_signup/assets/signup.css",
+      "styleBlocks": 0,
+      "hardcodedColors": 26,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 1,
+      "focusSelectors": 3,
+      "cssVariablesWithHex": 9
+    },
+    {
+      "file": "resources/views/_admin-shell.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 25,
+      "mediaQueries": 2,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/person-detail.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 24,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 3,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-family-duplicates.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 23,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "printable/_printable-shell.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 23,
+      "mediaQueries": 2,
+      "minWidthDeclarations": 3,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 1
+    },
+    {
+      "file": "admin/groups_and_ministries/ministries.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 21,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 2,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-options.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 20,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 3,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/events-detail.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 20,
+      "mediaQueries": 2,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 3,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/events-list.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 18,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 3,
+      "outlineNone": 0,
+      "focusSelectors": 1,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "events_rsvp/admin_attendance.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 18,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 1,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-maintenance.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 17,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-person-edit.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 17,
+      "mediaQueries": 2,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/availability.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 16,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/login.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 15,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-church-info.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 14,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/css/app.css",
+      "styleBlocks": 0,
+      "hardcodedColors": 14,
+      "mediaQueries": 0,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 1,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/admin-outreach.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 11,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    },
+    {
+      "file": "resources/views/account.php",
+      "styleBlocks": 1,
+      "hardcodedColors": 10,
+      "mediaQueries": 1,
+      "minWidthDeclarations": 0,
+      "outlineNone": 0,
+      "focusSelectors": 0,
+      "cssVariablesWithHex": 0
+    }
+  ]
+}

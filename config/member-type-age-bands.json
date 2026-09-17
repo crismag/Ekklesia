@@ -1,0 +1,13 @@
+{
+  "_comment": "Age bands used to SUGGEST a member type for a person who has none. Never authoritative: the roster shows Trailblazer running 3-75 and Radical 0-35, and the types also turn on marital status and other affiliations, so a suggestion is a starting point for a person to confirm and nothing more. Only applied where the member type is empty; an existing value is never overwritten. Regenerate with tools/measure-member-type-ages.php after the roster changes materially.",
+  "_measured_on": "2026-08-26",
+  "_measured_from": "253 people, 244 with a birth year and a member type",
+  "bands": [
+    { "from": 0,  "to": 12,   "type": "G&A",         "observed": { "matching": 44, "total": 53 } },
+    { "from": 13, "to": 17,   "type": "Radical",     "observed": { "matching": 12, "total": 14 } },
+    { "from": 18, "to": 25,   "type": "Radical",     "observed": { "matching": 30, "total": 30 } },
+    { "from": 26, "to": 39,   "type": "Trailblazer", "observed": { "matching": 64, "total": 85 } },
+    { "from": 40, "to": 130,  "type": "Trailblazer", "observed": { "matching": 62, "total": 62 } }
+  ],
+  "_minimum_confidence": 0.7
+}

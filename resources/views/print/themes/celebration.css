@@ -1,0 +1,67 @@
+/*
+ * Celebration — birthdays, anniversaries and the children's calendar.
+ *
+ * This is the theme the adaptive cell was built for. On a birthday sheet most
+ * days are empty and the ones that are not carry a single name, so the old
+ * uniform 7.4pt row wasted almost the entire page. Here the cell becomes a
+ * small composition: rounded, softly filled when it has somebody in it, with
+ * the name set large and centred in the space the day is not otherwise using.
+ *
+ * The decoration is a separate layer (see .art in the shell) and carries no
+ * information whatsoever — the grid underneath is ordinary HTML text, so it
+ * reflows with the month, wraps long names, prints sharp and reads aloud.
+ */
+
+.theme-celebration .masthead { border-bottom: 0; margin-bottom: 10pt; padding-bottom: 0; }
+.theme-celebration .masthead-row { display: block; text-align: center; }
+.theme-celebration .church { font-size: 9pt; letter-spacing: .24em; font-weight: 800; }
+.theme-celebration .period {
+  text-align: center; font-size: 34pt; font-weight: 800; letter-spacing: -.02em; margin-top: 6pt;
+}
+.theme-celebration .period small { letter-spacing: .2em; font-size: 8pt; margin-top: 6pt; }
+
+/* Pills rather than a header rule — the weekday strip becomes part of the
+   design instead of a caption above it. */
+.theme-celebration .cal { border-spacing: 3pt; border-collapse: separate; }
+.theme-celebration .cal th {
+  border-bottom: 0; text-align: center; color: #fff; font-weight: 800;
+  background: var(--accent, #2f6b3c); border-radius: 999pt;
+  padding: 3.5pt 0; letter-spacing: .1em; font-size: calc(7pt * var(--ts, 1));
+}
+.theme-celebration .cal td {
+  border: .8pt solid #dfe7df; border-radius: 7pt; background: #fff;
+}
+.theme-celebration .cal td.wknd { background: #fbfdfb; }
+.theme-celebration .cal td.out { background: #f4f6f4; border-style: dashed; }
+.theme-celebration .cell { padding: 3.5pt 5pt 4pt; }
+.theme-celebration .num {
+  font-size: calc(9.5pt * var(--ts, 1)); font-weight: 700; opacity: .58; margin-bottom: 0;
+}
+
+/* A day with somebody on it is filled, so the month can be read at a glance
+   from across a hall before a single name is. The fill is a tint of the theme
+   accent rather than a fixed colour, so an accent change carries through. */
+.theme-celebration td:has(.s-sparse) { background: #f2f7f2; border-color: #cfe0d2; }
+.theme-celebration .s-sparse .num { opacity: .5; }
+
+.theme-celebration .ents { justify-content: center; }
+.theme-celebration .ent {
+  border-left: 0; padding-left: 0; text-align: center;
+}
+.theme-celebration .ent .t { font-weight: 800; letter-spacing: -.01em; color: #1d3a24; }
+.theme-celebration .ent .w { opacity: .75; font-weight: 600; }
+/* Category is carried by a tinted chip on the *secondary* line, never by
+   colour alone: this sheet gets photocopied like every other one. */
+.theme-celebration .t-showcase .ent .w,
+.theme-celebration .t-readable .ent .w { letter-spacing: .04em; }
+.theme-celebration .more { text-align: center; font-style: normal; font-weight: 700; }
+
+.theme-celebration .colophon { border-top: 0; }
+
+/* The artwork's foot band needs somewhere to be. Without this the sheet ends
+   at the colophon, the hedge is drawn over "Printed …", and decoration sits on
+   top of text — which is the one thing the safe zone exists to prevent. */
+
+/* The decorative band: as tall as the safe zone the grid was told to leave,
+   sitting above the colophon so no shape is ever drawn across the footer. */
+.theme-celebration .art { --art-h: 0.66in; --art-t: 8pt; --art-b: 2pt; }

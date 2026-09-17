@@ -1,0 +1,43 @@
+# Files that must never reach a live deployment.
+#
+# Written after tools/anonymize-dev-db.php was deployed to production and found
+# to run there: the host has APP_ENV=local and a loopback database, so the
+# environment and host gates both passed. The tool now requires an explicit
+# ANONYMIZE_ALLOW_DEV opt-in, but shipping a destructive development tool to a
+# live server is a second mistake on its own. Keep it off the server as well.
+.git/
+node_modules/
+.env
+.bak/
+*.bak
+reports/
+storage/private/*
+# Development-only tooling and harnesses
+tools/anonymize-dev-db.php
+tests/
+playwright.config.ts
+design-system/
+
+# Settings the portal writes at runtime.
+#
+# These are edited through the admin screens and live only on the server that
+# owns them. They were being shipped from the repository on every deploy, so a
+# change made in /admin/header survived until the next release and then
+# silently reverted — which is what kept removing Events from the main menu.
+#
+# The copies in the repository stay as the starting point for a new
+# installation; see docs/deploy/README.md.
+config/announcements.json
+config/holidays.json
+config/chrome.json
+config/church-info.json
+config/hero.json
+config/ministries.json
+config/people.json
+config/related-families.json
+config/theme.json
+
+# Server-owned deployment state. The maintenance flag is written on the server
+# by tools/deploy.sh and cleared there; syncing a local copy would either take
+# the site down or lift a gate that is still needed.
+storage/maintenance.flag

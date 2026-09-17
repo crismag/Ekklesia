@@ -1,0 +1,39 @@
+{
+    "_comment": "Site-wide header + footer overrides. Edit via /admin/header and /admin/footer. primaryNav is the SINGLE source of the portal's primary navigation (Phase 1) — page views no longer define their own. Daily-work tabs: Home, Calendar, Ministries, People, Events (once). Docs, Printables, My Schedule, Availability, Account, and Admin are overflow/drawer items unless an admin pins Docs in primaryNav.",
+    "header": {
+        "brandTitle": "Scheduler",
+        "brandSubtitle": "Campus-aware ministry operations",
+        "primaryNav": [
+            {
+                "label": "Home",
+                "href": "/",
+                "icon": "dashboard"
+            },
+            {
+                "label": "Calendar",
+                "href": "/calendar",
+                "icon": "calendar"
+            },
+            {
+                "label": "Ministries",
+                "href": "/ministries",
+                "icon": "ministry"
+            },
+            {
+                "label": "People",
+                "href": "/people",
+                "icon": "people"
+            },
+            {
+                "label": "Events",
+                "href": "/events",
+                "icon": "events"
+            }
+        ]
+    },
+    "footer": {
+        "leftText": "Church Portal",
+        "rightText": "Campus-aware ministry operations",
+        "minimal": true
+    }
+}

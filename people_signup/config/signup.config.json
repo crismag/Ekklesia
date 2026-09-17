@@ -1,0 +1,26 @@
+{
+  "app": {
+    "title": "Guest Sign-Up",
+    "church_name": "Christlikeness Church",
+    "tagline": "Welcome! Tell us a little about you."
+  },
+  "simple_fields": { "email": false, "phone": false, "gender": false },
+  "reason_options": [
+    "First-time guest",
+    "Returning guest",
+    "Invited by friend/family",
+    "Special event",
+    "Looking for a church home",
+    "Prayer / support",
+    "Other"
+  ],
+  "features": { "advanced_link": true, "require_reason": true, "require_birth_month_year": true, "extra_page": true },
+  "defaults": { "country": "Canada", "province": "Ontario" },
+  "admin_access": { "prefix": "ChristLikeness", "default_word": "Welcome", "default_days": 7 },
+  "member_types": { "1": "Radical", "2": "Trailblazer", "3": "G&A" },
+  "validation": { "max_name": 60, "max_city": 80 },
+  "messages": {
+    "success_title": "Thanks — you're signed in!",
+    "success_body": "We're so glad you're here. Someone from our team may reach out to welcome you."
+  }
+}

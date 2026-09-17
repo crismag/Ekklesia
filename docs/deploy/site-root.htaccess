@@ -1,0 +1,12 @@
+# Correct old browser-cached redirects that point to /public/...
+RedirectMatch 301 ^/public/(.+)$ /
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass church_portal and churchcrm subdirs to their own .htaccess
+    RewriteRule ^(church_portal|churchcrm)(/.*)? - [L]
+
+    # Redirect bare root to /church_portal
+    RewriteRule ^$ /church_portal [R=302,L]
+</IfModule>

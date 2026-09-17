@@ -1,0 +1,15 @@
+{
+    "pages": {
+        "board": true,
+        "directory": true
+    },
+    "excluded_ministries": [
+        "Bishops",
+        "Clergy",
+        "CrisTest"
+    ],
+    "excluded_groups": [],
+    "title": "Ministers of His Grace",
+    "subtitle": "We are therefore Christ’s ambassadors, as though God were making His appeal through us.",
+    "hero_lead": "Never be lacking in zeal, but keep your spiritual fervor, serving the Lord."
+}

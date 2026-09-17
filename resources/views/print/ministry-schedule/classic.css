@@ -1,0 +1,213 @@
+/* Classic Ministry Schedule.
+ *
+ * A designed sheet, so it is set in physical units: the canvas is 8.5in wide
+ * because that is what comes out of the printer, and the type is in points
+ * because a point is a real size and a pixel is a guess about a screen.
+ *
+ * Every colour is a variable on .ms-sheet. That is not tidiness for its own
+ * sake — a Christmas or Easter variant of this sheet is an obvious future ask,
+ * and it should be a block of six values rather than a search through a
+ * stylesheet.
+ */
+
+.ms-sheet {
+  --ms-primary:        #13307c;  /* card headings, title */
+  --ms-primary-dark:   #0d2258;
+  --ms-primary-light:  #a9c4ec;
+  --ms-accent:         #1e4fd8;  /* date, role labels */
+  --ms-border:         #b9cbe8;
+  --ms-stripe:         #eaf1fc;
+  --ms-text:           #12224f;
+  --ms-muted:          #5d6f96;
+  --ms-paper:          #ffffff;
+
+  --ms-gap:            0.145in;
+  --ms-pad:            0.36in;
+
+  position: relative;
+  box-sizing: border-box;
+  width: 8.5in;
+  min-height: 11in;
+  padding: var(--ms-pad);
+  background: var(--ms-paper);
+  color: var(--ms-text);
+  /* Print robustness before typographic preference: a church office PC may
+     have no network when somebody hits Print, and a sheet that silently falls
+     back to Times is not the document that was designed. Archivo is an
+     enhancement; everything after it is present on the machines that print. */
+  font-family: "Archivo", "Inter", "Helvetica Neue", "Segoe UI", Roboto,
+               system-ui, -apple-system, Arial, sans-serif;
+  /* Tabular-ish rendering is not wanted here, but consistent shaping is: this
+     stops the fallback stack from tracking letters apart. */
+  font-kerning: normal;
+  font-variant-ligatures: none;
+  overflow: hidden;
+}
+
+.ms-sheet *, .ms-sheet *::before, .ms-sheet *::after { box-sizing: border-box; }
+
+/* --- decorative corners ------------------------------------------------- */
+/* Behind everything and unclickable, so they can never take a click meant for
+   the text or push a card out of place. */
+.ms-corner { position: absolute; width: 1.75in; height: 1.75in; z-index: 0; pointer-events: none; }
+.ms-corner--tl { top: 0; left: 0; }
+.ms-corner--br { bottom: 0; right: 0; }
+
+.ms-head, .ms-columns, .ms-overflow, .ms-empty { position: relative; z-index: 1; }
+
+/* --- masthead ----------------------------------------------------------- */
+.ms-head { text-align: center; margin: 0 0 0.17in; }
+
+/* The strongest thing on the page by a wide margin, because it is what tells
+   somebody across the room what they are looking at. */
+.ms-title {
+  margin: 0;
+  font-size: 37pt;
+  line-height: 1.0;
+  font-weight: 800;
+  letter-spacing: -0.5pt;
+  color: var(--ms-primary);
+  text-transform: uppercase;
+  /* Long enough to matter: "MINISTRY SCHEDULE" must not wrap into three words
+     on one line and one on the next. */
+  text-wrap: balance;
+}
+.ms-date {
+  margin: 0.02in 0 0;
+  font-size: 23pt;
+  line-height: 1.04;
+  font-weight: 700;
+  letter-spacing: -0.2pt;
+  color: var(--ms-accent);
+  text-transform: uppercase;
+}
+.ms-service {
+  margin: 0.05in 0 0;
+  font-size: 10pt;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}
+
+/* --- three columns ------------------------------------------------------ */
+/* A grid of three real columns, each filled by the balancer. Not CSS columns:
+   those flow differently between browsers and again between screen and print,
+   and this sheet has to come out the same twice. */
+.ms-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ms-gap);
+  align-items: start;
+}
+.ms-column { display: grid; gap: var(--ms-gap); align-content: start; min-width: 0; }
+
+/* --- cards -------------------------------------------------------------- */
+.ms-card {
+  border: 0.75pt solid var(--ms-border);
+  border-radius: 3pt;
+  background: var(--ms-paper);
+  overflow: hidden;
+  /* A ministry split across a page break is the one layout failure that makes
+     the sheet useless — half of Facilities is worse than none of it. */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Unless the card is taller than the page. Refusing to break it then does not
+   make it fit; it moves the whole thing to the next sheet and wastes this one.
+   It breaks between duties, never inside one. */
+.ms-card--tall { break-inside: auto; page-break-inside: auto; }
+.ms-card--tall .ms-duty { break-inside: avoid; page-break-inside: avoid; }
+.ms-card--tall .ms-card-head { break-after: avoid; page-break-after: avoid; }
+
+.ms-card-head {
+  margin: 0;
+  padding: 4.2pt 6pt;
+  background: var(--ms-primary);
+  color: #fff;
+  font-size: 12pt;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+  /* A long ministry name wraps inside the bar rather than stretching the card
+     or spilling out of it. */
+  overflow-wrap: anywhere;
+}
+
+.ms-card-body { padding: 5pt 7pt 5.5pt; }
+
+/* --- a duty within a ministry ------------------------------------------- */
+.ms-duty + .ms-duty {
+  margin-top: 4.4pt;
+  padding-top: 3.6pt;
+  border-top: 0.5pt solid var(--ms-stripe);
+}
+
+/* Stronger than the names beneath it, so the eye can run down the roles. */
+.ms-role {
+  margin: 0 0 0.5pt;
+  font-size: 9.2pt;
+  line-height: 1.14;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ms-accent);
+  overflow-wrap: anywhere;
+}
+
+.ms-name {
+  margin: 0;
+  font-size: 10.2pt;
+  line-height: 1.26;
+  font-weight: 500;
+  color: var(--ms-text);
+  text-transform: uppercase;
+  /* Names are the payload. They wrap; they are never truncated and never
+     shrunk to fit. */
+  overflow-wrap: anywhere;
+  hyphens: none;
+}
+
+.ms-note {
+  margin: 0.5pt 0 0;
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}
+
+/* An unfilled slot says so in words. It is the most useful thing this sheet can
+   tell anyone before Sunday, so it is not merely a gap. */
+.ms-unfilled { color: var(--ms-muted); font-style: italic; text-transform: none; font-weight: 600; }
+
+/* --- flat cards: a ministry with no named roles -------------------------- */
+/* The reference shows both shapes. Gifts & Arrows is a plain list of names, and
+   the faint banding is what keeps four names from reading as one paragraph. */
+.ms-card--flat .ms-card-body { padding: 0; }
+.ms-card--flat .ms-name--row {
+  padding: 4pt 7pt;
+  border-bottom: 0.5pt solid var(--ms-stripe);
+}
+.ms-card--flat .ms-name--row:nth-child(odd) { background: var(--ms-stripe); }
+.ms-card--flat .ms-name--row:last-child { border-bottom: 0; }
+
+/* --- states ------------------------------------------------------------- */
+.ms-empty {
+  margin: 1in 0;
+  text-align: center;
+  font-size: 12pt;
+  color: var(--ms-muted);
+}
+.ms-overflow {
+  margin: 0.16in 0 0;
+  text-align: center;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ms-muted);
+}

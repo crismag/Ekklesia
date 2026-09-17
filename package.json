@@ -1,0 +1,23 @@
+{
+  "name": "church-portal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check vite.config.js && node --check resources/js/app.js && node --check resources/js/Components/Schedules/ScheduleGrid.js && node --check resources/js/Pages/Schedules/Index.js",
+    "build": "vite build",
+    "inventory:css": "node tools/css-debt-inventory.mjs",
+    "test:contracts": "node tests/Regression/source-contracts.mjs",
+    "test:e2e": "playwright test",
+    "test:regression-php": "php tests/Regression/run.php"
+  },
+  "dependencies": {
+    "@inertiajs/react": "^1.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "vite": "^7.3.2"
+  }
+}

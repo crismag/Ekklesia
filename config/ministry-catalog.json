@@ -1,0 +1,94 @@
+{
+  "serving": [
+    {
+      "name": "Admin",
+      "description": "Church administration team",
+      "aliases": ["Administration"]
+    },
+    {
+      "name": "Creatives",
+      "description": "Creative and design team",
+      "aliases": ["Creative"]
+    },
+    {
+      "name": "Dance Ministry",
+      "description": "Dance ministry",
+      "aliases": ["Dance"]
+    },
+    {
+      "name": "Events",
+      "description": "Events team",
+      "aliases": []
+    },
+    {
+      "name": "Facilities",
+      "description": "Facilities and venue team",
+      "aliases": []
+    },
+    {
+      "name": "Field",
+      "description": "Field ministry",
+      "aliases": ["Field Ministry"]
+    },
+    {
+      "name": "Gifts and Arrows",
+      "description": "Gifts and Arrows (G&A)",
+      "aliases": ["G&A", "Gift and Arrows", "Gift & Arrows", "Gifts & Arrows", "G and A"]
+    },
+    {
+      "name": "Guest Services",
+      "description": "Guest Services (GS)",
+      "aliases": ["GS"],
+      "roles": ["Usher", "Emcee"]
+    },
+    {
+      "name": "MTE",
+      "description": "More than Enough",
+      "aliases": ["More than Enough", "More Than Enough"]
+    },
+    {
+      "name": "Prayer",
+      "description": "Prayer ministry",
+      "aliases": ["Prayer Ministry"]
+    },
+    {
+      "name": "Productions",
+      "description": "Productions and media",
+      "aliases": ["Production"]
+    },
+    {
+      "name": "Psalmist",
+      "description": "Psalmists / worship",
+      "aliases": ["Psalmists"]
+    },
+    {
+      "name": "Victuals",
+      "description": "Food and hospitality",
+      "aliases": []
+    }
+  ],
+  "compounds": [
+    {
+      "phrase": "Events & Prayer Ministry",
+      "names": ["Events", "Prayer"]
+    },
+    {
+      "phrase": "Psalmist G&A",
+      "names": ["Psalmist", "Gifts and Arrows"]
+    }
+  ],
+  "deactivate": [
+    {
+      "name": "CrisTest",
+      "reason": "Sample / test ministry, not a church team"
+    },
+    {
+      "name": "Bishops",
+      "reason": "Not a Hub serving team"
+    },
+    {
+      "name": "Clergy",
+      "reason": "Not a Hub serving team"
+    }
+  ]
+}

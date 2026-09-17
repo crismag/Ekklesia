@@ -1,0 +1,179 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Ministry assignment on member import.
+ *
+ * The import parsed and staged the workbook's ministry column and then dropped
+ * it — the review screen showed ministries that were never going to be saved.
+ *
+ * How membership actually works here, established by reading the data rather
+ * than the table names: one row in person2group2role_p2g2r links a person, a
+ * group and a role. There is no separate membership table. Role 0 means "no
+ * assignment role", which is what 282 of the 284 existing memberships carry;
+ * the roles that do exist (Porter, Runner, Create1) are per-ministry scheduling
+ * roles, not a Member/Leader convention. Leadership is not a role at all: it is
+ * an RBAC grant in portal_user_roles scoped to a ministry.
+ */
+
+spl_autoload_register(static function (string $class): void {
+    if (!str_starts_with($class, 'App\\')) {
+        return;
+    }
+    $path = __DIR__ . '/../../app/' . str_replace('\\', '/', substr($class, 4)) . '.php';
+    if (is_file($path)) {
+        require_once $path;
+    }
+});
+require __DIR__ . '/../../app/Services/MinistryCatalog.php';
+require __DIR__ . '/../../app/Services/MemberMinistryAssigner.php';
+
+use App\Services\MemberMinistryAssigner;
+use App\Services\MinistryCatalog;
+
+$passed = 0;
+$failed = 0;
+function check(string $label, bool $ok): void
+{
+    global $passed, $failed;
+    $ok ? $passed++ : $failed++;
+    printf("  [%s] %s\n", $ok ? 'ok' : 'FAIL', $label);
+}
+
+// A fixed list of ministries, in the shape listMinistriesPublic() returns.
+$ministries = static fn (): array => [
+    ['ministry_id' => 1, 'name' => 'Psalmists', 'campus_id' => null],
+    ['ministry_id' => 4, 'name' => 'Victuals', 'campus_id' => null],
+    ['ministry_id' => 5, 'name' => 'Events', 'campus_id' => null],
+    ['ministry_id' => 6, 'name' => 'Guest Services', 'campus_id' => null],
+    ['ministry_id' => 7, 'name' => 'Prayer', 'campus_id' => null],
+    ['ministry_id' => 9, 'name' => 'Creatives', 'campus_id' => null],
+    ['ministry_id' => 3, 'name' => 'Facilities', 'campus_id' => null],
+    // Note the singular "Gift": the catalogue canonicalises G&A to the plural
+    // "Gifts and Arrows", and the two must still meet.
+    ['ministry_id' => 11, 'name' => 'Gift and Arrows', 'campus_id' => null],
+];
+
+$assigner = new MemberMinistryAssigner(
+    MinistryCatalog::fromFile(__DIR__ . '/../../config/ministry-catalog.json'),
+    $ministries
+);
+
+check('members are imported with no assignment role', MemberMinistryAssigner::MEMBER_ROLE_ID === 0);
+
+$exact = $assigner->resolve('Creatives');
+check('an exact ministry name resolves', $exact['ids'] === [9]);
+
+$alias = $assigner->resolve('Creative');
+check('a catalogue alias resolves', $alias['ids'] === [9]);
+
+$abbrev = $assigner->resolve('GS');
+check('an abbreviation resolves', $abbrev['ids'] === [6]);
+
+// The catalogue says "Psalmist"; the group is "Psalmists". Neither spelling
+// should decide whether a member is assigned.
+$plural = $assigner->resolve('Psalmists');
+check('a singular/plural difference still resolves', $plural['ids'] === [1]);
+
+$compound = $assigner->resolve('Events & Prayer Ministry');
+check('a compound cell resolves to several ministries', $compound['ids'] === [5, 7]);
+
+$multi = $assigner->resolve('Creatives, Victuals');
+check('a list in one cell resolves to each', $multi['ids'] === [9, 4] || $multi['ids'] === [4, 9]);
+
+// The workbook does not always delimit the cell. "Facilities Psalmist Victuals"
+// is three ministries separated by nothing but spaces, and a comma-only split
+// left the whole cell unrecognised — that member imported no ministries at all.
+$spaced = $assigner->resolve('Facilities Psalmist Victuals');
+sort($spaced['ids']);
+check('a space-separated cell resolves to each ministry', $spaced['ids'] === [1, 3, 4]);
+check('and reports nothing unmatched', $spaced['unmatched'] === []);
+
+// Multi-word names must survive the space-splitting: longest match wins, so
+// "Guest Services" is one ministry rather than a stray "Guest" and "Services".
+$multiWord = $assigner->resolve('Guest Services Psalmists');
+sort($multiWord['ids']);
+check('a multi-word name is not shredded by the space split', $multiWord['ids'] === [1, 6]);
+
+// G&A canonicalises to "Gifts and Arrows" while the group is "Gift and Arrows".
+// The plural is on the first word, so trimming a trailing "s" cannot match them.
+check('G&A resolves to Gift and Arrows', $assigner->resolve('G&A')['ids'] === [11]);
+check('as does the spelled-out name', $assigner->resolve('Gift and Arrows')['ids'] === [11]);
+check('as does the catalogue plural', $assigner->resolve('Gifts and Arrows')['ids'] === [11]);
+check('GS resolves to Guest Services', $assigner->resolve('GS')['ids'] === [6]);
+
+$mixedCell = $assigner->resolve('Facilities Psalmist Victuals G&A');
+sort($mixedCell['ids']);
+check('the reported row resolves to all four ministries', $mixedCell['ids'] === [1, 3, 4, 11]);
+
+// A keyword nobody recognises must be named, and must not take the ministries
+// around it down with it.
+$partly = $assigner->resolve('Psalmist Zumba Victuals');
+sort($partly['ids']);
+check('an unknown keyword does not spoil the rest of the cell', $partly['ids'] === [1, 4]);
+check('and the unknown keyword is reported by name', $partly['unmatched'] === ['Zumba']);
+
+// Unknown text must be reported, never guessed at: a wrong ministry is worse
+// than none.
+$unknown = $assigner->resolve('Worship Team');
+check('an unknown ministry assigns nothing', $unknown['ids'] === []);
+check('and is reported rather than dropped silently', $unknown['unmatched'] === ['Worship Team']);
+
+foreach (['', 'N/A', '-', 'none'] as $blank) {
+    $r = $assigner->resolve($blank);
+    check("a blank-ish cell (\"{$blank}\") assigns nothing and reports nothing",
+        $r['ids'] === [] && $r['unmatched'] === []);
+}
+
+$dupes = $assigner->resolve('Creatives, Creative, Creatives');
+check('the same ministry named twice yields one membership', $dupes['ids'] === [9]);
+
+// The import must not invent leadership, and must not read it from the sheet.
+$svc = (string) file_get_contents(__DIR__ . '/../../app/Services/MemberCampusImportService.php');
+check('the import never writes leadership',
+    !str_contains($svc, "role = 'leader'") && !str_contains($svc, 'addRole('));
+check('the import keeps a leader\'s membership',
+    str_contains($svc, 'listMinistryLeaderPersonIds'));
+// The workbook is the source of truth, so removal is required — but it must
+// never reach beyond the people this import actually applied.
+check('removal is scoped to people in this import',
+    str_contains($svc, 'foreach ($desired as $personId => $wanted)'));
+
+$auth = (string) file_get_contents(__DIR__ . '/../../app/Adapters/Portal/PortalAuthAdapter.php');
+check('leaders are read from portal_user_roles, not from a role name',
+    str_contains($auth, 'listMinistryLeaderPersonIds') && str_contains($auth, 'scope_ministry_id'));
+check('both person-link paths are considered',
+    str_contains($auth, 'churchcrm_person_id') && str_contains($auth, 'portal_user_person_links'));
+
+// --- the workbook is authoritative ------------------------------------------
+// Only the ministries listed are current ministries, so anything else is
+// removed — with two exceptions the code must honour.
+$svcSrc = (string) file_get_contents(__DIR__ . '/../../app/Services/MemberCampusImportService.php');
+
+check('memberships the workbook omits are removed',
+    str_contains($svcSrc, 'removeMemberFromMinistry'));
+check('an empty ministry cell is a real answer, not "unknown"',
+    str_contains($svcSrc, 'some people') || str_contains($svcSrc, 'serve in none'));
+check('a leader keeps a membership the sheet omits',
+    str_contains($svcSrc, 'keptForLeaders') && str_contains($svcSrc, 'leads that ministry'));
+
+// The guard that matters most: a ministry column that fails to map makes every
+// cell look blank, and replacing on that would clear every membership in the
+// church with nothing in the workbook to restore them from.
+check('nothing is removed when the sheet names no ministry at all',
+    str_contains($svcSrc, 'sheetMentionsAnyMinistry'));
+check('and that case is reported rather than passing silently',
+    str_contains($svcSrc, 'No ministry was named anywhere'));
+
+check('removals are counted and reported',
+    str_contains($svcSrc, 'no longer lists them'));
+
+// Reading current memberships must be batched: a query per person turns a
+// 250-member import into 250 round trips.
+$adapterSrc = (string) file_get_contents(__DIR__ . '/../../app/Adapters/ChurchCRM/ChurchCrmMinistryAdapter.php');
+check('current memberships are read in one query',
+    str_contains($adapterSrc, 'listMinistryIdsForPeople') && str_contains($adapterSrc, 'IN ('));
+
+printf("\nPassed: %d; failed: %d\n", $passed, $failed);
+exit($failed === 0 ? 0 : 1);

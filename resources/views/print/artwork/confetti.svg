@@ -1,0 +1,28 @@
+<!--
+  Confetti — original decoration for the Celebration theme.
+  Drawn in the band's proportions; see garden.svg for why artwork is a strip.
+-->
+<svg viewBox="0 0 1360 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" focusable="false">
+  <g>
+    <rect x="60" y="58" width="34" height="12" rx="6" fill="#e2b13f" transform="rotate(-20 77 64)"/>
+    <rect x="222" y="70" width="30" height="11" rx="5.5" fill="#7ba98a" transform="rotate(26 237 75)"/>
+    <rect x="392" y="54" width="34" height="12" rx="6" fill="#c96f6f" transform="rotate(13 409 60)"/>
+    <rect x="560" y="72" width="30" height="11" rx="5.5" fill="#6f8fc9" transform="rotate(-24 575 77)"/>
+    <rect x="742" y="56" width="34" height="12" rx="6" fill="#e2b13f" transform="rotate(19 759 62)"/>
+    <rect x="920" y="72" width="30" height="11" rx="5.5" fill="#7ba98a" transform="rotate(-15 935 77)"/>
+    <rect x="1096" y="54" width="34" height="12" rx="6" fill="#6f8fc9" transform="rotate(24 1113 60)"/>
+    <rect x="1268" y="70" width="30" height="11" rx="5.5" fill="#c96f6f" transform="rotate(-28 1283 75)"/>
+    <circle cx="146" cy="80" r="9" fill="#c96f6f"/><circle cx="310" cy="60" r="8" fill="#6f8fc9"/>
+    <circle cx="478" cy="82" r="9" fill="#e2b13f"/><circle cx="650" cy="60" r="8" fill="#7ba98a"/>
+    <circle cx="836" cy="82" r="9" fill="#c96f6f"/><circle cx="1012" cy="60" r="8" fill="#e2b13f"/>
+    <circle cx="1188" cy="82" r="9" fill="#7ba98a"/>
+  </g>
+  <g data-art="extra" opacity=".85">
+    <rect x="150" y="28" width="26" height="10" rx="5" fill="#7ba98a" transform="rotate(16 163 33)"/>
+    <rect x="430" y="24" width="26" height="10" rx="5" fill="#e2b13f" transform="rotate(-22 443 29)"/>
+    <rect x="790" y="26" width="26" height="10" rx="5" fill="#c96f6f" transform="rotate(20 803 31)"/>
+    <rect x="1130" y="24" width="26" height="10" rx="5" fill="#6f8fc9" transform="rotate(-16 1143 29)"/>
+    <circle cx="292" cy="26" r="7" fill="#6f8fc9"/><circle cx="620" cy="24" r="7" fill="#c96f6f"/>
+    <circle cx="960" cy="26" r="7" fill="#7ba98a"/><circle cx="1288" cy="24" r="7" fill="#e2b13f"/>
+  </g>
+</svg>

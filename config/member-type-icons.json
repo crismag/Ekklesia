@@ -1,0 +1,20 @@
+{
+  "_comment": "A symbol for each member type, so the people directory can show a mark instead of a two-letter code. These are markers for a type recorded on the person, nothing more — they carry no age, status or seniority, and the roster confirms the types overlap on all of those. The name is always on hover and in the key beneath the table. A member type that is not listed here falls back to a short text code, so adding one never breaks the page. Names match case-insensitively and ignore punctuation, so 'G&A' also matches 'G and A'. Change an assignment freely; the only rule is that two types should not share a symbol.",
+  "symbols": {
+    "arrow": "Arrow",
+    "flag": "Pennant",
+    "seedling": "Seedling",
+    "torch": "Torch",
+    "dove": "Dove",
+    "shield": "Shield",
+    "star": "Star"
+  },
+  "types": {
+    "G&A": "arrow",
+    "Gifts and Arrows": "arrow",
+    "Trailblazer": "flag",
+    "Trailblazers": "flag",
+    "Radical": "seedling",
+    "Radicals": "seedling"
+  }
+}

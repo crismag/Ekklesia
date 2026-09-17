@@ -1,0 +1,38 @@
+# Secrets — never commit (holds production DB credentials)
+.env
+.env.*
+!.env.example
+
+# Dependencies / build
+/node_modules/
+/vendor/
+/public/build/
+/public/hot
+
+# Runtime / logs / backups
+/logs/
+*.log
+.bak/
+*.tmp.*
+*.bak
+/storage/private/**
+!/storage/private/.htaccess
+!/storage/private/index.html
+!/storage/private/.gitkeep
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Playwright / regression artifacts
+/playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache
+/reports/generated/
+/reports/acceptance-audit/raw.json
+
+# Address sweep reports name members. Roster data, never committed.
+address-sweep*.csv

@@ -1,0 +1,54 @@
+/*
+ * Editorial — the calendar as a publication rather than a notice.
+ *
+ * The reference for this was a page whose title was the design: one enormous
+ * word, a great deal of air beneath it, and a grid so quiet it reads as ruling
+ * rather than as boxes. Nothing here is decorative; the whole effect comes from
+ * type size, whitespace and the restraint to draw fewer lines.
+ *
+ * Deliberately no script face. A printable has to set with the network
+ * unplugged and on whatever machine is in the church office, and a title that
+ * silently falls back to Times is worse than one that was never script.
+ */
+
+.theme-editorial .masthead { border-bottom: 0; margin-bottom: 20pt; padding-bottom: 0; }
+.theme-editorial .masthead-row { display: block; text-align: center; }
+.theme-editorial .church {
+  font-size: 8pt; letter-spacing: .34em; font-weight: 600; opacity: .78;
+}
+.theme-editorial .subtitle { font-size: 8.5pt; letter-spacing: .08em; margin-top: 4pt; }
+.theme-editorial .period {
+  text-align: center; font-size: 44pt; font-weight: 300; letter-spacing: -.025em;
+  margin-top: 10pt; line-height: .96;
+}
+.theme-editorial .period small {
+  font-size: 7.5pt; letter-spacing: .3em; margin-top: 9pt; font-weight: 600; opacity: .7;
+}
+
+/* Ruled, not boxed. Verticals come off entirely and the horizontals thin to a
+   hairline, which is what makes the grid recede behind the writing in it. */
+.theme-editorial .cal td { border: 0; border-top: .5pt solid #d8ded9; }
+.theme-editorial .cal td.out { background: transparent; }
+.theme-editorial .cal td.wknd { background: transparent; }
+.theme-editorial .cal th {
+  border-bottom: 0; font-size: calc(7pt * var(--ts, 1)); letter-spacing: .24em;
+  padding-bottom: 8pt; opacity: .62;
+}
+.theme-editorial .cell { padding-top: 6pt; }
+.theme-editorial .num { font-weight: 400; font-size: calc(12pt * var(--ts, 1)); opacity: .85; }
+.theme-editorial .cal td.out .num { opacity: .3; }
+
+/* The rule beside an entry becomes a small square: at this weight of type a
+   2pt bar reads as a bracket, which fights the calmness the rest is buying. */
+.theme-editorial .ent {
+  border-left: 0; padding-left: 9pt; position: relative;
+}
+.theme-editorial .ent::before {
+  content: ""; position: absolute; left: 0; top: .42em;
+  width: 3.4pt; height: 3.4pt; border-radius: 50%;
+  background: currentColor; opacity: .55;
+}
+.theme-editorial .ent .t { font-weight: 600; letter-spacing: -.005em; }
+.theme-editorial .t-showcase .ent::before { display: none; }
+
+.theme-editorial .colophon { border-top: 0; letter-spacing: .12em; font-size: 7pt; opacity: .6; }

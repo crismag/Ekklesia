@@ -1,0 +1,44 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Deny direct HTTP access to server-side code, configuration and data.
+    #
+    # This must come BEFORE the passthrough below, which serves any real file.
+    # Without it, application source, routes, migrations and configuration were
+    # all reachable, and Apache executed the PHP among them: /routes/web.php,
+    # /app/Services/AuthService.php and /tools/*.php all returned 200, and
+    # /migrations/*.sql served the schema as plain text.
+    # reports/ is excluded from deploy, but a copy predating that exclusion was
+    # still on the server and still being served: /reports/css-debt-inventory.json
+    # returned 200 to anyone. Deny it here too, so the directory being absent is
+    # not the only thing keeping it private.
+    RewriteRule ^(app|bootstrap|config|migrations|reports|resources|routes|storage|tests|tools|design-system|vendor|node_modules)(/|$) - [F,L]
+
+    # /docs/<section> is a portal route, and docs/ is also a real directory on
+    # disk. Deny the real files without breaking the route, which has no
+    # extension and falls through to the front controller.
+    RewriteRule ^docs/.+\.(md|ya?ml|json|html?|txt|htaccess)$ - [F,L]
+    RewriteRule ^docs/deploy(/|$) - [F,L]
+
+    # Repository and build metadata.
+    RewriteRule ^(composer\.(json|lock)|package(-lock)?\.json|vite\.config\.js|playwright\.config\.ts|README\.md|\.rsync-deploy-exclude)$ - [F,L]
+
+    # Dotfiles, editor leftovers and backups.
+    RewriteRule (^|/)\.(?!well-known) - [F,L]
+    RewriteRule \.(bak|orig|save|swp|sql|log|dist|example)$ - [F,L]
+
+    # Pass actual files directly (build assets, images, etc.)
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Root -> front controller
+    RewriteRule ^$ public/index.php [L]
+
+    # Standalone apps are separate applications served directly. Without
+    # this, a directory URL (which does not match the -f test above) fell
+    # through to the portal front controller and 404d as JSON.
+    RewriteRule ^(people_signup|events_rsvp|printable)(/|$) - [L]
+
+    # All non-file sub-paths -> public/ (public/.htaccess routes to index.php)
+    RewriteRule ^((?!public/).*)$ public/$1 [L,NC]
+</IfModule>
