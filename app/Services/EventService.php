@@ -150,8 +150,8 @@ final readonly class EventService
         return array_map(function (array $r) use ($ministryNames): EventSummary {
             return new EventSummary(
                 eventId: (int) $r['event_id'],
-                title: (string) $r['event_title'],
-                description: $r['event_desc'] ?? null,
+                title: (string) $r['title'],
+                description: $r['summary'] ?? null,
                 occurrenceCount: (int) $r['occurrence_count'],
                 nextOccurrenceAt: $r['next_occurrence_at'] ?? null,
                 nextOccurrenceEnd: $r['next_occurrence_end'] ?? null,
@@ -176,8 +176,8 @@ final readonly class EventService
         $availableCampuses = $this->filterCampusesForActor($ctx, $row['available_campuses'] ?? []);
         return new EventDetailView(
             eventId: (int) $row['event_id'],
-            title: (string) $row['event_title'],
-            description: $row['event_desc'] ?? null,
+            title: (string) $row['title'],
+            description: $row['summary'] ?? null,
             occurrences: $row['occurrences'] ?? [],
             campusIds: array_values(array_map('intval', $row['campus_ids'] ?? [])),
             availableCampuses: $availableCampuses,
@@ -189,7 +189,7 @@ final readonly class EventService
             eventTypeId: isset($row['event_type_id']) ? (int) $row['event_type_id'] : null,
             eventTypeLabel: $row['type_label'] ?? null,
             eventTypeColor: $row['type_color'] ?? null,
-            assignmentSchedulingEnabled: $this->assignmentSchedulingEnabledFrom($row),
+            usesServingSchedule: $this->usesServingScheduleFrom($row),
         );
     }
 
@@ -211,8 +211,8 @@ final readonly class EventService
         }
 
         $payload = $cmd->toArray();
-        $payload['event_start'] = $dates[0]['start'];
-        $payload['event_end'] = $dates[0]['end'];
+        $payload['starts_at'] = $dates[0]['start'];
+        $payload['ends_at'] = $dates[0]['end'];
         $newId = $this->events->createEvent($payload, $now);
 
         // Every date becomes an occurrence, which is what the Calendar reads.
@@ -220,8 +220,8 @@ final readonly class EventService
         // event with no occurrences never appears on the calendar at all.
         $rows = array_map(static fn (array $d): array => [
             'event_id' => $newId,
-            'occurrence_start' => $d['start'],
-            'occurrence_end' => $d['end'],
+            'starts_at' => $d['start'],
+            'ends_at' => $d['end'],
         ], $dates);
         $this->events->insertOccurrences($newId, $rows);
 
@@ -252,7 +252,7 @@ final readonly class EventService
             eventTypeId: isset($row['event_type_id']) ? (int) $row['event_type_id'] : $cmd->eventTypeId,
             eventTypeLabel: $row['type_label'] ?? null,
             eventTypeColor: $row['type_color'] ?? null,
-            assignmentSchedulingEnabled: $this->assignmentSchedulingEnabledFrom($row ?? [], $cmd->assignmentSchedulingEnabled),
+            usesServingSchedule: $this->usesServingScheduleFrom($row ?? [], $cmd->usesServingSchedule),
         );
     }
 
@@ -280,8 +280,8 @@ final readonly class EventService
         }
         return new EventDetailView(
             eventId: $eventId,
-            title: $row['event_title'],
-            description: $row['event_desc'] ?? null,
+            title: $row['title'],
+            description: $row['summary'] ?? null,
             occurrences: $row['occurrences'] ?? [],
             campusIds: array_values(array_map('intval', $row['campus_ids'] ?? [])),
             availableCampuses: $this->filterCampusesForActor($ctx, $row['available_campuses'] ?? []),
@@ -293,17 +293,17 @@ final readonly class EventService
             eventTypeId: isset($row['event_type_id']) ? (int) $row['event_type_id'] : null,
             eventTypeLabel: $row['type_label'] ?? null,
             eventTypeColor: $row['type_color'] ?? null,
-            assignmentSchedulingEnabled: $this->assignmentSchedulingEnabledFrom($row),
+            usesServingSchedule: $this->usesServingScheduleFrom($row),
         );
     }
 
     /**
      * @param array<string,mixed> $row
      */
-    private function assignmentSchedulingEnabledFrom(array $row, bool $fallback = false): bool
+    private function usesServingScheduleFrom(array $row, bool $fallback = false): bool
     {
-        if (array_key_exists('assignment_scheduling_enabled', $row) && $row['assignment_scheduling_enabled'] !== null) {
-            return (int) $row['assignment_scheduling_enabled'] === 1;
+        if (array_key_exists('uses_serving_schedule', $row) && $row['uses_serving_schedule'] !== null) {
+            return (int) $row['uses_serving_schedule'] === 1;
         }
 
         return $fallback;
@@ -548,7 +548,7 @@ final readonly class EventService
         $rows = [];
         if ($intervalDays === 0) {
             $end = $startsAt->add(new DateInterval('PT' . $cmd->durationMin . 'M'));
-            $rows[] = ['event_id' => $cmd->eventId, 'occurrence_start' => $startsAt->format('Y-m-d H:i:s'), 'occurrence_end' => $end->format('Y-m-d H:i:s')];
+            $rows[] = ['event_id' => $cmd->eventId, 'starts_at' => $startsAt->format('Y-m-d H:i:s'), 'ends_at' => $end->format('Y-m-d H:i:s')];
         } else {
             $current = $startsAt;
             $count = 0;
@@ -556,7 +556,7 @@ final readonly class EventService
                 if ($cmd->count !== null && $count >= $cmd->count) break;
                 if ($cmd->untilOn !== null && $current > $cmd->untilOn) break;
                 $end = $current->add(new DateInterval('PT' . $cmd->durationMin . 'M'));
-                $rows[] = ['event_id' => $cmd->eventId, 'occurrence_start' => $current->format('Y-m-d H:i:s'), 'occurrence_end' => $end->format('Y-m-d H:i:s')];
+                $rows[] = ['event_id' => $cmd->eventId, 'starts_at' => $current->format('Y-m-d H:i:s'), 'ends_at' => $end->format('Y-m-d H:i:s')];
                 $current = $current->add(new DateInterval('P' . $intervalDays . 'D'));
                 $count++;
             }
@@ -594,8 +594,8 @@ final readonly class EventService
         // Keep the length the occurrence already had unless a new one is given.
         // Correcting a start time should not silently resize the event.
         if ($durationMin === null) {
-            $oldStart = new DateTimeImmutable($existing['occurrence_start']);
-            $oldEnd = new DateTimeImmutable($existing['occurrence_end']);
+            $oldStart = new DateTimeImmutable($existing['starts_at']);
+            $oldEnd = new DateTimeImmutable($existing['ends_at']);
             $durationMin = max(1, (int) round(($oldEnd->getTimestamp() - $oldStart->getTimestamp()) / 60));
         }
         if ($durationMin < 1 || $durationMin > 1440) {
@@ -606,7 +606,7 @@ final readonly class EventService
         // clash is reported as a clash rather than as a database error.
         $startStr = $startsAt->format('Y-m-d H:i:s');
         foreach ($this->events->listEventOccurrences($eventId) as $row) {
-            if ($row['occurrence_id'] !== $occurrenceId && $row['occurrence_start'] === $startStr) {
+            if ($row['occurrence_id'] !== $occurrenceId && $row['starts_at'] === $startStr) {
                 throw new ValidationFailed(
                     'This event already has an occurrence on ' . $startsAt->format('D j M Y')
                     . ' at ' . $startsAt->format('H:i') . '.'
@@ -661,14 +661,14 @@ final readonly class EventService
         $taken = [];
         foreach ($all as $row) {
             if (!isset($moving[$row['occurrence_id']])) {
-                $taken[$row['occurrence_start']] = true;
+                $taken[$row['starts_at']] = true;
             }
         }
 
         $changes = [];
         foreach ($selected as $row) {
-            $oldStart = new DateTimeImmutable($row['occurrence_start']);
-            $oldEnd = new DateTimeImmutable($row['occurrence_end']);
+            $oldStart = new DateTimeImmutable($row['starts_at']);
+            $oldEnd = new DateTimeImmutable($row['ends_at']);
             $length = $durationMin ?? max(1, (int) round(($oldEnd->getTimestamp() - $oldStart->getTimestamp()) / 60));
             $newStart = $oldStart->setTime($hour, $minute);
             $newEnd = $newStart->add(new DateInterval('PT' . $length . 'M'));
@@ -680,13 +680,13 @@ final readonly class EventService
                 );
             }
             $taken[$startStr] = true;
-            if ($startStr === $row['occurrence_start'] && $newEnd->format('Y-m-d H:i:s') === $row['occurrence_end']) {
+            if ($startStr === $row['starts_at'] && $newEnd->format('Y-m-d H:i:s') === $row['ends_at']) {
                 continue;
             }
             $changes[] = [
                 'occurrence_id' => $row['occurrence_id'],
-                'occurrence_start' => $startStr,
-                'occurrence_end' => $newEnd->format('Y-m-d H:i:s'),
+                'starts_at' => $startStr,
+                'ends_at' => $newEnd->format('Y-m-d H:i:s'),
             ];
         }
 
@@ -750,15 +750,15 @@ final readonly class EventService
             throw new ValidationFailed('That schedule produces no dates from today onward.');
         }
 
-        // Remove first, then insert: event_occurrence is unique on
+        // Remove first, then insert: event_occurrences is unique on
         // (event_id, start), so a new date landing on an old one would collide
         // if the order were reversed.
         $removed = $ids === [] ? 0 : $this->events->deleteOccurrencesForEvent($eventId, $ids);
         $this->events->insertOccurrences($eventId, array_map(
             static fn (array $d): array => [
                 'event_id' => $eventId,
-                'occurrence_start' => $d['start'],
-                'occurrence_end' => $d['end'],
+                'starts_at' => $d['start'],
+                'ends_at' => $d['end'],
             ],
             $fresh,
         ));
@@ -853,16 +853,16 @@ final readonly class EventService
         $observed = false;
         if ($rule === null) {
             $rule = \App\Services\Events\RecurrenceRule::observe(
-                array_map(static fn (array $r): string => $r['occurrence_start'], $occurrences),
+                array_map(static fn (array $r): string => $r['starts_at'], $occurrences),
             );
             $observed = $rule !== null;
         }
 
-        // Times come from the occurrences, not from the rule: event_recurrence
+        // Times come from the occurrences, not from the rule: the repeat rule
         // stores when it repeats, never at what time of day.
         $first = $occurrences[0] ?? null;
-        $startTime = $first === null ? null : substr($first['occurrence_start'], 11, 5);
-        $endTime = $first === null ? null : substr($first['occurrence_end'], 11, 5);
+        $startTime = $first === null ? null : substr($first['starts_at'], 11, 5);
+        $endTime = $first === null ? null : substr($first['ends_at'], 11, 5);
         $allDay = $first !== null && $startTime === '00:00' && $endTime === '00:00';
 
         return [
@@ -915,7 +915,7 @@ final readonly class EventService
     }
 
     /**
-     * @return list<array{occurrence_id:int,occurrence_start:string,occurrence_end:string}>
+     * @return list<array{occurrence_id:int,starts_at:string,ends_at:string}>
      */
     private function selectOccurrences(int $eventId, string $scope, ?string $from = null): array
     {
@@ -939,7 +939,7 @@ final readonly class EventService
 
         return array_values(array_filter(
             $all,
-            static fn (array $r): bool => $r['occurrence_start'] >= $cutoff,
+            static fn (array $r): bool => $r['starts_at'] >= $cutoff,
         ));
     }
 
@@ -1000,14 +1000,14 @@ final readonly class EventService
      * Readable by anyone who can read events at all: a tag is a label on a
      * public-facing calendar, not a permission.
      *
-     * @return list<array{tag_id:int,slug:string,label:string,usage_count:int}>
+     * @return list<array{slug:string,label:string,usage_count:int}>
      */
     public function listTags(): array
     {
         return $this->events->listTags();
     }
 
-    /** @return list<array{tag_id:int,slug:string,label:string}> */
+    /** @return list<array{slug:string,label:string}> */
     public function tagsForEvent(?ActorContext $ctx, int $eventId): array
     {
         $now = new DateTimeImmutable();
@@ -1024,7 +1024,7 @@ final readonly class EventService
      * Set an event's tags to exactly this list.
      *
      * @param list<string> $raw as typed
-     * @return list<array{tag_id:int,slug:string,label:string}>
+     * @return list<array{slug:string,label:string}>
      */
     public function setEventTags(ActorContext $ctx, int $eventId, array $raw): array
     {
@@ -1057,7 +1057,7 @@ final readonly class EventService
      * Give one date of a series its own title and description.
      *
      * The scope is deliberately only ever this occurrence. "This and following"
-     * would mean splitting the series in two, which event_recurrence cannot
+     * would mean splitting the series in two, which the repeat rule cannot
      * represent — it holds one rule per event and no notion of a series that
      * changed its name partway through. Offering the choice and then doing
      * something else would be worse than not offering it.

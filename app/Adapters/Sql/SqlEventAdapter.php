@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Adapters\ChurchCRM;
+namespace App\Adapters\Sql;
 
 use App\Contracts\EventAdapter;
 use DateTimeImmutable;
 use PDO;
 
-final class ChurchCrmEventAdapter implements EventAdapter
+final class SqlEventAdapter implements EventAdapter
 {
     /**
      * Every audience value, for internal reads that the service has already
@@ -30,13 +30,11 @@ final class ChurchCrmEventAdapter implements EventAdapter
      * The audience predicate, as a bare boolean expression over an already
      * joined `event_types et`.
      *
-     * COALESCE(NULLIF(...), 'members') rather than an INNER JOIN on purpose:
-     * events_event.event_type has carried dangling ids for years, and
-     * ChurchCRM's own EditEventTypes.php can delete a type row at any time. An
-     * INNER JOIN would make those events vanish for everyone, which is a
-     * data-loss-shaped bug. The fallback is 'members', never 'leaders', so an
-     * unclassified event stays visible to signed-in users and can never become
-     * restricted by accident.
+     * COALESCE(NULLIF(...), 'members') over a LEFT JOIN rather than an INNER
+     * JOIN on purpose: an event whose type row is missing must not vanish for
+     * everyone, which is a data-loss-shaped bug. The fallback is 'members',
+     * never 'leaders', so an unclassified event stays visible to signed-in
+     * users and can never become restricted by accident.
      *
      * @param list<string>        $audiences
      * @param array<string,mixed> $bind      receives the generated placeholders
@@ -54,11 +52,11 @@ final class ChurchCrmEventAdapter implements EventAdapter
             return 0;
         }
         $stmt = $this->connection->query(
-            'SELECT type_id FROM event_types WHERE portal_is_default = 1 LIMIT 1'
+            'SELECT id FROM event_types WHERE is_default = 1 LIMIT 1'
         );
         $row = $stmt === false || $stmt === null ? false : $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $row === false ? 0 : (int) $row['type_id'];
+        return $row === false ? 0 : (int) $row['id'];
     }
 
     private function audienceExpr(array $audiences, array &$bind): string
@@ -76,7 +74,7 @@ final class ChurchCrmEventAdapter implements EventAdapter
             $bind[$key] = $value;
         }
 
-        return 'COALESCE(NULLIF(et.portal_audience, ""), "members") IN (' . implode(', ', $keys) . ')';
+        return 'COALESCE(NULLIF(et.audience, ""), "members") IN (' . implode(', ', $keys) . ')';
     }
 
     /**
@@ -98,27 +96,27 @@ final class ChurchCrmEventAdapter implements EventAdapter
         $audienceExpr = $this->audienceExpr($audiences, $audBind);
         $campusJoin = '';
         if ($campusId !== null && $campusId > 0) {
-            $campusJoin = 'JOIN events_event_campus fc ON fc.event_id = e.event_id AND fc.campus_id = :campus_id';
+            $campusJoin = 'JOIN event_campuses fc ON fc.event_id = e.id AND fc.campus_id = :campus_id';
         }
-        $sql = 'SELECT o.occurrence_id, o.occurrence_start, o.occurrence_end, o.is_cancelled,
-                       COALESCE(NULLIF(o.override_title, ""), e.event_title) AS title,
-                       e.event_id, e.event_desc, e.custom_location_name AS location_name, e.ministry_id,
-                       e.event_type AS event_type_id, et.portal_slug AS type_slug,
-                       et.portal_label AS type_label, et.portal_color AS type_color,
-                       (SELECT COUNT(*) FROM event_occurrence oc WHERE oc.event_id = e.event_id) AS occurrence_count,
-                       (SELECT GROUP_CONCAT(c.campus_name ORDER BY ec.is_host DESC, c.campus_name SEPARATOR ", ")
-                          FROM events_event_campus ec JOIN church_campus c ON c.campus_id = ec.campus_id
-                         WHERE ec.event_id = e.event_id) AS campus_names,
-                       (SELECT c2.campus_name FROM events_event_campus ec2
-                          JOIN church_campus c2 ON c2.campus_id = ec2.campus_id
-                         WHERE ec2.event_id = e.event_id AND ec2.is_host = 1 LIMIT 1) AS host_campus_name
-                  FROM event_occurrence o
-                  JOIN events_event e ON e.event_id = o.event_id
-             LEFT JOIN event_types et ON et.type_id = e.event_type
+        $sql = 'SELECT o.id AS occurrence_id, o.starts_at, o.ends_at, o.status,
+                       COALESCE(NULLIF(o.title_override, ""), e.title) AS title,
+                       e.id AS event_id, e.summary, e.location_name, e.ministry_id,
+                       e.event_type_id, et.slug AS type_slug,
+                       et.name AS type_label, et.color AS type_color,
+                       (SELECT COUNT(*) FROM event_occurrences oc WHERE oc.event_id = e.id) AS occurrence_count,
+                       (SELECT GROUP_CONCAT(c.name ORDER BY ec.is_host DESC, c.name SEPARATOR ", ")
+                          FROM event_campuses ec JOIN campuses c ON c.id = ec.campus_id
+                         WHERE ec.event_id = e.id) AS campus_names,
+                       (SELECT c2.name FROM event_campuses ec2
+                          JOIN campuses c2 ON c2.id = ec2.campus_id
+                         WHERE ec2.event_id = e.id AND ec2.is_host = 1 LIMIT 1) AS host_campus_name
+                  FROM event_occurrences o
+                  JOIN events e ON e.id = o.event_id
+             LEFT JOIN event_types et ON et.id = e.event_type_id
                        ' . $campusJoin . '
-                 WHERE o.occurrence_start >= :from AND o.occurrence_start < :to
+                 WHERE o.starts_at >= :from AND o.starts_at < :to
                    AND ' . $audienceExpr . '
-              ORDER BY o.occurrence_start ' . ($descending ? 'DESC' : 'ASC') . ', title ASC
+              ORDER BY o.starts_at ' . ($descending ? 'DESC' : 'ASC') . ', title ASC
                  LIMIT :limit';
 
         $stmt = $this->connection->prepare($sql);
@@ -139,10 +137,11 @@ final class ChurchCrmEventAdapter implements EventAdapter
                 'occurrence_id' => (int) $r['occurrence_id'],
                 'event_id' => (int) $r['event_id'],
                 'title' => (string) $r['title'],
-                'description' => $r['event_desc'] === null ? null : (string) $r['event_desc'],
-                'starts_at' => (string) $r['occurrence_start'],
-                'ends_at' => $r['occurrence_end'] === null ? null : (string) $r['occurrence_end'],
-                'is_cancelled' => (int) ($r['is_cancelled'] ?? 0) === 1,
+                'summary' => $r['summary'] === null ? null : (string) $r['summary'],
+                'starts_at' => (string) $r['starts_at'],
+                'ends_at' => $r['ends_at'] === null ? null : (string) $r['ends_at'],
+                // Derived from status, for the views that ask a yes/no question.
+                'is_cancelled' => (string) ($r['status'] ?? 'scheduled') === 'cancelled',
                 'occurrence_count' => (int) $r['occurrence_count'],
                 'campus_names' => $r['campus_names'] === null ? null : (string) $r['campus_names'],
                 'host_campus_name' => $r['host_campus_name'] === null ? null : (string) $r['host_campus_name'],
@@ -168,10 +167,10 @@ final class ChurchCrmEventAdapter implements EventAdapter
         $bind = [];
         $audienceExpr = $this->audienceExpr($audiences, $bind);
         $window = match ($range) {
-            'past' => 'eo.occurrence_start < CURDATE()',
+            'past' => 'eo.starts_at < CURDATE()',
             'all' => '1 = 1',
-            'month', 'quarter' => 'eo.occurrence_start >= :win_from AND eo.occurrence_start < :win_to',
-            default => 'eo.occurrence_start >= CURDATE()',
+            'month', 'quarter' => 'eo.starts_at >= :win_from AND eo.starts_at < :win_to',
+            default => 'eo.starts_at >= CURDATE()',
         };
         if ($range === 'month' || $range === 'quarter') {
             $base = $anchor !== null && $anchor !== '' ? new \DateTimeImmutable($anchor) : new \DateTimeImmutable('today');
@@ -191,37 +190,37 @@ final class ChurchCrmEventAdapter implements EventAdapter
         // list ignored it entirely, so switching campus changed nothing here.
         $campusJoin = '';
         if ($campusId !== null && $campusId > 0) {
-            $campusJoin = 'JOIN events_event_campus fc ON fc.event_id = e.event_id AND fc.campus_id = :campus_id';
+            $campusJoin = 'JOIN event_campuses fc ON fc.event_id = e.id AND fc.campus_id = :campus_id';
             $bind[':campus_id'] = $campusId;
         }
 
         // The list is a management surface, so it needs enough to scan a whole
         // schedule: when it next runs and for how long, which campus it is for,
         // where it is held if that is not a campus, and how often it repeats.
-        $sql = 'SELECT e.event_id AS event_id, e.event_title AS event_title, e.event_desc AS event_desc,
-                       e.custom_location_name AS location_name,
-                       e.ministry_id AS ministry_id,
-                       e.event_type AS event_type_id, et.portal_slug AS type_slug,
-                       et.portal_label AS type_label, et.portal_color AS type_color,
-                       COUNT(eo.occurrence_id) AS occurrence_count,
-                       MIN(eo.occurrence_start) AS next_occurrence_at,
-                       (SELECT o2.occurrence_end FROM event_occurrence o2
-                         WHERE o2.event_id = e.event_id AND o2.occurrence_start >= CURDATE()
-                         ORDER BY o2.occurrence_start ASC LIMIT 1) AS next_occurrence_end,
-                       (SELECT GROUP_CONCAT(c.campus_name ORDER BY ec.is_host DESC, c.campus_name SEPARATOR ", ")
-                          FROM events_event_campus ec
-                          JOIN church_campus c ON c.campus_id = ec.campus_id
-                         WHERE ec.event_id = e.event_id) AS campus_names,
-                       (SELECT c2.campus_name FROM events_event_campus ec2
-                          JOIN church_campus c2 ON c2.campus_id = ec2.campus_id
-                         WHERE ec2.event_id = e.event_id AND ec2.is_host = 1 LIMIT 1) AS host_campus_name
-                  FROM events_event e
-             LEFT JOIN event_occurrence eo ON eo.event_id = e.event_id AND ' . $window . '
-             LEFT JOIN event_types et ON et.type_id = e.event_type
+        $sql = 'SELECT e.id AS event_id, e.title, e.summary,
+                       e.location_name,
+                       e.ministry_id,
+                       e.event_type_id, et.slug AS type_slug,
+                       et.name AS type_label, et.color AS type_color,
+                       COUNT(eo.id) AS occurrence_count,
+                       MIN(eo.starts_at) AS next_occurrence_at,
+                       (SELECT o2.ends_at FROM event_occurrences o2
+                         WHERE o2.event_id = e.id AND o2.starts_at >= CURDATE()
+                         ORDER BY o2.starts_at ASC LIMIT 1) AS next_occurrence_end,
+                       (SELECT GROUP_CONCAT(c.name ORDER BY ec.is_host DESC, c.name SEPARATOR ", ")
+                          FROM event_campuses ec
+                          JOIN campuses c ON c.id = ec.campus_id
+                         WHERE ec.event_id = e.id) AS campus_names,
+                       (SELECT c2.name FROM event_campuses ec2
+                          JOIN campuses c2 ON c2.id = ec2.campus_id
+                         WHERE ec2.event_id = e.id AND ec2.is_host = 1 LIMIT 1) AS host_campus_name
+                  FROM events e
+             LEFT JOIN event_occurrences eo ON eo.event_id = e.id AND ' . $window . '
+             LEFT JOIN event_types et ON et.id = e.event_type_id
                    ' . $campusJoin . '
                  WHERE ' . $audienceExpr . '
-              GROUP BY e.event_id, e.event_title, e.event_desc, e.custom_location_name, e.ministry_id,
-                       e.event_type, et.portal_slug, et.portal_label, et.portal_color
+              GROUP BY e.id, e.title, e.summary, e.location_name, e.ministry_id,
+                       e.event_type_id, et.slug, et.name, et.color
              HAVING next_occurrence_at IS NOT NULL
               ORDER BY next_occurrence_at ' . ($range === 'past' ? 'DESC' : 'ASC') . '
               LIMIT :limit';
@@ -237,8 +236,8 @@ final class ChurchCrmEventAdapter implements EventAdapter
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
             $rows[] = [
                 'event_id' => (int) $row['event_id'],
-                'event_title' => (string) $row['event_title'],
-                'event_desc' => $row['event_desc'] === null ? null : (string) $row['event_desc'],
+                'title' => (string) $row['title'],
+                'summary' => $row['summary'] === null ? null : (string) $row['summary'],
                 'occurrence_count' => (int) $row['occurrence_count'],
                 'next_occurrence_at' => $row['next_occurrence_at'] === null ? null : (string) $row['next_occurrence_at'],
                 'next_occurrence_end' => $row['next_occurrence_end'] === null ? null : (string) $row['next_occurrence_end'],
@@ -265,15 +264,15 @@ final class ChurchCrmEventAdapter implements EventAdapter
         // would confirm that a hidden event exists at 117.
         $audBind = [];
         $audienceExpr = $this->audienceExpr($audiences, $audBind);
-        $sql = 'SELECT e.event_id AS event_id, e.event_title AS event_title, e.event_desc AS event_desc,
-                       COALESCE(e.is_multi_campus, 0) AS is_multi_campus,
-                       e.ministry_id AS ministry_id,
-                       e.event_type AS event_type_id, et.portal_slug AS type_slug,
-                       et.portal_label AS type_label, et.portal_color AS type_color,
-                       COALESCE(e.assignment_scheduling_enabled, 0) AS assignment_scheduling_enabled
-                  FROM events_event e
-             LEFT JOIN event_types et ON et.type_id = e.event_type
-                 WHERE e.event_id = :event_id
+        $sql = 'SELECT e.id AS event_id, e.title, e.summary,
+                       ((SELECT COUNT(*) FROM event_campuses mc WHERE mc.event_id = e.id) > 1) AS is_multi_campus,
+                       e.ministry_id,
+                       e.event_type_id, et.slug AS type_slug,
+                       et.name AS type_label, et.color AS type_color,
+                       e.uses_serving_schedule
+                  FROM events e
+             LEFT JOIN event_types et ON et.id = e.event_type_id
+                 WHERE e.id = :event_id
                    AND ' . $audienceExpr . '
                  LIMIT 1';
         $stmt = $this->connection->prepare($sql);
@@ -288,12 +287,12 @@ final class ChurchCrmEventAdapter implements EventAdapter
         }
 
         $stmt2 = $this->connection->prepare(
-            'SELECT occurrence_id, occurrence_start, occurrence_end,
-                      is_cancelled, is_modified, override_title, override_desc
-               FROM event_occurrence
+            'SELECT id, starts_at, ends_at, original_starts_at,
+                      status, title_override, details_override
+               FROM event_occurrences
               WHERE event_id = :event_id
-                AND occurrence_start BETWEEN :start_at AND :end_at
-              ORDER BY occurrence_start ASC'
+                AND starts_at BETWEEN :start_at AND :end_at
+              ORDER BY starts_at ASC'
         );
         $stmt2->bindValue(':event_id', $eventId, PDO::PARAM_INT);
         $stmt2->bindValue(':start_at', $start->format('Y-m-d H:i:s'), PDO::PARAM_STR);
@@ -302,20 +301,20 @@ final class ChurchCrmEventAdapter implements EventAdapter
         $occ = [];
         foreach ($stmt2->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
             $occ[] = [
-                'occurrence_id' => (int) $r['occurrence_id'],
-                'occurrence_start' => (string) $r['occurrence_start'],
-                'occurrence_end' => (string) $r['occurrence_end'],
-                'is_cancelled' => (int) ($r['is_cancelled'] ?? 0) === 1,
+                'occurrence_id' => (int) $r['id'],
+                'starts_at' => (string) $r['starts_at'],
+                'ends_at' => (string) $r['ends_at'],
+                'is_cancelled' => (string) $r['status'] === 'cancelled',
                 // What this one date says, when it says something of its own.
-                'is_modified' => (int) ($r['is_modified'] ?? 0) === 1,
-                'override_title' => ($r['override_title'] ?? '') !== '' ? (string) $r['override_title'] : null,
-                'override_desc' => ($r['override_desc'] ?? '') !== '' ? (string) $r['override_desc'] : null,
+                'is_modified' => self::isModified($r),
+                'title_override' => ($r['title_override'] ?? '') !== '' ? (string) $r['title_override'] : null,
+                'details_override' => ($r['details_override'] ?? '') !== '' ? (string) $r['details_override'] : null,
             ];
         }
 
         $campusIdsStmt = $this->connection->prepare(
             'SELECT campus_id
-               FROM events_event_campus
+               FROM event_campuses
               WHERE event_id = :event_id
               ORDER BY is_host DESC, campus_id ASC'
         );
@@ -327,10 +326,10 @@ final class ChurchCrmEventAdapter implements EventAdapter
         );
 
         $campusesStmt = $this->connection->query(
-            'SELECT campus_id AS id, campus_name AS name
-               FROM church_campus
+            'SELECT id, name
+               FROM campuses
               WHERE is_active = 1
-              ORDER BY is_main DESC, campus_name ASC, campus_id ASC'
+              ORDER BY is_main DESC, name ASC, id ASC'
         );
         $availableCampuses = [];
         foreach ($campusesStmt?->fetchAll(PDO::FETCH_ASSOC) ?: [] as $campusRow) {
@@ -342,8 +341,8 @@ final class ChurchCrmEventAdapter implements EventAdapter
 
         return [
             'event_id' => (int) $row['event_id'],
-            'event_title' => (string) $row['event_title'],
-            'event_desc' => $row['event_desc'] === null ? null : (string) $row['event_desc'],
+            'title' => (string) $row['title'],
+            'summary' => $row['summary'] === null ? null : (string) $row['summary'],
             'occurrences' => $occ,
             'campus_ids' => $campusIds,
             'available_campuses' => $availableCampuses,
@@ -353,7 +352,7 @@ final class ChurchCrmEventAdapter implements EventAdapter
             'type_slug' => $row['type_slug'] === null ? null : (string) $row['type_slug'],
             'type_label' => $row['type_label'] === null ? null : (string) $row['type_label'],
             'type_color' => $row['type_color'] === null ? null : (string) $row['type_color'],
-            'assignment_scheduling_enabled' => (int) ($row['assignment_scheduling_enabled'] ?? 0) === 1,
+            'uses_serving_schedule' => (int) ($row['uses_serving_schedule'] ?? 0) === 1,
         ];
     }
 
@@ -375,12 +374,12 @@ final class ChurchCrmEventAdapter implements EventAdapter
             return null;
         }
         $stmt = $this->connection->prepare(
-            'SELECT e.event_id AS event_id,
-                    COALESCE(NULLIF(et.portal_audience, ""), "members") AS audience
-               FROM event_occurrence o
-               JOIN events_event e ON e.event_id = o.event_id
-          LEFT JOIN event_types et ON et.type_id = e.event_type
-              WHERE o.occurrence_id = :occurrence_id
+            'SELECT e.id AS event_id,
+                    COALESCE(NULLIF(et.audience, ""), "members") AS audience
+               FROM event_occurrences o
+               JOIN events e ON e.id = o.event_id
+          LEFT JOIN event_types et ON et.id = e.event_type_id
+              WHERE o.id = :occurrence_id
               LIMIT 1'
         );
         $stmt->bindValue(':occurrence_id', $occurrenceId, PDO::PARAM_INT);
@@ -400,52 +399,55 @@ final class ChurchCrmEventAdapter implements EventAdapter
         }
         $campusIds = $this->normalizeCampusIds($cmd['campus_ids'] ?? []);
 
-        // event_start / event_end are NOT NULL with no default. This used to
-        // insert NULL into both, so creation always failed on an integrity
-        // constraint. The caller now supplies a real window.
-        $start = (string) ($cmd['event_start'] ?? '');
-        $end = (string) ($cmd['event_end'] ?? '');
+        // The caller supplies the first date's window; the event keeps its
+        // date and clock times, and each occurrence keeps its own datetimes.
+        $start = (string) ($cmd['starts_at'] ?? '');
+        $end = (string) ($cmd['ends_at'] ?? '');
         if ($start === '' || $end === '') {
             throw new \InvalidArgumentException('An event needs a start and end datetime.');
         }
+        [$startsOn, $startTime, $endTime, $allDay] = self::splitWindow($start, $end);
 
-        $sql = 'INSERT INTO events_event
-                    (event_title, event_desc, event_start, event_end, is_multi_campus,
-                     custom_location_name, custom_location_address, ministry_id, event_type,
-                     assignment_scheduling_enabled)
-                VALUES (:title, :desc, :start, :end, :is_multi_campus, :loc_name, :loc_addr, :ministry_id, :event_type,
-                        :assignment_scheduling_enabled)';
+        $sql = 'INSERT INTO events
+                    (title, summary, starts_on, start_time, end_time, all_day,
+                     location_name, location_address, ministry_id, event_type_id,
+                     uses_serving_schedule, source_app)
+                VALUES (:title, :summary, :starts_on, :start_time, :end_time, :all_day,
+                        :location_name, :location_address, :ministry_id, :event_type_id,
+                        :uses_serving_schedule, :source_app)';
         $stmt = $this->connection->prepare($sql);
         $this->connection->beginTransaction();
         try {
             $stmt->bindValue(':title', $cmd['title'] ?? '', PDO::PARAM_STR);
-            $stmt->bindValue(':desc', $cmd['description'] ?? null, PDO::PARAM_STR);
-            $stmt->bindValue(':start', $start, PDO::PARAM_STR);
-            $stmt->bindValue(':end', $end, PDO::PARAM_STR);
-            $stmt->bindValue(':is_multi_campus', count($campusIds) > 1 ? 1 : 0, PDO::PARAM_INT);
-            // Location is not campus. These columns already existed and were
-            // never written, so an event held somewhere other than its campus
-            // had nowhere to say so.
-            $stmt->bindValue(':loc_name', $cmd['location_name'] ?? null, PDO::PARAM_STR);
-            $stmt->bindValue(':loc_addr', $cmd['location_address'] ?? null, PDO::PARAM_STR);
+            $summary = ($cmd['summary'] ?? '') === '' ? null : (string) $cmd['summary'];
+            $stmt->bindValue(':summary', $summary, $summary === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+            $stmt->bindValue(':starts_on', $startsOn, PDO::PARAM_STR);
+            $stmt->bindValue(':start_time', $startTime, $startTime === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+            $stmt->bindValue(':end_time', $endTime, $endTime === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+            $stmt->bindValue(':all_day', $allDay ? 1 : 0, PDO::PARAM_INT);
+            // Location is not campus: an event held somewhere other than its
+            // campus has somewhere to say so.
+            $locName = ($cmd['location_name'] ?? '') === '' ? null : (string) $cmd['location_name'];
+            $locAddr = ($cmd['location_address'] ?? '') === '' ? null : (string) $cmd['location_address'];
+            $stmt->bindValue(':location_name', $locName, $locName === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+            $stmt->bindValue(':location_address', $locAddr, $locAddr === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
             // NULL means church-wide, which is right for a holiday or Communion.
             $ministryId = isset($cmd['ministry_id']) && (int) $cmd['ministry_id'] > 0 ? (int) $cmd['ministry_id'] : null;
             $stmt->bindValue(':ministry_id', $ministryId, $ministryId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-            // event_type was missing from this INSERT entirely, so every event
-            // the portal created landed with 0 — an id matching no event_types
-            // row. That is why both the column and the table sat inert, and why
-            // ChurchCRM's attendance counts never worked for portal events.
             // Falling back to the configured default keeps the audience join
             // meaningful instead of relying on the COALESCE safety net.
             $typeId = isset($cmd['event_type_id']) && (int) $cmd['event_type_id'] > 0
                 ? (int) $cmd['event_type_id']
                 : $this->defaultTypeId();
-            $stmt->bindValue(':event_type', $typeId, PDO::PARAM_INT);
+            $stmt->bindValue(':event_type_id', $typeId, PDO::PARAM_INT);
             $stmt->bindValue(
-                ':assignment_scheduling_enabled',
-                !empty($cmd['assignment_scheduling_enabled']) ? 1 : 0,
+                ':uses_serving_schedule',
+                !empty($cmd['uses_serving_schedule']) ? 1 : 0,
                 PDO::PARAM_INT,
             );
+            // Events created here are the portal's own; a calendar sync from
+            // another application writes its own source_app and external_id.
+            $stmt->bindValue(':source_app', 'portal', PDO::PARAM_STR);
             $stmt->execute();
             $eventId = (int) $this->connection->lastInsertId();
             $this->syncEventCampuses($eventId, $campusIds, isset($cmd['host_campus_id']) ? (int) $cmd['host_campus_id'] : null);
@@ -485,25 +487,25 @@ final class ChurchCrmEventAdapter implements EventAdapter
             ? $this->normalizeCampusIds($cmd['campus_ids'])
             : array_values(array_map('intval', $current['campus_ids'] ?? []));
 
-        $sql = 'UPDATE events_event
-                   SET event_title = :title,
-                       event_desc = :desc,
-                       is_multi_campus = :is_multi_campus,
-                       event_type = :event_type,
+        $sql = 'UPDATE events
+                   SET title = :title,
+                       summary = :summary,
+                       event_type_id = :event_type_id,
                        ministry_id = :ministry_id,
-                       assignment_scheduling_enabled = :assignment_scheduling_enabled
-                 WHERE event_id = :event_id';
+                       uses_serving_schedule = :uses_serving_schedule
+                 WHERE id = :event_id';
         $stmt = $this->connection->prepare($sql);
         $this->connection->beginTransaction();
         try {
-            $stmt->bindValue(':title', $cmd['title'] ?? $current['event_title'] ?? '', PDO::PARAM_STR);
-            $stmt->bindValue(':desc', array_key_exists('description', $cmd) ? ($cmd['description'] ?? null) : ($current['event_desc'] ?? null), PDO::PARAM_STR);
-            $stmt->bindValue(':is_multi_campus', count($campusIds) > 1 ? 1 : 0, PDO::PARAM_INT);
+            $stmt->bindValue(':title', $cmd['title'] ?? $current['title'] ?? '', PDO::PARAM_STR);
+            $summary = array_key_exists('summary', $cmd) ? ($cmd['summary'] ?? null) : ($current['summary'] ?? null);
+            $summary = $summary === '' ? null : $summary;
+            $stmt->bindValue(':summary', $summary, $summary === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
             // A null event_type_id means "leave it alone", not "clear it".
             $typeId = isset($cmd['event_type_id']) && (int) $cmd['event_type_id'] > 0
                 ? (int) $cmd['event_type_id']
                 : (int) ($current['event_type_id'] ?? 0);
-            $stmt->bindValue(':event_type', $typeId, PDO::PARAM_INT);
+            $stmt->bindValue(':event_type_id', $typeId, PDO::PARAM_INT);
             // Null leaves the ministry alone; 0 clears it to church-wide. The
             // two have to stay distinguishable or "no particular ministry"
             // becomes unreachable once one has been set.
@@ -516,21 +518,23 @@ final class ChurchCrmEventAdapter implements EventAdapter
                 $stmt->bindValue(':ministry_id', $existing > 0 ? $existing : null,
                     $existing > 0 ? PDO::PARAM_INT : PDO::PARAM_NULL);
             }
-            if (array_key_exists('assignment_scheduling_enabled', $cmd) && $cmd['assignment_scheduling_enabled'] !== null) {
+            if (array_key_exists('uses_serving_schedule', $cmd) && $cmd['uses_serving_schedule'] !== null) {
                 $stmt->bindValue(
-                    ':assignment_scheduling_enabled',
-                    $cmd['assignment_scheduling_enabled'] ? 1 : 0,
+                    ':uses_serving_schedule',
+                    $cmd['uses_serving_schedule'] ? 1 : 0,
                     PDO::PARAM_INT,
                 );
             } else {
                 $stmt->bindValue(
-                    ':assignment_scheduling_enabled',
-                    !empty($current['assignment_scheduling_enabled']) ? 1 : 0,
+                    ':uses_serving_schedule',
+                    !empty($current['uses_serving_schedule']) ? 1 : 0,
                     PDO::PARAM_INT,
                 );
             }
             $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
             $ok = $stmt->execute();
+            // How many campuses an event is for is read from event_campuses,
+            // so rewriting them is all "multi-campus" needs.
             $this->syncEventCampuses($eventId, $campusIds);
             $this->connection->commit();
             return $ok;
@@ -548,12 +552,16 @@ final class ChurchCrmEventAdapter implements EventAdapter
         $this->connection->beginTransaction();
         try {
             $ids = [];
-            $sql = 'INSERT INTO event_occurrence (event_id, occurrence_start, occurrence_end) VALUES (:event_id, :start_at, :end_at)';
+            // original_starts_at records the date as it was first scheduled and
+            // is never written again, so a moved date can still be recognised.
+            $sql = 'INSERT INTO event_occurrences (event_id, original_starts_at, starts_at, ends_at, status)
+                    VALUES (:event_id, :original_starts_at, :starts_at, :ends_at, "scheduled")';
             $stmt = $this->connection->prepare($sql);
             foreach ($rows as $r) {
                 $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
-                $stmt->bindValue(':start_at', $r['occurrence_start'], PDO::PARAM_STR);
-                $stmt->bindValue(':end_at', $r['occurrence_end'], PDO::PARAM_STR);
+                $stmt->bindValue(':original_starts_at', $r['starts_at'], PDO::PARAM_STR);
+                $stmt->bindValue(':starts_at', $r['starts_at'], PDO::PARAM_STR);
+                $stmt->bindValue(':ends_at', $r['ends_at'], PDO::PARAM_STR);
                 $stmt->execute();
                 $ids[] = (int) $this->connection->lastInsertId();
             }
@@ -570,17 +578,18 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return [];
         }
+        // A tag is its slug. The label shown is the first one it was given,
+        // which is the one every use of it shares.
         $stmt = $this->connection->query(
-            'SELECT t.tag_id, t.tag_slug, t.tag_label,
-                    (SELECT COUNT(*) FROM event_tag_map m WHERE m.tag_id = t.tag_id) AS usage_count
-               FROM event_tag t
-           ORDER BY t.tag_label ASC'
+            'SELECT t.slug, MIN(t.label) AS label, COUNT(*) AS usage_count
+               FROM event_tags t
+           GROUP BY t.slug
+           ORDER BY label ASC'
         );
 
         return array_map(static fn (array $r): array => [
-            'tag_id' => (int) $r['tag_id'],
-            'slug' => (string) $r['tag_slug'],
-            'label' => (string) $r['tag_label'],
+            'slug' => (string) $r['slug'],
+            'label' => (string) $r['label'],
             'usage_count' => (int) $r['usage_count'],
         ], $stmt?->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
@@ -591,19 +600,17 @@ final class ChurchCrmEventAdapter implements EventAdapter
             return [];
         }
         $stmt = $this->connection->prepare(
-            'SELECT t.tag_id, t.tag_slug, t.tag_label
-               FROM event_tag_map m
-               JOIN event_tag t ON t.tag_id = m.tag_id
-              WHERE m.event_id = :event_id
-           ORDER BY t.tag_label ASC'
+            'SELECT t.slug, t.label
+               FROM event_tags t
+              WHERE t.event_id = :event_id
+           ORDER BY t.label ASC'
         );
         $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
         $stmt->execute();
 
         return array_map(static fn (array $r): array => [
-            'tag_id' => (int) $r['tag_id'],
-            'slug' => (string) $r['tag_slug'],
-            'label' => (string) $r['tag_label'],
+            'slug' => (string) $r['slug'],
+            'label' => (string) $r['label'],
         ], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
@@ -614,7 +621,7 @@ final class ChurchCrmEventAdapter implements EventAdapter
         }
         $this->connection->beginTransaction();
         try {
-            $ids = [];
+            $wanted = [];
             foreach ($tags as $tag) {
                 $slug = (string) $tag['slug'];
                 $label = (string) $tag['label'];
@@ -622,45 +629,31 @@ final class ChurchCrmEventAdapter implements EventAdapter
                 // lookup is keyed on. An existing tag keeps the label it was
                 // first given: renaming every past use because somebody typed
                 // it differently today would be a surprise, not a correction.
-                $find = $this->connection->prepare('SELECT tag_id FROM event_tag WHERE tag_slug = :slug LIMIT 1');
+                $find = $this->connection->prepare('SELECT label FROM event_tags WHERE slug = :slug LIMIT 1');
                 $find->bindValue(':slug', $slug, PDO::PARAM_STR);
                 $find->execute();
                 $row = $find->fetch(PDO::FETCH_ASSOC);
-                if ($row !== false) {
-                    $ids[] = (int) $row['tag_id'];
-                    continue;
-                }
-                $ins = $this->connection->prepare(
-                    'INSERT INTO event_tag (tag_slug, tag_label, created_at) VALUES (:slug, :label, NOW())'
-                );
-                $ins->bindValue(':slug', $slug, PDO::PARAM_STR);
-                $ins->bindValue(':label', $label, PDO::PARAM_STR);
-                $ins->execute();
-                $ids[] = (int) $this->connection->lastInsertId();
+                $wanted[$slug] ??= $row !== false ? (string) $row['label'] : $label;
             }
 
             // Replace rather than merge: the caller sent the complete list, and
-            // an "add only" write gives no way to remove one.
-            $del = $this->connection->prepare('DELETE FROM event_tag_map WHERE event_id = :event_id');
+            // an "add only" write gives no way to remove one. A tag nothing
+            // carries any more stops existing with its last row.
+            $del = $this->connection->prepare('DELETE FROM event_tags WHERE event_id = :event_id');
             $del->bindValue(':event_id', $eventId, PDO::PARAM_INT);
             $del->execute();
 
-            if ($ids !== []) {
-                $map = $this->connection->prepare(
-                    'INSERT INTO event_tag_map (event_id, tag_id) VALUES (:event_id, :tag_id)'
+            if ($wanted !== []) {
+                $ins = $this->connection->prepare(
+                    'INSERT INTO event_tags (event_id, slug, label) VALUES (:event_id, :slug, :label)'
                 );
-                foreach (array_unique($ids) as $tagId) {
-                    $map->bindValue(':event_id', $eventId, PDO::PARAM_INT);
-                    $map->bindValue(':tag_id', $tagId, PDO::PARAM_INT);
-                    $map->execute();
+                foreach ($wanted as $slug => $label) {
+                    $ins->bindValue(':event_id', $eventId, PDO::PARAM_INT);
+                    $ins->bindValue(':slug', (string) $slug, PDO::PARAM_STR);
+                    $ins->bindValue(':label', $label, PDO::PARAM_STR);
+                    $ins->execute();
                 }
             }
-
-            // A tag nothing carries any more is not a tag. Leaving them behind
-            // fills the picker with things somebody typed once by mistake.
-            $this->connection->exec(
-                'DELETE FROM event_tag WHERE tag_id NOT IN (SELECT tag_id FROM event_tag_map)'
-            );
 
             $this->connection->commit();
         } catch (\Throwable $e) {
@@ -676,11 +669,7 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return [];
         }
-        $stmt = $this->connection->prepare(
-            'SELECT m.event_id FROM event_tag_map m
-               JOIN event_tag t ON t.tag_id = m.tag_id
-              WHERE t.tag_slug = :slug'
-        );
+        $stmt = $this->connection->prepare('SELECT event_id FROM event_tags WHERE slug = :slug');
         $stmt->bindValue(':slug', $slug, PDO::PARAM_STR);
         $stmt->execute();
 
@@ -692,22 +681,18 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return false;
         }
-        // is_modified is derived, never supplied. It exists so a reader can
-        // tell "this date differs from its series" without comparing strings,
-        // and the only way it stays true is if one statement owns both.
-        $modified = ($title !== null && $title !== '') || ($desc !== null && $desc !== '');
+        // is_modified is derived on read (a moved date, or an override), so
+        // only the overrides themselves are written.
         $stmt = $this->connection->prepare(
-            'UPDATE event_occurrence
-                SET override_title = :title,
-                    override_desc = :desc,
-                    is_modified = :modified
-              WHERE occurrence_id = :id'
+            'UPDATE event_occurrences
+                SET title_override = :title,
+                    details_override = :details
+              WHERE id = :id'
         );
         $stmt->bindValue(':title', $title === '' ? null : $title,
             $title === null || $title === '' ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $stmt->bindValue(':desc', $desc === '' ? null : $desc,
+        $stmt->bindValue(':details', $desc === '' ? null : $desc,
             $desc === null || $desc === '' ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $stmt->bindValue(':modified', $modified ? 1 : 0, PDO::PARAM_INT);
         $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
 
         return $stmt->execute();
@@ -719,15 +704,29 @@ final class ChurchCrmEventAdapter implements EventAdapter
             return null;
         }
         $stmt = $this->connection->prepare(
-            'SELECT occurrence_id, event_id, occurrence_start, occurrence_end,
-                    is_cancelled, is_modified, override_title, override_desc
-               FROM event_occurrence WHERE occurrence_id = :id LIMIT 1'
+            'SELECT id, event_id, starts_at, ends_at, original_starts_at,
+                    status, title_override, details_override
+               FROM event_occurrences WHERE id = :id LIMIT 1'
         );
         $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
         $stmt->execute();
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
 
-        return $row === false ? null : $row;
+        return [
+            'occurrence_id' => (int) $row['id'],
+            'event_id' => (int) $row['event_id'],
+            'starts_at' => (string) $row['starts_at'],
+            'ends_at' => (string) $row['ends_at'],
+            'original_starts_at' => (string) $row['original_starts_at'],
+            'status' => (string) $row['status'],
+            'is_cancelled' => (string) $row['status'] === 'cancelled',
+            'is_modified' => self::isModified($row),
+            'title_override' => $row['title_override'],
+            'details_override' => $row['details_override'],
+        ];
     }
 
     public function setOccurrenceCancelled(int $occurrenceId, bool $cancelled): bool
@@ -736,9 +735,9 @@ final class ChurchCrmEventAdapter implements EventAdapter
             return false;
         }
         $stmt = $this->connection->prepare(
-            'UPDATE event_occurrence SET is_cancelled = :cancelled WHERE occurrence_id = :id'
+            'UPDATE event_occurrences SET status = :status WHERE id = :id'
         );
-        $stmt->bindValue(':cancelled', $cancelled ? 1 : 0, PDO::PARAM_INT);
+        $stmt->bindValue(':status', $cancelled ? 'cancelled' : 'scheduled', PDO::PARAM_STR);
         $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
 
         return $stmt->execute();
@@ -749,9 +748,24 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return false;
         }
-        $stmt = $this->connection->prepare('DELETE FROM event_occurrence WHERE occurrence_id = :id');
-        $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
-        return $stmt->execute();
+        // The service has already refused unless nobody is scheduled or the
+        // deletion was confirmed. Assignments refuse to be orphaned, so a
+        // confirmed deletion takes them with the date, in one transaction.
+        $this->connection->beginTransaction();
+        try {
+            $del = $this->connection->prepare('DELETE FROM assignments WHERE occurrence_id = :id');
+            $del->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
+            $del->execute();
+            $stmt = $this->connection->prepare('DELETE FROM event_occurrences WHERE id = :id');
+            $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
+            $ok = $stmt->execute();
+            $this->connection->commit();
+
+            return $ok;
+        } catch (\Throwable $e) {
+            $this->connection->rollBack();
+            throw $e;
+        }
     }
 
     public function listEventOccurrences(int $eventId): array
@@ -760,19 +774,19 @@ final class ChurchCrmEventAdapter implements EventAdapter
             return [];
         }
         $stmt = $this->connection->prepare(
-            'SELECT occurrence_id, occurrence_start, occurrence_end
-               FROM event_occurrence
+            'SELECT id, starts_at, ends_at
+               FROM event_occurrences
               WHERE event_id = :event_id
-              ORDER BY occurrence_start ASC'
+              ORDER BY starts_at ASC'
         );
         $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
         $stmt->execute();
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
             $out[] = [
-                'occurrence_id' => (int) $row['occurrence_id'],
-                'occurrence_start' => (string) $row['occurrence_start'],
-                'occurrence_end' => (string) $row['occurrence_end'],
+                'occurrence_id' => (int) $row['id'],
+                'starts_at' => (string) $row['starts_at'],
+                'ends_at' => (string) $row['ends_at'],
             ];
         }
 
@@ -784,70 +798,49 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return false;
         }
+        // original_starts_at is left alone: it is what the date was first.
         $stmt = $this->connection->prepare(
-            'UPDATE event_occurrence SET occurrence_start = :start_at, occurrence_end = :end_at
-              WHERE occurrence_id = :id'
+            'UPDATE event_occurrences SET starts_at = :starts_at, ends_at = :ends_at
+              WHERE id = :id'
         );
-        $stmt->bindValue(':start_at', $start, PDO::PARAM_STR);
-        $stmt->bindValue(':end_at', $end, PDO::PARAM_STR);
+        $stmt->bindValue(':starts_at', $start, PDO::PARAM_STR);
+        $stmt->bindValue(':ends_at', $end, PDO::PARAM_STR);
         $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
 
         return $stmt->execute();
     }
 
     /**
-     * Remove an event and everything hanging off it.
+     * Keep the repeat rule on the event itself.
      *
-     * Occurrences and campus links are removed here rather than left to a
-     * foreign key: the campus link table is written by this adapter and the
-     * occurrence rows are what the calendar reads, so an event deleted without
-     * them would vanish from the events list and go on appearing in the
-     * calendar.
-     *
-     * Assignments are the caller's problem — the service refuses to reach this
-     * method while any exist unless the deletion was explicitly confirmed.
+     * A null rule is "this event no longer repeats": the frequency goes back
+     * to 'none' and every other repeat column is cleared, so a stale end date
+     * or weekday cannot outlive the rule it belonged to.
      */
     public function saveRecurrence(int $eventId, ?array $rule): void
     {
         if ($this->connection === null) {
             return;
         }
-        // Replace rather than upsert. event_recurrence is keyed by event_id
-        // alone, so one delete plus at most one insert says exactly what is
-        // meant — including "this event no longer repeats", which an upsert
-        // cannot express.
-        $this->connection->beginTransaction();
-        try {
-            $del = $this->connection->prepare('DELETE FROM event_recurrence WHERE event_id = :event_id');
-            $del->bindValue(':event_id', $eventId, PDO::PARAM_INT);
-            $del->execute();
-
-            if ($rule !== null) {
-                $stmt = $this->connection->prepare(
-                    'INSERT INTO event_recurrence
-                        (event_id, recurrence_type, recurrence_interval, recurrence_days_of_week,
-                         recurrence_week_of_month, recurrence_until, recurrence_count,
-                         created_at, updated_at)
-                     VALUES (:event_id, :type, :interval, :dow, :week, :until, :cnt, NOW(), NOW())'
-                );
-                $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
-                $stmt->bindValue(':type', (string) $rule['recurrence_type'], PDO::PARAM_STR);
-                $stmt->bindValue(':interval', (int) ($rule['recurrence_interval'] ?? 1), PDO::PARAM_INT);
-                $stmt->bindValue(':dow', $rule['recurrence_days_of_week'] ?? null,
-                    $rule['recurrence_days_of_week'] === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-                $stmt->bindValue(':week', $rule['recurrence_week_of_month'] ?? null,
-                    ($rule['recurrence_week_of_month'] ?? null) === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-                $stmt->bindValue(':until', $rule['recurrence_until'] ?? null,
-                    ($rule['recurrence_until'] ?? null) === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-                $stmt->bindValue(':cnt', $rule['recurrence_count'] ?? null,
-                    ($rule['recurrence_count'] ?? null) === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-                $stmt->execute();
-            }
-            $this->connection->commit();
-        } catch (\Throwable $e) {
-            $this->connection->rollBack();
-            throw $e;
-        }
+        $stmt = $this->connection->prepare(
+            'UPDATE events
+                SET repeat_frequency = :frequency, repeat_interval = :interval,
+                    repeat_weekdays = :weekdays, repeat_week_of_month = :week,
+                    repeat_until = :until, repeat_count = :cnt
+              WHERE id = :event_id'
+        );
+        $weekdays = $rule['repeat_weekdays'] ?? null;
+        $week = $rule['repeat_week_of_month'] ?? null;
+        $until = $rule['repeat_until'] ?? null;
+        $count = $rule['repeat_count'] ?? null;
+        $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
+        $stmt->bindValue(':frequency', $rule === null ? 'none' : (string) $rule['repeat_frequency'], PDO::PARAM_STR);
+        $stmt->bindValue(':interval', $rule === null ? 1 : (int) ($rule['repeat_interval'] ?? 1), PDO::PARAM_INT);
+        $stmt->bindValue(':weekdays', $weekdays, $weekdays === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':week', $week, $week === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':until', $until, $until === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':cnt', $count, $count === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->execute();
     }
 
     public function findRecurrence(int $eventId): ?array
@@ -855,7 +848,13 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return null;
         }
-        $stmt = $this->connection->prepare('SELECT * FROM event_recurrence WHERE event_id = :event_id LIMIT 1');
+        $stmt = $this->connection->prepare(
+            'SELECT id AS event_id, repeat_frequency, repeat_interval, repeat_weekdays,
+                    repeat_week_of_month, repeat_until, repeat_count
+               FROM events
+              WHERE id = :event_id AND repeat_frequency <> "none"
+              LIMIT 1'
+        );
         $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
         $stmt->execute();
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -863,6 +862,16 @@ final class ChurchCrmEventAdapter implements EventAdapter
         return $row === false ? null : $row;
     }
 
+    /**
+     * Remove an event and everything hanging off it.
+     *
+     * Assignments and occurrences are removed here rather than left to a
+     * foreign key: occurrences refuse to cascade, because they are what
+     * assignments attach to. Campus links and tags cascade with the event.
+     *
+     * Assignments are the caller's problem — the service refuses to reach this
+     * method while any exist unless the deletion was explicitly confirmed.
+     */
     public function deleteEvent(int $eventId): bool
     {
         if ($this->connection === null) {
@@ -871,16 +880,16 @@ final class ChurchCrmEventAdapter implements EventAdapter
         $this->connection->beginTransaction();
         try {
             foreach ([
-                'DELETE FROM assignment WHERE occurrence_id IN (SELECT occurrence_id FROM event_occurrence WHERE event_id = :event_id)',
-                'DELETE FROM event_occurrence WHERE event_id = :event_id',
-                'DELETE FROM events_event_campus WHERE event_id = :event_id',
-                'DELETE FROM events_event WHERE event_id = :event_id',
+                'DELETE FROM assignments WHERE occurrence_id IN (SELECT id FROM event_occurrences WHERE event_id = :event_id)',
+                'DELETE FROM event_occurrences WHERE event_id = :event_id',
+                'DELETE FROM event_campuses WHERE event_id = :event_id',
+                'DELETE FROM events WHERE id = :event_id',
             ] as $sql) {
                 $stmt = $this->connection->prepare($sql);
                 $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
                 $stmt->execute();
                 $affected = $stmt->rowCount();
-                if (str_contains($sql, 'events_event WHERE') && $affected === 0) {
+                if (str_starts_with($sql, 'DELETE FROM events WHERE') && $affected === 0) {
                     $this->connection->rollBack();
 
                     return false;
@@ -905,13 +914,13 @@ final class ChurchCrmEventAdapter implements EventAdapter
             // The event id is in the WHERE clause so an occurrence of another
             // event cannot be moved through this call, however its id arrived.
             $stmt = $this->connection->prepare(
-                'UPDATE event_occurrence SET occurrence_start = :start_at, occurrence_end = :end_at
-                  WHERE occurrence_id = :id AND event_id = :event_id'
+                'UPDATE event_occurrences SET starts_at = :starts_at, ends_at = :ends_at
+                  WHERE id = :id AND event_id = :event_id'
             );
             $updated = 0;
             foreach ($rows as $r) {
-                $stmt->bindValue(':start_at', $r['occurrence_start'], PDO::PARAM_STR);
-                $stmt->bindValue(':end_at', $r['occurrence_end'], PDO::PARAM_STR);
+                $stmt->bindValue(':starts_at', $r['starts_at'], PDO::PARAM_STR);
+                $stmt->bindValue(':ends_at', $r['ends_at'], PDO::PARAM_STR);
                 $stmt->bindValue(':id', (int) $r['occurrence_id'], PDO::PARAM_INT);
                 $stmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
                 $stmt->execute();
@@ -937,8 +946,16 @@ final class ChurchCrmEventAdapter implements EventAdapter
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $this->connection->beginTransaction();
         try {
+            // Confirmed by the service when anybody was scheduled; the
+            // assignments go with their dates rather than blocking the delete.
+            $assigned = $this->connection->prepare(
+                'DELETE a FROM assignments a
+                   JOIN event_occurrences o ON o.id = a.occurrence_id
+                  WHERE o.event_id = ? AND o.id IN (' . $placeholders . ')'
+            );
+            $assigned->execute(array_merge([$eventId], $ids));
             $stmt = $this->connection->prepare(
-                'DELETE FROM event_occurrence WHERE event_id = ? AND occurrence_id IN (' . $placeholders . ')'
+                'DELETE FROM event_occurrences WHERE event_id = ? AND id IN (' . $placeholders . ')'
             );
             $stmt->execute(array_merge([$eventId], $ids));
             $deleted = $stmt->rowCount();
@@ -959,7 +976,7 @@ final class ChurchCrmEventAdapter implements EventAdapter
         }
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $this->connection->prepare(
-            'SELECT COUNT(*) AS c FROM assignment WHERE occurrence_id IN (' . $placeholders . ')'
+            'SELECT COUNT(*) AS c FROM assignments WHERE occurrence_id IN (' . $placeholders . ')'
         );
         $stmt->execute($ids);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -989,11 +1006,49 @@ final class ChurchCrmEventAdapter implements EventAdapter
         if ($this->connection === null) {
             return 0;
         }
-        $stmt = $this->connection->prepare('SELECT COUNT(*) AS c FROM assignment WHERE occurrence_id = :id');
+        $stmt = $this->connection->prepare('SELECT COUNT(*) AS c FROM assignments WHERE occurrence_id = :id');
         $stmt->bindValue(':id', $occurrenceId, PDO::PARAM_INT);
         $stmt->execute();
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row === false ? 0 : (int) $row['c'];
+    }
+
+    /**
+     * A date differs from its series when it was moved or says something of
+     * its own. Derived, never stored, so it cannot disagree with the row.
+     *
+     * @param array<string,mixed> $row
+     */
+    private static function isModified(array $row): bool
+    {
+        return (string) ($row['starts_at'] ?? '') !== (string) ($row['original_starts_at'] ?? $row['starts_at'] ?? '')
+            || ($row['title_override'] ?? '') !== ''
+            || ($row['details_override'] ?? '') !== '';
+    }
+
+    /**
+     * An event's first window as the event row stores it: a date, clock times
+     * and an all-day flag. A window that starts and ends at midnight is all
+     * day, which is how an all-day date has always been written.
+     *
+     * @return array{0:string,1:?string,2:?string,3:bool}
+     */
+    private static function splitWindow(string $start, string $end): array
+    {
+        $startsOn = substr($start, 0, 10);
+        $startTime = strlen($start) > 10 ? substr($start, 11, 8) : '00:00:00';
+        $endTime = strlen($end) > 10 ? substr($end, 11, 8) : '00:00:00';
+        if (strlen($startTime) === 5) {
+            $startTime .= ':00';
+        }
+        if (strlen($endTime) === 5) {
+            $endTime .= ':00';
+        }
+        if ($startTime === '00:00:00' && $endTime === '00:00:00') {
+            return [$startsOn, null, null, true];
+        }
+
+        return [$startsOn, $startTime, $endTime, false];
     }
 
     /** @param list<int>|array<int, int|string> $campusIds
@@ -1007,14 +1062,13 @@ final class ChurchCrmEventAdapter implements EventAdapter
         )));
     }
 
-    /** @param list<int> $campusIds */
     /**
      * @param list<int> $campusIds campuses the event is relevant to
      * @param int|null  $hostCampusId the campus that physically hosts it
      */
     private function syncEventCampuses(int $eventId, array $campusIds, ?int $hostCampusId = null): void
     {
-        $deleteStmt = $this->connection->prepare('DELETE FROM events_event_campus WHERE event_id = :event_id');
+        $deleteStmt = $this->connection->prepare('DELETE FROM event_campuses WHERE event_id = :event_id');
         $deleteStmt->bindValue(':event_id', $eventId, PDO::PARAM_INT);
         $deleteStmt->execute();
 
@@ -1031,7 +1085,7 @@ final class ChurchCrmEventAdapter implements EventAdapter
         }
 
         $insertStmt = $this->connection->prepare(
-            'INSERT INTO events_event_campus (event_id, campus_id, is_host)
+            'INSERT INTO event_campuses (event_id, campus_id, is_host)
                   VALUES (:event_id, :campus_id, :is_host)'
         );
         foreach ($campusIds as $index => $campusId) {

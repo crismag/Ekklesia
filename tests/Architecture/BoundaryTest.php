@@ -110,7 +110,7 @@ final class FakeScheduleRepository implements ScheduleRepository
      * @param list<int> $campusIds
      * @return list<int>
      */
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array
     {
         $ids = [];
         foreach ($this->eligibleEvents as $event) {
@@ -152,7 +152,7 @@ final class FakeScheduleRepository implements ScheduleRepository
                 [
                     'id' => 101,
                     'person_id' => $personId,
-                    'role_id' => 7,
+                    'serving_role_id' => 7,
                     'role_name' => 'Usher',
                     'ministry_id' => 10,
                     'ministry_name' => 'Hospitality',

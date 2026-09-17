@@ -3,7 +3,7 @@
 /**
  * CLI diagnostic for the portal calendar adapter.
  *
- * Calls ChurchCrmCalendarAdapter::listSystemItems with the same plumbing the
+ * Calls SqlCalendarAdapter::listSystemItems with the same plumbing the
  * /api/calendar/sources route uses, and prints the resulting items. Lets us
  * verify that recurring event occurrences (and birthday/anniversary items)
  * are surfaced correctly, without requiring an authenticated browser session.
@@ -16,7 +16,7 @@
 declare(strict_types=1);
 
 // Mirror public/index.php's autoloader and env loader so the App\ namespace
-// resolves and the ChurchCRM PDO can be built from the portal's .env.
+// resolves and the member database PDO can be built from the portal's .env.
 spl_autoload_register(function (string $class): void {
     $prefix = 'App\\';
     if (!str_starts_with($class, $prefix)) {
@@ -29,7 +29,7 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
-use App\Adapters\ChurchCRM\ChurchCrmCalendarAdapter;
+use App\Adapters\Sql\SqlCalendarAdapter;
 use App\Core\Config\EnvLoader;
 use App\Core\Database\MembersConnection;
 
@@ -44,11 +44,11 @@ $endDt   = new DateTimeImmutable($end);
 
 $pdo = MembersConnection::get();
 if ($pdo === null) {
-    fwrite(STDERR, "FAIL: ChurchCRM PDO not available.\n");
+    fwrite(STDERR, "FAIL: member database PDO not available.\n");
     exit(1);
 }
 
-$adapter = new ChurchCrmCalendarAdapter($pdo);
+$adapter = new SqlCalendarAdapter($pdo);
 $items = $adapter->listSystemItems($startDt, $endDt, $campusId);
 
 printf(

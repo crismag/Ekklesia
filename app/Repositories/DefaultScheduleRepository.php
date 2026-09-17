@@ -15,7 +15,7 @@ use DateTimeImmutable;
  * Composes a ScheduleAdapter (the source-specific data layer) into the shape
  * the service contract expects. This class contains zero SQL; all storage
  * concerns live in the adapter. When the underlying source changes (e.g.
- * ChurchCRM is replaced), the adapter is swapped via the service container —
+ * the store is replaced), the adapter is swapped via the service container —
  * this repository is unchanged.
  */
 final class DefaultScheduleRepository implements ScheduleRepository
@@ -54,9 +54,9 @@ final class DefaultScheduleRepository implements ScheduleRepository
      * @param list<int> $campusIds
      * @return list<int>
      */
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array
     {
-        return $this->adapter->listDefaultAssignmentEventIds($campusIds);
+        return $this->adapter->listDefaultSchedulingEventIds($campusIds);
     }
 
     /**

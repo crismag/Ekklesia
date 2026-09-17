@@ -68,7 +68,7 @@ final class FakeScheduleRepository implements ScheduleRepository
     public function fetchScheduleGrid(int $ministryId, DateTimeImmutable $start, DateTimeImmutable $end, array $campusIds = [], ?array $eventIds = null): array { return []; }
     public function listEligibleSchedulingEvents(array $campusIds = []): array { return []; }
     public function listSchedulableEventsInRange(array $campusIds, DateTimeImmutable $start, DateTimeImmutable $end): array { return []; }
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array { return []; }
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array { return []; }
     public function fetchMySchedule(int $personId, DateTimeImmutable $start, DateTimeImmutable $end): array { return []; }
     public function saveAssignments(\App\DTO\Schedules\AssignmentBatchCommand $command): array { return ['saved' => true, 'assignment_count' => 0]; }
     public function __call(string $name, array $args): mixed { return []; }
@@ -78,7 +78,7 @@ $row = static fn (string $ministry, string $role, string $person, int $mid = 1):
     'occurrence_id' => 9, 'event_id' => 5, 'event_title' => 'Sunday Worship Service',
     'starts_on' => '2026-08-23T09:00:00+00:00', 'ends_on' => '2026-08-23T11:00:00+00:00',
     'ministry_id' => $mid, 'ministry_name' => $ministry,
-    'role_id' => 1, 'role_name' => $role,
+    'serving_role_id' => 1, 'role_name' => $role,
     'person_id' => null, 'person_name' => $person,
 ];
 

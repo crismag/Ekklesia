@@ -188,18 +188,13 @@ if (!function_exists('ee_html')) {
 
         $typeOptions = '';
         foreach ($types as $t) {
-            $id = (int) ($t['typeId'] ?? $t['type_id'] ?? $t['id'] ?? 0);
+            $id = (int) ($t['typeId'] ?? $t['id'] ?? 0);
             if ($id <= 0) {
                 continue;
             }
-            // The type's own default start time rides along on the option, so
-            // choosing "Church Service" can fill in 08:00 without another
-            // request. ChurchCRM already stores these and nothing read them.
             $typeOptions .= '<option value="' . $id . '"'
-                . ' data-start="' . pc_attr(substr((string) ($t['default_start_time'] ?? ''), 0, 5)) . '"'
-                . ' data-repeat="' . pc_attr((string) ($t['default_recurrence'] ?? '')) . '"'
                 . ((int) ($v['eventTypeId'] ?? 0) === $id ? ' selected' : '') . '>'
-                . pc_attr((string) ($t['label'] ?? $t['name'] ?? $t['type_name'] ?? '')) . '</option>';
+                . pc_attr((string) ($t['label'] ?? $t['name'] ?? '')) . '</option>';
         }
 
         // "All campuses" is a chip of its own rather than the meaning of an
@@ -244,7 +239,7 @@ if (!function_exists('ee_html')) {
         }
 
         $desc = pc_attr((string) ($v['description'] ?? ''));
-        $assignOn = !empty($v['assignmentSchedulingEnabled']) || !empty($v['assignment_scheduling_enabled']);
+        $assignOn = !empty($v['usesServingSchedule']) || !empty($v['uses_serving_schedule']);
         $assignChecked = $assignOn ? ' checked' : '';
         // An event that already has a description must show it, not hide it
         // behind a disclosure the editor would have to be told to open.
@@ -458,8 +453,6 @@ if (!function_exists('ee_script')) {
             // its properties, and its dates are managed as a schedule below.
             const hasWhen = !!(date && repeat && allDay);
             let dates = (opts.selectedDates || []).slice();
-            // Only stop overwriting the time once somebody has actually set one.
-            let timeTouched = !!(start && start.value);
 
             // ---- selected dates ------------------------------------------
             function renderDates() {
@@ -599,22 +592,6 @@ if (!function_exists('ee_script')) {
                 if (this.checked) { start.value = ''; end.value = ''; }
                 say();
             });
-            start?.addEventListener('input', function () { timeTouched = true; });
-
-            // A type carries its own default start time and repeat, already in
-            // ChurchCRM and never read until now. Applied only while the user
-            // has not set a time themselves.
-            type?.addEventListener('change', function () {
-                const o = this.selectedOptions[0];
-                if (!o || !hasWhen) return;
-                if (!timeTouched && o.dataset.start) { start.value = o.dataset.start; }
-                if (repeat.value === 'one_off' && o.dataset.repeat &&
-                    o.dataset.repeat !== 'none' && repeat.querySelector('[value="' + o.dataset.repeat + '"]')) {
-                    repeat.value = o.dataset.repeat;
-                    syncRepeat();
-                }
-                say();
-            });
 
             form.addEventListener('input', say);
             form.addEventListener('change', say);
@@ -696,7 +673,7 @@ if (!function_exists('ee_script')) {
                     hostCampusId: id('eeHost')?.value || null,
                     locationName: elsewhere ? (id('eeLocName')?.value.trim() || null) : null,
                     locationAddress: elsewhere ? (id('eeLocAddress')?.value.trim() || null) : null,
-                    assignmentSchedulingEnabled: !!(id('eeAssignmentScheduling') && id('eeAssignmentScheduling').checked),
+                    usesServingSchedule: !!(id('eeAssignmentScheduling') && id('eeAssignmentScheduling').checked),
                 };
                 if (hasWhen) {
                     body.pattern = repeat.value;

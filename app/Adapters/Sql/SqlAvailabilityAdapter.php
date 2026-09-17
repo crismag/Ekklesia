@@ -10,10 +10,10 @@ use DateTimeImmutable;
 use PDO;
 
 /**
- * Member-database adapter for unavailability.
+ * Adapter for unavailability: dates a person cannot serve.
  *
- * Read / write paths are kept symmetric with the auth adapter: distinct named
- * placeholders only, integers bound as PDO::PARAM_INT, dates formatted in PHP.
+ * Distinct named placeholders only, integers bound as PDO::PARAM_INT, dates
+ * formatted in PHP.
  */
 final class SqlAvailabilityAdapter implements AvailabilityAdapter
 {
@@ -131,7 +131,8 @@ final class SqlAvailabilityAdapter implements AvailabilityAdapter
         $stmt->bindValue(':starts_on',  $command->startsOn->format('Y-m-d'), PDO::PARAM_STR);
         $stmt->bindValue(':ends_on',    $command->endsOn->format('Y-m-d'),   PDO::PARAM_STR);
         $stmt->bindValue(':reason',     $command->reason,                    $command->reason === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $stmt->bindValue(':created_by', $createdByAccountId,              PDO::PARAM_INT);
+        $stmt->bindValue(':created_by', $createdByAccountId > 0 ? $createdByAccountId : null,
+            $createdByAccountId > 0 ? PDO::PARAM_INT : PDO::PARAM_NULL);
         $stmt->bindValue(':created_at', $now->format('Y-m-d H:i:s'),         PDO::PARAM_STR);
         $stmt->bindValue(':updated_at', $now->format('Y-m-d H:i:s'),         PDO::PARAM_STR);
         $stmt->execute();

@@ -17,12 +17,12 @@ use DateTimeImmutable;
  *
  * Two sources exist, and they are genuinely different systems:
  *
- *   assignment → roles → group_grp   (ChurchCRM) — someone rostered onto a role
+ *   assignments → serving_roles → ministries — someone rostered onto a role
  *                                     of a ministry, for a dated occurrence.
  *                                     This is the shape the printed schedule
  *                                     has always had: ministry, role, names.
  *
- *   schedule_roster*                 (portal) — a container with dated or
+ *   rosters → roster_slots           — a container with dated or
  *                                     weekday slots, each carrying a label, a
  *                                     location and one or more assignees.
  *
@@ -32,8 +32,8 @@ use DateTimeImmutable;
  * without a database and grows a second copy of these rules the moment a
  * second template exists.
  *
- * Nothing is invented. Ministries come from group_grp, roles from the roles
- * table, names from person_per or from the label somebody typed. A ministry
+ * Nothing is invented. Ministries come from ministries, roles from the
+ * serving_roles table, names from people or from the label somebody typed. A ministry
  * that has no assignments on the day does not appear — a card reading
  * "Facilities: nobody" is not what a noticeboard is for, though the builder
  * does say so in its warnings.
@@ -280,7 +280,7 @@ final class MinistryScheduleDocumentBuilder
     {
         $assignments = array_values($section['roles']);
         // People within a role in the order they were assigned; roles in the
-        // order the source gave them, which for assignments is role_order.
+        // order the source gave them, which for assignments is the serving role's sort_order.
         foreach ($assignments as $i => $a) {
             $seen = [];
             $unique = [];

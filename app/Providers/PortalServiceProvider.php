@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Adapters\ChurchCRM\ChurchCrmCalendarAdapter;
+use App\Adapters\Sql\SqlCalendarAdapter;
 use App\Adapters\Sql\SqlMinistryAdapter;
-use App\Adapters\ChurchCRM\ChurchCrmEventAdapter;
-use App\Adapters\ChurchCRM\ChurchCrmScheduleAdapter;
+use App\Adapters\Sql\SqlEventAdapter;
+use App\Adapters\Sql\SqlScheduleAdapter;
 use App\Adapters\Sql\SqlAuthAdapter;
 use App\Adapters\Sql\SqlAvailabilityAdapter;
 use App\Contracts\AuthAdapter;
@@ -47,7 +47,7 @@ final class PortalServiceProvider
      *                              ↑
      *                         ScheduleAdapter contract
      *                              ↑
-     *                         ChurchCrmScheduleAdapter  (ChurchCRM SQL only)
+     *                         SqlScheduleAdapter  (SQL only)
      *                              ↑
      *                         PDO from MembersConnection
      *
@@ -59,11 +59,11 @@ final class PortalServiceProvider
     {
         return [
             \App\Contracts\EventTypeRepository::class => \App\Repositories\DefaultEventTypeRepository::class,
-            \App\Contracts\EventTypeAdapter::class    => \App\Adapters\ChurchCRM\ChurchCrmEventTypeAdapter::class,
+            \App\Contracts\EventTypeAdapter::class    => \App\Adapters\Sql\SqlEventTypeAdapter::class,
             CalendarRepository::class     => DefaultCalendarRepository::class,
-            CalendarAdapter::class        => ChurchCrmCalendarAdapter::class,
+            CalendarAdapter::class        => SqlCalendarAdapter::class,
             ScheduleRepository::class     => DefaultScheduleRepository::class,
-            ScheduleAdapter::class        => ChurchCrmScheduleAdapter::class,
+            ScheduleAdapter::class        => SqlScheduleAdapter::class,
             MinistryRepository::class     => DefaultMinistryRepository::class,
             MinistryAdapter::class        => SqlMinistryAdapter::class,
             AuthRepository::class         => DefaultAuthRepository::class,
@@ -91,7 +91,7 @@ final class PortalServiceProvider
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
         $pdo = MembersConnection::get();
-        $adapter = new ChurchCrmScheduleAdapter($pdo);
+        $adapter = new SqlScheduleAdapter($pdo);
         $repository = new DefaultScheduleRepository($adapter);
         return new ScheduleService($repository);
     }
@@ -111,7 +111,7 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for EventService.
-     * Wires:  MembersConnection → ChurchCrmEventAdapter → DefaultEventRepository → EventService
+     * Wires:  MembersConnection → SqlEventAdapter → DefaultEventRepository → EventService
      */
     /** Saved calendar views: the print studio's reusable configurations. */
     public static function makeSavedViewService(): \App\Services\Calendar\SavedViewService
@@ -127,7 +127,7 @@ final class PortalServiceProvider
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
         $pdo = MembersConnection::get();
-        $adapter = new ChurchCrmEventAdapter($pdo);
+        $adapter = new SqlEventAdapter($pdo);
         $repository = new \App\Repositories\DefaultEventRepository($adapter);
 
         // Ministry names come from the portal database for display on the
@@ -160,7 +160,7 @@ final class PortalServiceProvider
     public static function makeEventTypeService(): \App\Services\EventTypeService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $adapter = new \App\Adapters\ChurchCRM\ChurchCrmEventTypeAdapter(MembersConnection::get());
+        $adapter = new \App\Adapters\Sql\SqlEventTypeAdapter(MembersConnection::get());
         $repository = new \App\Repositories\DefaultEventTypeRepository($adapter);
 
         return new \App\Services\EventTypeService($repository);
@@ -293,13 +293,13 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for CalendarService.
-     * Wires:  MembersConnection → ChurchCrmCalendarAdapter → DefaultCalendarRepository → CalendarService
+     * Wires:  MembersConnection → SqlCalendarAdapter → DefaultCalendarRepository → CalendarService
      */
     public static function makeCalendarService(): CalendarService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
         $pdo = MembersConnection::get();
-        $adapter = new ChurchCrmCalendarAdapter($pdo);
+        $adapter = new SqlCalendarAdapter($pdo);
         $repository = new DefaultCalendarRepository($adapter);
         return new CalendarService($repository);
     }
@@ -319,16 +319,14 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for RosterScheduleService.
-     * Wires:  Portal+ChurchCRM PDO → RosterScheduleService.
-     * Direct-PDO (no adapter) since rosters live entirely in the portal DB
-     * and there's no plausible alternate backend to swap.
+     * Wires:  MembersConnection → RosterScheduleService.
+     * Direct-PDO (no adapter) since rosters live entirely in the member
+     * database and there's no plausible alternate backend to swap.
      */
     public static function makeRosterScheduleService(): \App\Services\RosterScheduleService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $portal    = MembersConnection::get();
-        $churchcrm = MembersConnection::get();
-        return new \App\Services\RosterScheduleService($portal, $churchcrm);
+        return new \App\Services\RosterScheduleService(MembersConnection::get());
     }
 
     /**

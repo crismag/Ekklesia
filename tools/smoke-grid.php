@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Smoke check: end-to-end read of a ScheduleGrid from the ChurchCRM DB.
+ * Smoke check: end-to-end read of a ScheduleGrid from the member database.
  *
  * Wires the full chain by hand using PortalServiceProvider::makeScheduleService()
  * and prints the grid. No writes. No auth — uses a hardcoded ActorContext with

@@ -39,7 +39,7 @@ interface EventRepository
      * "This Sunday we meet at the park" is a normal thing for a church to say
      * about one week of a service that otherwise runs unchanged. Both columns
      * have existed since the schema was created and the calendar has always
-     * read override_title; nothing could ever set it, so the only way to say it
+     * read title_override; nothing could ever set it, so the only way to say it
      * was to break the date out of its series.
      *
      * Null on either clears it, and the occurrence inherits from its event
@@ -53,11 +53,11 @@ interface EventRepository
      * answer it many times over: a service can be Christmas and family and
      * music at once.
      *
-     * @return list<array{tag_id:int,slug:string,label:string,usage_count:int}>
+     * @return list<array{slug:string,label:string,usage_count:int}>
      */
     public function listTags(): array;
 
-    /** @return list<array{tag_id:int,slug:string,label:string}> */
+    /** @return list<array{slug:string,label:string}> */
     public function tagsForEvent(int $eventId): array;
 
     /**
@@ -65,7 +65,7 @@ interface EventRepository
      * and dropping any tag left carried by nothing.
      *
      * @param list<array{slug:string,label:string}> $tags
-     * @return list<array{tag_id:int,slug:string,label:string}>
+     * @return list<array{slug:string,label:string}>
      */
     public function setEventTags(int $eventId, array $tags): array;
 
@@ -83,7 +83,7 @@ interface EventRepository
 
     public function countAssignmentsForOccurrence(int $occurrenceId): int;
 
-    /** @return list<array{occurrence_id:int,occurrence_start:string,occurrence_end:string}> */
+    /** @return list<array{occurrence_id:int,starts_at:string,ends_at:string}> */
     public function listEventOccurrences(int $eventId): array;
 
     public function updateOccurrenceTimes(int $occurrenceId, string $start, string $end): bool;
@@ -94,7 +94,7 @@ interface EventRepository
     /** @param list<int> $occurrenceIds */
     public function countAssignmentsForOccurrences(array $occurrenceIds): int;
 
-    /** @param list<array{occurrence_id:int,occurrence_start:string,occurrence_end:string}> $rows */
+    /** @param list<array{occurrence_id:int,starts_at:string,ends_at:string}> $rows */
     public function updateOccurrenceTimesBatch(int $eventId, array $rows): int;
 
     public function deleteEvent(int $eventId): bool;

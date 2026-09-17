@@ -9,8 +9,8 @@ use DateTimeImmutable;
 /**
  * The schedule an event repeats on, as a stored rule rather than as its output.
  *
- * The portal materialises occurrences into event_occurrence and, until now,
- * discarded the pattern that produced them: event_recurrence held two rows
+ * The portal materialises occurrences into event_occurrences and, until now,
+ * discarded the pattern that produced them: the rule table held two rows
  * against four hundred occurrences. Nothing could say "every Sunday until
  * October" because nothing kept it. That is why "Generate occurrences" had to
  * be exposed to ordinary administrators — the application had no schedule to
@@ -20,8 +20,8 @@ use DateTimeImmutable;
  * no database handle so it can be tested on its own, which matters: a wrong
  * answer here silently puts the wrong dates on the church calendar.
  *
- * Only patterns event_recurrence can actually express are offered. Its
- * recurrence_type enum is daily/weekly/biweekly/monthly/yearly with a
+ * Only patterns the events repeat columns can actually express are offered. Its
+ * repeat_frequency enum is daily/weekly/biweekly/monthly/yearly with a
  * days-of-week string, and there is no week-of-month or BYSETPOS equivalent, so
  * "First Sunday of every month" is deliberately absent rather than present and
  * quietly doing something else.
@@ -49,14 +49,14 @@ final class RecurrenceRule
     ];
 
     /**
-     * A preset as the row event_recurrence stores, or null for a schedule that
+     * A preset as the repeat columns an event stores, or null for a schedule that
      * is not a rule at all.
      *
      * One-off and selected-dates return null on purpose. A list of chosen dates
      * is not a repetition, and writing a rule that cannot reproduce it would be
      * worse than writing nothing: the next reader would trust it.
      *
-     * @return array{recurrence_type:string,recurrence_interval:int,recurrence_days_of_week:?string,recurrence_until:?string,recurrence_count:?int}|null
+     * @return array{repeat_frequency:string,repeat_interval:int,repeat_weekdays:?string,repeat_until:?string,repeat_count:?int}|null
      */
     public static function toStorage(
         string $pattern,
@@ -68,7 +68,7 @@ final class RecurrenceRule
             return null;
         }
 
-        // Both monthly presets store recurrence_type 'monthly'; the
+        // Both monthly presets store repeat_frequency 'monthly'; the
         // week-of-month column is what separates "the 6th of every month" from
         // "the first Sunday of every month".
         $nth = $pattern === 'monthly_nth';
@@ -79,12 +79,12 @@ final class RecurrenceRule
             // interval of 2. The column offers both spellings; using the one
             // the enum names keeps a reader from having to check the interval
             // to know what kind of schedule this is.
-            'recurrence_type' => $nth ? 'monthly' : $pattern,
-            'recurrence_interval' => 1,
-            'recurrence_days_of_week' => $byDate ? null : self::dayCodeFor($startDate),
-            'recurrence_week_of_month' => $nth ? self::weekOfMonthFor($startDate) : null,
-            'recurrence_until' => self::normaliseDate($untilOn),
-            'recurrence_count' => $count !== null && $count > 0 ? $count : null,
+            'repeat_frequency' => $nth ? 'monthly' : $pattern,
+            'repeat_interval' => 1,
+            'repeat_weekdays' => $byDate ? null : self::dayCodeFor($startDate),
+            'repeat_week_of_month' => $nth ? self::weekOfMonthFor($startDate) : null,
+            'repeat_until' => self::normaliseDate($untilOn),
+            'repeat_count' => $count !== null && $count > 0 ? $count : null,
         ];
     }
 
@@ -95,7 +95,7 @@ final class RecurrenceRule
      * "MONTHLY/1/SU". The stored representation is an implementation detail and
      * the brief is explicit that it stays one.
      *
-     * @param array<string,mixed>|null $stored a row from event_recurrence
+     * @param array<string,mixed>|null $stored an event's repeat columns
      */
     public static function describe(
         ?array $stored,
@@ -105,13 +105,13 @@ final class RecurrenceRule
     ): string {
         $parts = [];
 
-        $type = $stored === null ? null : (string) ($stored['recurrence_type'] ?? '');
+        $type = $stored === null ? null : (string) ($stored['repeat_frequency'] ?? '');
         if ($type === null || $type === '') {
             $parts[] = 'Does not repeat';
         } else {
-            $day = self::dayName((string) ($stored['recurrence_days_of_week'] ?? ''));
-            $week = isset($stored['recurrence_week_of_month']) && $stored['recurrence_week_of_month'] !== null
-                ? (int) $stored['recurrence_week_of_month']
+            $day = self::dayName((string) ($stored['repeat_weekdays'] ?? ''));
+            $week = isset($stored['repeat_week_of_month']) && $stored['repeat_week_of_month'] !== null
+                ? (int) $stored['repeat_week_of_month']
                 : null;
             $parts[] = match ($type) {
                 'weekly' => $day !== null ? 'Every ' . $day : 'Every week',
@@ -131,8 +131,8 @@ final class RecurrenceRule
             $parts[] = $when;
         }
 
-        $until = self::normaliseDate($stored['recurrence_until'] ?? null);
-        $count = isset($stored['recurrence_count']) ? (int) $stored['recurrence_count'] : 0;
+        $until = self::normaliseDate($stored['repeat_until'] ?? null);
+        $count = isset($stored['repeat_count']) ? (int) $stored['repeat_count'] : 0;
         if ($until !== null) {
             $parts[] = 'until ' . (new DateTimeImmutable($until))->format('j F Y');
         } elseif ($count > 0) {
@@ -217,11 +217,11 @@ final class RecurrenceRule
         }
 
         return [
-            'recurrence_type' => $type,
-            'recurrence_interval' => 1,
-            'recurrence_days_of_week' => $type === 'daily' ? null : self::dayCodeFor($days[0]),
-            'recurrence_until' => end($days),
-            'recurrence_count' => null,
+            'repeat_frequency' => $type,
+            'repeat_interval' => 1,
+            'repeat_weekdays' => $type === 'daily' ? null : self::dayCodeFor($days[0]),
+            'repeat_until' => end($days),
+            'repeat_count' => null,
         ];
     }
 
@@ -246,7 +246,7 @@ final class RecurrenceRule
         return $dayOfMonth + 7 > (int) $d->format('t') ? -1 : $nth;
     }
 
-    /** The two-letter code event_recurrence stores for a date's weekday. */
+    /** The two-letter code repeat_weekdays stores for a date's weekday. */
     private static function dayCodeFor(?string $ymd): ?string
     {
         $date = self::normaliseDate($ymd);

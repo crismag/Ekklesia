@@ -43,12 +43,12 @@ final readonly class EventTypeService
     /**
      * Events pointing at a type row that no longer exists.
      *
-     * ChurchCRM's own event-type editor can delete a row the portal created.
-     * Those events fall back to the 'members' audience, so a leaders-only event
+     * A type row removed behind the application's back leaves its events
+     * pointing at nothing. Those events fall back to the 'members' audience, so a leaders-only event
      * becomes visible to every signed-in user — silently. Surfacing the list is
      * what turns that from a hidden regression into a visible chore.
      *
-     * @return list<array{event_id:int,event_title:string,event_type:int}>
+     * @return list<array{event_id:int,title:string,event_type_id:int}>
      */
     public function orphanedEvents(ActorContext $ctx): array
     {
@@ -71,13 +71,13 @@ final readonly class EventTypeService
         $allowed = EventAudience::allowedFor($ctx);
         $layers = [];
         foreach ($this->portalTypes() as $type) {
-            if (!in_array((string) $type['portal_audience'], $allowed, true)) {
+            if (!in_array((string) $type['audience'], $allowed, true)) {
                 continue;
             }
             $layers[] = [
-                'source' => 'events:' . $type['portal_slug'],
-                'label' => (string) ($type['portal_label'] ?? $type['type_name']),
-                'color' => (string) ($type['portal_color'] ?? '#2c6ea5'),
+                'source' => 'events:' . $type['slug'],
+                'label' => (string) $type['name'],
+                'color' => (string) ($type['color'] ?? '#2c6ea5'),
                 'kind' => 'event',
                 'group' => 'events',
             ];
@@ -99,19 +99,15 @@ final readonly class EventTypeService
         $allowed = EventAudience::allowedFor($ctx);
         $out = [];
         foreach ($this->portalTypes() as $type) {
-            if (!in_array((string) $type['portal_audience'], $allowed, true)) {
+            if (!in_array((string) $type['audience'], $allowed, true)) {
                 continue;
             }
             $out[] = [
-                'typeId' => (int) $type['type_id'],
-                'label' => (string) ($type['portal_label'] ?? $type['type_name']),
-                'audience' => (string) $type['portal_audience'],
-                'color' => (string) ($type['portal_color'] ?? '#2c6ea5'),
-                'isDefault' => (bool) $type['portal_is_default'],
-                // Carried through so the editor can prefill a start time and a
-                // repeat from the chosen type.
-                'default_start_time' => $type['default_start_time'] ?? null,
-                'default_recurrence' => $type['default_recurrence'] ?? null,
+                'typeId' => (int) $type['id'],
+                'label' => (string) $type['name'],
+                'audience' => (string) $type['audience'],
+                'color' => (string) ($type['color'] ?? '#2c6ea5'),
+                'isDefault' => (bool) $type['is_default'],
             ];
         }
 
@@ -122,8 +118,8 @@ final readonly class EventTypeService
     public function defaultTypeId(): int
     {
         foreach ($this->portalTypes() as $type) {
-            if ($type['portal_is_default']) {
-                return (int) $type['type_id'];
+            if ($type['is_default']) {
+                return (int) $type['id'];
             }
         }
 
@@ -139,7 +135,7 @@ final readonly class EventTypeService
         }
 
         return in_array(
-            EventAudience::fromStorage($type['portal_audience'] ?? null)->value,
+            EventAudience::fromStorage($type['audience'] ?? null)->value,
             EventAudience::allowedFor($ctx),
             true,
         );
@@ -160,10 +156,9 @@ final readonly class EventTypeService
         return $this->types->insert([
             'name' => $label,
             'slug' => $slug,
-            'label' => $label,
             'audience' => $this->cleanAudience($audience),
             'color' => $this->cleanColor($color),
-            'sort' => $sort,
+            'sort_order' => $sort,
         ]);
     }
 
@@ -175,44 +170,13 @@ final readonly class EventTypeService
 
         $this->types->update($typeId, [
             'name' => $label,
-            'label' => $label,
             'audience' => $this->cleanAudience($audience),
             'color' => $this->cleanColor($color),
-            'sort' => $sort,
+            'sort_order' => $sort,
             // The slug is deliberately not editable: it is the calendar's
             // localStorage key and a CSS class name, so changing it would reset
             // every user's layer preferences without telling them.
-            'slug' => $existing['portal_slug'],
-        ]);
-    }
-
-    /**
-     * Give a ChurchCRM-only type a portal identity.
-     *
-     * Adoption rather than editing, because a row with no portal_slug is one
-     * ChurchCRM created and the portal has never claimed. Adopting it is a
-     * deliberate act with a visible audience consequence.
-     */
-    public function adopt(ActorContext $ctx, int $typeId, string $audience, string $color, int $sort): void
-    {
-        $this->requireAdmin($ctx);
-        $existing = $this->requireType($typeId);
-        if ($existing['portal_slug'] !== null) {
-            throw new ValidationFailed('That event type is already managed by the portal.');
-        }
-        $label = $this->cleanLabel((string) $existing['type_name']);
-        $slug = $this->slugify($label);
-        if ($slug === '' || $this->types->slugExists($slug, $typeId)) {
-            throw new ValidationFailed('Rename this type in ChurchCRM first — its name clashes with an existing layer.');
-        }
-
-        $this->types->update($typeId, [
-            'name' => $label,
-            'label' => $label,
-            'audience' => $this->cleanAudience($audience),
-            'color' => $this->cleanColor($color),
-            'sort' => $sort,
-            'slug' => $slug,
+            'slug' => $existing['slug'],
         ]);
     }
 
@@ -220,10 +184,7 @@ final readonly class EventTypeService
     {
         $this->requireAdmin($ctx);
         $type = $this->requireType($typeId);
-        if ($type['portal_slug'] === null) {
-            throw new ValidationFailed('Adopt this type into the portal before making it the default.');
-        }
-        if (EventAudience::fromStorage($type['portal_audience'] ?? null) === EventAudience::Leaders) {
+        if (EventAudience::fromStorage($type['audience'] ?? null) === EventAudience::Leaders) {
             // The default lands on every event created without an explicit
             // choice, and on every event the backfill could not classify. A
             // leaders-only default would hide those from the congregation by
@@ -237,7 +198,7 @@ final readonly class EventTypeService
     {
         $this->requireAdmin($ctx);
         $type = $this->requireType($typeId);
-        if ($type['portal_is_default']) {
+        if ($type['is_default']) {
             throw new ValidationFailed('The default type cannot be deleted. Make another type the default first.');
         }
         $used = $this->types->countEventsOfType($typeId);
@@ -249,12 +210,12 @@ final readonly class EventTypeService
         $this->types->delete($typeId);
     }
 
-    /** @return list<array<string,mixed>> rows the portal has claimed */
+    /** @return list<array<string,mixed>> active types */
     private function portalTypes(): array
     {
         return array_values(array_filter(
             $this->types->listAll(),
-            static fn (array $t): bool => ($t['portal_slug'] ?? null) !== null && $t['type_active'] !== false,
+            static fn (array $t): bool => $t['is_active'] !== false,
         ));
     }
 

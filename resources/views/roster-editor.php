@@ -588,20 +588,20 @@ require_once __DIR__ . '/_portal-shell.php';
 
     // -------- save / delete --------
     function tasksToSlots() {
-        // Each task → one slot (slot_date for once, slot_dow for weekly) +
+        // Each task → one slot (slot_date for once, slot_weekday for weekly) +
         // one assignment row. Display order preserves the order the leader
         // typed entries.
         return tasks.map((t, i) => ({
             slotDate: t.kind === 'once'   ? (t.date || null) : null,
-            slotDow:  t.kind === 'weekly' ? t.dow            : null,
+            slotWeekday: t.kind === 'weekly' ? t.dow            : null,
             label:    t.role || null,
             location: null,
             roleId:   null,
-            displayOrder: i,
+            sortOrder: i,
             assignees: [{
                 personId:    t.personId,
                 displayName: t.displayName,
-                displayOrder: 0,
+                sortOrder: 0,
             }],
         }));
     }
@@ -663,11 +663,11 @@ require_once __DIR__ . '/_portal-shell.php';
             // independently.
             tasks = [];
             for (const s of (r.slots || [])) {
-                const kind = s.slotDate ? 'once' : (s.slotDow !== null ? 'weekly' : 'once');
+                const kind = s.slotDate ? 'once' : (s.slotWeekday !== null ? 'weekly' : 'once');
                 for (const a of (s.assignees || [])) {
                     tasks.push({
                         kind,
-                        dow:  kind === 'weekly' ? s.slotDow : null,
+                        dow:  kind === 'weekly' ? s.slotWeekday : null,
                         date: kind === 'once'   ? (s.slotDate || '') : null,
                         role: s.label || null,
                         personId: a.personId,

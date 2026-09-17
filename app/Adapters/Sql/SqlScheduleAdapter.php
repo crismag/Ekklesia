@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Adapters\ChurchCRM;
+namespace App\Adapters\Sql;
 
 use App\Contracts\ScheduleAdapter;
 use App\DTO\Schedules\AssignmentBatchCommand;
@@ -10,19 +10,16 @@ use DateTimeImmutable;
 use PDO;
 
 /**
- * ChurchCRM-specific schedule data adapter.
+ * Serving schedule data adapter.
  *
- * Owns all SQL targeting the ChurchCRM database (roles, assignment,
- * event_occurrence, person_per, person2group2role_p2g2r,
- * person_campus_affiliation, etc.). This is the ONLY layer below services
- * that is permitted to know ChurchCRM table names.
+ * Owns all SQL for the serving schedule (serving_roles, assignments,
+ * event_occurrences, people, ministry_members, campuses). This is the ONLY
+ * layer below services that is permitted to know those table names.
  *
- * Implementation step: scaffold first, real SQL in C2/A.
- *
- * When ChurchCRM is replaced, a new adapter (e.g. NewSourceScheduleAdapter)
- * is bound via the service provider; nothing above this layer changes.
+ * A different store is bound via the service provider; nothing above this
+ * layer changes.
  */
-final class ChurchCrmScheduleAdapter implements ScheduleAdapter
+final class SqlScheduleAdapter implements ScheduleAdapter
 {
     public function __construct(
         private readonly ?PDO $connection = null,
@@ -39,11 +36,11 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         }
 
         $stmt = $this->connection->prepare(
-            'SELECT role_id AS id, role_name AS name
-               FROM roles
-              WHERE ministry_group_id = :ministry_id
-                AND active = 1
-              ORDER BY role_order ASC, role_name ASC'
+            'SELECT id, name
+               FROM serving_roles
+              WHERE ministry_id = :ministry_id
+                AND is_active = 1
+              ORDER BY sort_order ASC, name ASC'
         );
         $stmt->bindValue(':ministry_id', $ministryId, PDO::PARAM_INT);
         $stmt->execute();
@@ -69,24 +66,27 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
 
         $campusIds = $this->normalizeCampusIds($campusIds);
 
+        // Who may be scheduled: the ministry's confirmed members. A pending
+        // request to join is not yet membership, and an ended one no longer is.
         $sql = 'SELECT DISTINCT
-                    p.per_ID AS id,
-                    TRIM(CONCAT_WS(\' \', p.per_FirstName, p.per_LastName)) AS display_name
-                FROM person2group2role_p2g2r p2g
-                INNER JOIN person_per p ON p.per_ID = p2g.p2g2r_per_ID';
+                    p.id AS id,
+                    TRIM(CONCAT_WS(\' \', p.first_name, p.last_name)) AS display_name,
+                    p.last_name, p.first_name
+                FROM ministry_members mm
+                INNER JOIN people p ON p.id = mm.person_id';
 
         $params = [':ministry_id' => $ministryId];
 
+        $sql .= ' WHERE mm.ministry_id = :ministry_id
+                    AND mm.status = \'confirmed\'';
+
         if ($campusIds !== []) {
             [$campusSql, $campusParams] = $this->buildCampusInList($campusIds, 'member_campus_');
-            $sql .= ' INNER JOIN person_campus_affiliation pca
-                          ON pca.person_id = p.per_ID
-                         AND pca.campus_id IN (' . $campusSql . ')';
+            $sql .= ' AND p.campus_id IN (' . $campusSql . ')';
             $params += $campusParams;
         }
 
-        $sql .= ' WHERE p2g.p2g2r_grp_ID = :ministry_id
-                  ORDER BY p.per_LastName ASC, p.per_FirstName ASC';
+        $sql .= ' ORDER BY p.last_name ASC, p.first_name ASC';
 
         $stmt = $this->connection->prepare($sql);
         foreach ($params as $key => $value) {
@@ -116,27 +116,28 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         $campusIds = $this->normalizeCampusIds($campusIds);
 
         $sql = 'SELECT DISTINCT
-                    p.per_ID AS id,
-                    TRIM(CONCAT_WS(\' \', p.per_FirstName, p.per_LastName)) AS display_name
-                FROM person_per p';
+                    p.id AS id,
+                    TRIM(CONCAT_WS(\' \', p.first_name, p.last_name)) AS display_name,
+                    p.last_name, p.first_name
+                FROM people p';
 
         $params = [':ministry_id' => $ministryId];
 
+        $sql .= ' WHERE NOT EXISTS (
+                    SELECT 1
+                      FROM ministry_members mm
+                     WHERE mm.ministry_id = :ministry_id
+                       AND mm.person_id = p.id
+                       AND mm.status = \'confirmed\'
+                  )';
+
         if ($campusIds !== []) {
             [$campusSql, $campusParams] = $this->buildCampusInList($campusIds, 'special_campus_');
-            $sql .= ' INNER JOIN person_campus_affiliation pca
-                          ON pca.person_id = p.per_ID
-                         AND pca.campus_id IN (' . $campusSql . ')';
+            $sql .= ' AND p.campus_id IN (' . $campusSql . ')';
             $params += $campusParams;
         }
 
-        $sql .= ' WHERE NOT EXISTS (
-                    SELECT 1
-                      FROM person2group2role_p2g2r p2g
-                     WHERE p2g.p2g2r_grp_ID = :ministry_id
-                       AND p2g.p2g2r_per_ID = p.per_ID
-                  )
-                  ORDER BY p.per_LastName ASC, p.per_FirstName ASC';
+        $sql .= ' ORDER BY p.last_name ASC, p.first_name ASC';
 
         $stmt = $this->connection->prepare($sql);
         foreach ($params as $key => $value) {
@@ -159,7 +160,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
      *   id:int,
      *   occurrence_id:int,
      *   person_id:int,
-     *   role_id:int,
+     *   serving_role_id:int,
     *   starts_on:DateTimeImmutable,
     *   label:string,
     *   display_name:string
@@ -177,27 +178,25 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
 
         $campusIds = $this->normalizeCampusIds($campusIds);
 
-        // `assignee_name` carries an external (non-person_per) name when
-        // assignment.person_id is NULL — added by the 7.1.2 scheduler
-        // migration. We surface it as the label so external assignees still
-        // appear in the grid alongside CRM-people.
-        $sql = 'SELECT a.assignment_id      AS id,
+        // An assignment is a person or an open role. The label is always empty:
+        // free-text assignee names are not kept.
+        $sql = 'SELECT a.id                 AS id,
                         a.occurrence_id      AS occurrence_id,
                         a.person_id          AS person_id,
-                        a.role_id            AS role_id,
-                        eo.occurrence_start  AS starts_on,
-                        COALESCE(a.assignee_name, \'\') AS label,
+                        a.serving_role_id    AS serving_role_id,
+                        eo.starts_at         AS starts_on,
+                        \'\'                   AS label,
                         CASE
-                            WHEN a.person_id IS NOT NULL THEN TRIM(CONCAT_WS(\' \', p.per_FirstName, p.per_LastName))
-                            ELSE COALESCE(a.assignee_name, \'\')
+                            WHEN a.person_id IS NOT NULL THEN TRIM(CONCAT_WS(\' \', p.first_name, p.last_name))
+                            ELSE \'\'
                         END AS display_name
-                   FROM assignment a
-                   INNER JOIN event_occurrence eo ON eo.occurrence_id = a.occurrence_id
-                   INNER JOIN roles r             ON r.role_id        = a.role_id
-                   LEFT JOIN person_per p         ON p.per_ID         = a.person_id
-                  WHERE r.ministry_group_id = :ministry_id
-                    AND eo.occurrence_start >= :start_at
-                    AND eo.occurrence_start <  :end_at';
+                   FROM assignments a
+                   INNER JOIN event_occurrences eo ON eo.id = a.occurrence_id
+                   INNER JOIN serving_roles r      ON r.id  = a.serving_role_id
+                   LEFT JOIN people p              ON p.id  = a.person_id
+                  WHERE r.ministry_id = :ministry_id
+                    AND eo.starts_at >= :start_at
+                    AND eo.starts_at <  :end_at';
 
         $predicateParams = [];
         if ($campusIds !== []) {
@@ -211,7 +210,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             $predicateParams = array_merge($predicateParams, $eventParams);
         }
 
-        $sql .= ' ORDER BY eo.occurrence_start ASC, r.role_order ASC, a.assignment_id ASC';
+        $sql .= ' ORDER BY eo.starts_at ASC, r.sort_order ASC, a.id ASC';
 
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':ministry_id', $ministryId, PDO::PARAM_INT);
@@ -228,7 +227,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
                 'id'            => (int) $row['id'],
                 'occurrence_id' => (int) $row['occurrence_id'],
                 'person_id'     => $row['person_id'] === null ? 0 : (int) $row['person_id'],
-                'role_id'       => (int) $row['role_id'],
+                'serving_role_id' => (int) $row['serving_role_id'],
                 'starts_on'     => new DateTimeImmutable((string) $row['starts_on']),
                 'label'         => (string) $row['label'],
                 'display_name'  => (string) $row['display_name'],
@@ -258,15 +257,15 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
 
         $campusIds = $this->normalizeCampusIds($campusIds);
 
-        $sql = 'SELECT eo.occurrence_id      AS id,
+        $sql = 'SELECT eo.id                 AS id,
                     eo.event_id           AS event_id,
-                    COALESCE(ee.event_title, \'\') AS event_title,
-                    eo.occurrence_start   AS starts_on,
-                    eo.occurrence_end     AS ends_on
-               FROM event_occurrence eo
-               LEFT JOIN events_event ee ON ee.event_id = eo.event_id
-              WHERE eo.occurrence_start >= :start_at
-                AND eo.occurrence_start <  :end_at';
+                    COALESCE(ee.title, \'\') AS event_title,
+                    eo.starts_at          AS starts_on,
+                    eo.ends_at            AS ends_on
+               FROM event_occurrences eo
+               LEFT JOIN events ee ON ee.id = eo.event_id
+              WHERE eo.starts_at >= :start_at
+                AND eo.starts_at <  :end_at';
 
         $predicateParams = [];
         if ($campusIds !== []) {
@@ -280,7 +279,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             $predicateParams = array_merge($predicateParams, $eventParams);
         }
 
-        $sql .= ' ORDER BY eo.occurrence_start ASC, eo.occurrence_id ASC';
+        $sql .= ' ORDER BY eo.starts_at ASC, eo.id ASC';
 
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':start_at', $start->format('Y-m-d H:i:s'), PDO::PARAM_STR);
@@ -314,20 +313,20 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         }
 
         $campusIds = $this->normalizeCampusIds($campusIds);
-        $defaults = array_fill_keys($this->listDefaultAssignmentEventIds($campusIds), true);
+        $defaults = array_fill_keys($this->listDefaultSchedulingEventIds($campusIds), true);
 
-        $sql = 'SELECT e.event_id AS id,
-                       COALESCE(e.event_title, \'\') AS title
-                  FROM events_event e
-                 WHERE COALESCE(e.assignment_scheduling_enabled, 0) = 1';
+        $sql = 'SELECT e.id AS id,
+                       COALESCE(e.title, \'\') AS title
+                  FROM events e
+                 WHERE e.uses_serving_schedule = 1';
 
         $predicateParams = [];
         if ($campusIds !== []) {
-            [$predicate, $predicateParams] = $this->eventCampusPredicate('e.event_id', $campusIds, 'eligible_campus_');
+            [$predicate, $predicateParams] = $this->eventCampusPredicate('e.id', $campusIds, 'eligible_campus_');
             $sql .= $predicate;
         }
 
-        $sql .= ' ORDER BY e.event_title ASC, e.event_id ASC';
+        $sql .= ' ORDER BY e.title ASC, e.id ASC';
 
         $stmt = $this->connection->prepare($sql);
         foreach ($predicateParams as $key => $value) {
@@ -351,11 +350,11 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
     /**
      * Everything with an occurrence in the window, on this campus.
      *
-     * The picker's source. It is not filtered by assignment_scheduling_enabled:
+     * The picker's source. It is not filtered by uses_serving_schedule:
      * that flag decides which event a campus opens with, and using it to gate
      * the search meant the only thing on offer was the thing already chosen.
      *
-     * Joined through event_occurrence rather than events_event alone, so an
+     * Joined through event_occurrences rather than events alone, so an
      * event that exists but never happens in the chosen weeks is not offered —
      * picking it would add an empty column to the grid.
      *
@@ -372,27 +371,27 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         }
 
         $campusIds = $this->normalizeCampusIds($campusIds);
-        $defaults = array_fill_keys($this->listDefaultAssignmentEventIds($campusIds), true);
+        $defaults = array_fill_keys($this->listDefaultSchedulingEventIds($campusIds), true);
 
         // Half-open on whole days, the same window the grid itself uses: a
         // closed end would drop everything happening on the last date.
         $from = $start->setTime(0, 0, 0);
         $until = $end->setTime(0, 0, 0)->modify('+1 day');
 
-        $sql = 'SELECT DISTINCT e.event_id AS id,
-                       COALESCE(e.event_title, \'\') AS title
-                  FROM events_event e
-            INNER JOIN event_occurrence eo ON eo.event_id = e.event_id
-                 WHERE eo.occurrence_start >= :range_start
-                   AND eo.occurrence_start <  :range_end';
+        $sql = 'SELECT DISTINCT e.id AS id,
+                       COALESCE(e.title, \'\') AS title
+                  FROM events e
+            INNER JOIN event_occurrences eo ON eo.event_id = e.id
+                 WHERE eo.starts_at >= :range_start
+                   AND eo.starts_at <  :range_end';
 
         $predicateParams = [];
         if ($campusIds !== []) {
-            [$predicate, $predicateParams] = $this->eventCampusPredicate('e.event_id', $campusIds, 'inrange_campus_');
+            [$predicate, $predicateParams] = $this->eventCampusPredicate('e.id', $campusIds, 'inrange_campus_');
             $sql .= $predicate;
         }
 
-        $sql .= ' ORDER BY e.event_title ASC, e.event_id ASC';
+        $sql .= ' ORDER BY e.title ASC, e.id ASC';
 
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':range_start', $from->format('Y-m-d H:i:s'), PDO::PARAM_STR);
@@ -419,21 +418,21 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
      * @param list<int> $campusIds
      * @return list<int>
      */
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array
     {
         if ($this->connection === null) {
             return [];
         }
 
         $campusIds = $this->normalizeCampusIds($campusIds);
-        $sql = 'SELECT default_assignment_event_id AS event_id
-                  FROM church_campus
-                 WHERE default_assignment_event_id IS NOT NULL
-                   AND default_assignment_event_id > 0';
+        $sql = 'SELECT default_scheduling_event_id AS event_id
+                  FROM campuses
+                 WHERE default_scheduling_event_id IS NOT NULL
+                   AND default_scheduling_event_id > 0';
         $params = [];
         if ($campusIds !== []) {
             [$campusSql, $params] = $this->buildCampusInList($campusIds, 'default_campus_');
-            $sql .= ' AND campus_id IN (' . $campusSql . ')';
+            $sql .= ' AND id IN (' . $campusSql . ')';
         }
 
         $stmt = $this->connection->prepare($sql);
@@ -457,7 +456,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
      * @return list<array{
      *   id:int,
      *   person_id:int,
-     *   role_id:int,
+     *   serving_role_id:int,
      *   role_name:string,
      *   ministry_id:int,
      *   ministry_name:string,
@@ -475,26 +474,26 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         }
 
         $stmt = $this->connection->prepare(
-            'SELECT a.assignment_id            AS id,
+            'SELECT a.id                       AS id,
                     a.person_id                AS person_id,
-                    a.role_id                  AS role_id,
-                    r.role_name                AS role_name,
-                    r.ministry_group_id        AS ministry_id,
-                    COALESCE(g.grp_Name, \'\') AS ministry_name,
+                    a.serving_role_id          AS serving_role_id,
+                    r.name                     AS role_name,
+                    r.ministry_id              AS ministry_id,
+                    COALESCE(g.name, \'\')     AS ministry_name,
                     eo.event_id                AS event_id,
-                    COALESCE(ee.event_title, \'\') AS event_title,
-                    eo.occurrence_start        AS starts_on,
-                    eo.occurrence_end          AS ends_on,
-                    COALESCE(a.status, \'open\') AS status
-               FROM assignment a
-               INNER JOIN event_occurrence eo ON eo.occurrence_id = a.occurrence_id
-               INNER JOIN roles r             ON r.role_id        = a.role_id
-               LEFT  JOIN events_event ee     ON ee.event_id      = eo.event_id
-               LEFT  JOIN group_grp g         ON g.grp_ID         = r.ministry_group_id
+                    COALESCE(ee.title, \'\')   AS event_title,
+                    eo.starts_at               AS starts_on,
+                    eo.ends_at                 AS ends_on,
+                    a.status                   AS status
+               FROM assignments a
+               INNER JOIN event_occurrences eo ON eo.id = a.occurrence_id
+               INNER JOIN serving_roles r      ON r.id  = a.serving_role_id
+               LEFT  JOIN events ee            ON ee.id = eo.event_id
+               LEFT  JOIN ministries g         ON g.id  = r.ministry_id
               WHERE a.person_id = :person_id
-                AND eo.occurrence_start >= :start_at
-                AND eo.occurrence_start <  :end_at
-              ORDER BY eo.occurrence_start ASC, r.role_order ASC, a.assignment_id ASC'
+                AND eo.starts_at >= :start_at
+                AND eo.starts_at <  :end_at
+              ORDER BY eo.starts_at ASC, r.sort_order ASC, a.id ASC'
         );
         $stmt->bindValue(':person_id', $personId, PDO::PARAM_INT);
         $stmt->bindValue(':start_at', $start->format('Y-m-d H:i:s'), PDO::PARAM_STR);
@@ -506,7 +505,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             $rows[] = [
                 'id' => (int) $row['id'],
                 'person_id' => (int) $row['person_id'],
-                'role_id' => (int) $row['role_id'],
+                'serving_role_id' => (int) $row['serving_role_id'],
                 'role_name' => (string) $row['role_name'],
                 'ministry_id' => (int) $row['ministry_id'],
                 'ministry_name' => (string) $row['ministry_name'],
@@ -537,36 +536,36 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
 
         $campusIds = $this->normalizeCampusIds($campusIds);
 
-        $sql = 'SELECT a.assignment_id       AS id,
+        $sql = 'SELECT a.id                  AS id,
                        a.occurrence_id       AS occurrence_id,
                        a.person_id           AS person_id,
                        CASE WHEN a.person_id IS NOT NULL
-                            THEN TRIM(CONCAT_WS(\' \', p.per_FirstName, p.per_LastName))
-                            ELSE COALESCE(a.assignee_name, \'\') END AS person_name,
-                       a.role_id             AS role_id,
-                       r.role_name           AS role_name,
-                       r.role_order          AS role_order,
-                       r.ministry_group_id   AS ministry_id,
-                       COALESCE(g.grp_Name, \'\') AS ministry_name,
+                            THEN TRIM(CONCAT_WS(\' \', p.first_name, p.last_name))
+                            ELSE \'\' END AS person_name,
+                       a.serving_role_id     AS serving_role_id,
+                       r.name                AS role_name,
+                       r.sort_order          AS role_sort_order,
+                       r.ministry_id         AS ministry_id,
+                       COALESCE(g.name, \'\') AS ministry_name,
                        eo.event_id           AS event_id,
-                       COALESCE(ee.event_title, \'\') AS event_title,
-                       eo.occurrence_start   AS starts_on,
-                       eo.occurrence_end     AS ends_on
-                  FROM assignment a
-                  INNER JOIN event_occurrence eo ON eo.occurrence_id = a.occurrence_id
-                  INNER JOIN roles r             ON r.role_id        = a.role_id
-                  LEFT  JOIN person_per p        ON p.per_ID         = a.person_id
-                  LEFT  JOIN events_event ee     ON ee.event_id      = eo.event_id
-                  LEFT  JOIN group_grp g         ON g.grp_ID         = r.ministry_group_id
-                 WHERE eo.occurrence_start >= :start_at
-                   AND eo.occurrence_start <  :end_at';
+                       COALESCE(ee.title, \'\') AS event_title,
+                       eo.starts_at          AS starts_on,
+                       eo.ends_at            AS ends_on
+                  FROM assignments a
+                  INNER JOIN event_occurrences eo ON eo.id = a.occurrence_id
+                  INNER JOIN serving_roles r      ON r.id  = a.serving_role_id
+                  LEFT  JOIN people p             ON p.id  = a.person_id
+                  LEFT  JOIN events ee            ON ee.id = eo.event_id
+                  LEFT  JOIN ministries g         ON g.id  = r.ministry_id
+                 WHERE eo.starts_at >= :start_at
+                   AND eo.starts_at <  :end_at';
 
         $params = [];
         $ministryIds = array_values(array_unique(array_filter(array_map('intval', $ministryIds), static fn ($x): bool => $x > 0)));
         if ($ministryIds !== []) {
             $ph = [];
             foreach ($ministryIds as $i => $mid) { $ph[] = ':bm' . $i; $params[':bm' . $i] = $mid; }
-            $sql .= ' AND r.ministry_group_id IN (' . implode(', ', $ph) . ')';
+            $sql .= ' AND r.ministry_id IN (' . implode(', ', $ph) . ')';
         }
 
         $predicateParams = [];
@@ -575,7 +574,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             $sql .= $predicate;
         }
 
-        $sql .= ' ORDER BY eo.occurrence_start ASC, g.grp_Name ASC, r.role_order ASC, a.assignment_id ASC';
+        $sql .= ' ORDER BY eo.starts_at ASC, g.name ASC, r.sort_order ASC, a.id ASC';
 
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue(':start_at', $start->format('Y-m-d H:i:s'), PDO::PARAM_STR);
@@ -594,7 +593,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
                 'ends_on'       => (new DateTimeImmutable((string) $row['ends_on']))->format(DATE_ATOM),
                 'ministry_id'   => (int) $row['ministry_id'],
                 'ministry_name' => (string) $row['ministry_name'],
-                'role_id'       => (int) $row['role_id'],
+                'serving_role_id' => (int) $row['serving_role_id'],
                 'role_name'     => (string) $row['role_name'],
                 'person_id'     => $row['person_id'] === null ? null : (int) $row['person_id'],
                 'person_name'   => (string) $row['person_name'],
@@ -610,7 +609,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
      * If the command provides $start/$end, this method performs a full diff
      * of (ministry, [start,end)): existing rows in that window that aren't
      * present in $command->assignments are deleted; new rows are inserted;
-     * matching rows with a changed person_id (or label) are updated.
+     * matching rows with a changed person_id are updated.
      *
      * If $start/$end are null, only inserts/updates run (legacy/test path).
      *
@@ -633,7 +632,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         // Pre-load the current window of assignments so we can diff in PHP.
         // SELECT FOR UPDATE keeps the diff atomic against concurrent edits.
         //
-        // ChurchCRM permits multiple assignments per (occurrence_id, role_id)
+        // Multiple assignments are permitted per (occurrence_id, serving_role_id)
         // — the "extra assignees" pattern (one primary assignee plus one or
         // more helpers in the same role). We match desired rows in two passes:
         //
@@ -652,17 +651,16 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
                 $saveCampusIds = $this->normalizeCampusIds(
                     $command->campusIds !== [] ? $command->campusIds : ($command->campusId !== null ? [$command->campusId] : [])
                 );
-                $saveSql = 'SELECT a.assignment_id      AS id,
+                $saveSql = 'SELECT a.id                 AS id,
                             a.occurrence_id      AS occurrence_id,
                             a.person_id          AS person_id,
-                            a.role_id            AS role_id,
-                            COALESCE(a.assignee_name, \'\') AS label
-                       FROM assignment a
-                       INNER JOIN event_occurrence eo ON eo.occurrence_id = a.occurrence_id
-                       INNER JOIN roles r             ON r.role_id        = a.role_id
-                      WHERE r.ministry_group_id = :ministry_id
-                        AND eo.occurrence_start >= :start_at
-                        AND eo.occurrence_start <  :end_at';
+                            a.serving_role_id    AS serving_role_id
+                       FROM assignments a
+                       INNER JOIN event_occurrences eo ON eo.id = a.occurrence_id
+                       INNER JOIN serving_roles r      ON r.id  = a.serving_role_id
+                      WHERE r.ministry_id = :ministry_id
+                        AND eo.starts_at >= :start_at
+                        AND eo.starts_at <  :end_at';
                 $saveParams = [];
                 if ($saveCampusIds !== []) {
                     [$predicate, $campusParams] = $this->eventCampusPredicate('eo.event_id', $saveCampusIds, 'save_campus_');
@@ -688,8 +686,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
                         'id'            => (int) $r['id'],
                         'occurrence_id' => (int) $r['occurrence_id'],
                         'person_id'     => $r['person_id'] === null ? 0 : (int) $r['person_id'],
-                        'role_id'       => (int) $r['role_id'],
-                        'label'         => (string) $r['label'],
+                        'serving_role_id' => (int) $r['serving_role_id'],
                     ];
                     $existingById[$row['id']] = $row;
                 }
@@ -699,18 +696,17 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             $touchedIds = [];
 
             $insert = $this->connection->prepare(
-                'INSERT INTO assignment
-                     (occurrence_id, role_id, person_id, assignee_name, status, assigned_at)
+                'INSERT INTO assignments
+                     (occurrence_id, serving_role_id, person_id, status, assigned_at)
                   VALUES
-                     (:occ, :role, :person, :label, :status, :now)'
+                     (:occ, :role, :person, :status, :now)'
             );
             $update = $this->connection->prepare(
-                'UPDATE assignment
+                'UPDATE assignments
                     SET person_id = :person,
-                        assignee_name = :label,
                         status = :status,
                         assigned_at = :now
-                  WHERE assignment_id = :id'
+                  WHERE id = :id'
             );
 
             $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
@@ -744,7 +740,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             $existingByKey = [];
             foreach ($existingById as $id => $row) {
                 if (isset($touchedIds[$id])) continue;
-                $key = $row['occurrence_id'] . ':' . $row['role_id'];
+                $key = $row['occurrence_id'] . ':' . $row['serving_role_id'];
                 $existingByKey[$key] ??= [];
                 $existingByKey[$key][] = $row;
             }
@@ -752,7 +748,6 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             foreach ($idLessRows as $a) {
                 $key = $a->occurrenceId . ':' . $a->roleId;
                 $personId = $a->personId > 0 ? $a->personId : null;
-                $label    = $a->label;
                 $status   = $personId !== null ? 'assigned' : 'open';
 
                 if (!empty($existingByKey[$key])) {
@@ -763,7 +758,6 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
                     $insert->bindValue(':occ',    $a->occurrenceId, PDO::PARAM_INT);
                     $insert->bindValue(':role',   $a->roleId,       PDO::PARAM_INT);
                     $insert->bindValue(':person', $personId, $personId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-                    $insert->bindValue(':label',  $label,           PDO::PARAM_STR);
                     $insert->bindValue(':status', $status,          PDO::PARAM_STR);
                     $insert->bindValue(':now',    $now,             PDO::PARAM_STR);
                     $insert->execute();
@@ -772,7 +766,7 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
             }
 
             if ($useDiff) {
-                $del = $this->connection->prepare('DELETE FROM assignment WHERE assignment_id = :id');
+                $del = $this->connection->prepare('DELETE FROM assignments WHERE id = :id');
                 foreach ($existingById as $id => $_row) {
                     if (isset($touchedIds[$id])) continue;
                     $del->bindValue(':id', $id, PDO::PARAM_INT);
@@ -801,16 +795,11 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
     private function upsertExisting(\PDOStatement $update, array $existing, \App\DTO\Schedules\ScheduleAssignment $a, string $now): void
     {
         $personId = $a->personId > 0 ? $a->personId : null;
-        $label    = $a->label;
         $status   = $personId !== null ? 'assigned' : 'open';
-        if (
-            $existing['person_id'] === ($personId ?? 0)
-            && $existing['label']  === $label
-        ) {
+        if ($existing['person_id'] === ($personId ?? 0)) {
             return; // unchanged
         }
         $update->bindValue(':person', $personId, $personId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-        $update->bindValue(':label',  $label,    PDO::PARAM_STR);
         $update->bindValue(':status', $status,   PDO::PARAM_STR);
         $update->bindValue(':now',    $now,      PDO::PARAM_STR);
         $update->bindValue(':id',     $existing['id'], PDO::PARAM_INT);
@@ -828,12 +817,12 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         return [' AND (
                     NOT EXISTS (
                         SELECT 1
-                          FROM events_event_campus eec_any
+                          FROM event_campuses eec_any
                          WHERE eec_any.event_id = ' . $eventIdSql . '
                     )
                     OR EXISTS (
                         SELECT 1
-                          FROM events_event_campus eec_match
+                          FROM event_campuses eec_match
                          WHERE eec_match.event_id = ' . $eventIdSql . '
                            AND eec_match.campus_id IN (' . $campusSql . ')
                     )
@@ -912,34 +901,34 @@ final class ChurchCrmScheduleAdapter implements ScheduleAdapter
         $stmt = $this->connection->prepare(
             'SELECT DISTINCT
                     a.person_id                              AS person_id,
-                    current_eo.occurrence_id                 AS grid_occurrence_id,
+                    current_eo.id                            AS grid_occurrence_id,
                     CONCAT(
-                        COALESCE(g.grp_Name, \'\'),
-                        CASE WHEN COALESCE(g.grp_Name, \'\') = \'\' THEN \'\' ELSE \' / \' END,
-                        r.role_name,
+                        COALESCE(g.name, \'\'),
+                        CASE WHEN COALESCE(g.name, \'\') = \'\' THEN \'\' ELSE \' / \' END,
+                        r.name,
                         CASE
-                            WHEN a.occurrence_id = current_eo.occurrence_id THEN \' (same occurrence)\'
+                            WHEN a.occurrence_id = current_eo.id THEN \' (same occurrence)\'
                             ELSE \'\'
                         END
                     ) AS conflict_label
-               FROM assignment a
-               INNER JOIN event_occurrence other_eo   ON other_eo.occurrence_id = a.occurrence_id
-               INNER JOIN roles r                     ON r.role_id              = a.role_id
-               LEFT  JOIN group_grp g                 ON g.grp_ID               = r.ministry_group_id
-               INNER JOIN event_occurrence current_eo ON current_eo.occurrence_id IN (' . $inSql . ')
+               FROM assignments a
+               INNER JOIN event_occurrences other_eo   ON other_eo.id = a.occurrence_id
+               INNER JOIN serving_roles r              ON r.id        = a.serving_role_id
+               LEFT  JOIN ministries g                 ON g.id        = r.ministry_id
+               INNER JOIN event_occurrences current_eo ON current_eo.id IN (' . $inSql . ')
               WHERE a.person_id IS NOT NULL
                 AND (
                     (
-                        a.occurrence_id <> current_eo.occurrence_id
-                        AND other_eo.occurrence_start < current_eo.occurrence_end
-                        AND other_eo.occurrence_end   > current_eo.occurrence_start
+                        a.occurrence_id <> current_eo.id
+                        AND other_eo.starts_at < current_eo.ends_at
+                        AND other_eo.ends_at   > current_eo.starts_at
                     )
                     OR (
-                        a.occurrence_id = current_eo.occurrence_id
-                        AND r.ministry_group_id <> :ministry_id
+                        a.occurrence_id = current_eo.id
+                        AND r.ministry_id <> :ministry_id
                     )
                 )
-              ORDER BY current_eo.occurrence_id ASC, a.person_id ASC'
+              ORDER BY current_eo.id ASC, a.person_id ASC'
         );
 
         $stmt->bindValue(':ministry_id', $ministryId, PDO::PARAM_INT);

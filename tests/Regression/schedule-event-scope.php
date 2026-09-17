@@ -61,7 +61,7 @@ final class ScopeScheduleRepository implements ScheduleRepository
     public array $events = [];
     /** @var list<array{id:int,event_id:int,title:string,starts_on:DateTimeImmutable,ends_on:DateTimeImmutable}> */
     public array $occurrences = [];
-    /** @var list<array{id:int,occurrence_id:int,event_id:int,person_id:int,role_id:int}> */
+    /** @var list<array{id:int,occurrence_id:int,event_id:int,person_id:int,serving_role_id:int}> */
     public array $assignments = [];
 
     /** @var list<int>|null */
@@ -115,8 +115,8 @@ final class ScopeScheduleRepository implements ScheduleRepository
         }
 
         $this->assignments = [
-            ['id' => 1, 'occurrence_id' => 501, 'event_id' => self::SUNDAY_NY, 'person_id' => 42, 'role_id' => 7],
-            ['id' => 2, 'occurrence_id' => 502, 'event_id' => self::PRAYER_NY, 'person_id' => 43, 'role_id' => 7],
+            ['id' => 1, 'occurrence_id' => 501, 'event_id' => self::SUNDAY_NY, 'person_id' => 42, 'serving_role_id' => 7],
+            ['id' => 2, 'occurrence_id' => 502, 'event_id' => self::PRAYER_NY, 'person_id' => 43, 'serving_role_id' => 7],
         ];
     }
 
@@ -186,7 +186,7 @@ final class ScopeScheduleRepository implements ScheduleRepository
         return $out;
     }
 
-    public function listDefaultAssignmentEventIds(array $campusIds = []): array
+    public function listDefaultSchedulingEventIds(array $campusIds = []): array
     {
         $ids = [];
         foreach ($this->listEligibleSchedulingEvents($campusIds) as $event) {
@@ -241,7 +241,7 @@ final class ScopeScheduleRepository implements ScheduleRepository
                 'id' => $row['id'],
                 'occurrence_id' => $row['occurrence_id'],
                 'person_id' => $row['person_id'],
-                'role_id' => $row['role_id'],
+                'serving_role_id' => $row['serving_role_id'],
                 'starts_on' => $start,
                 'label' => '',
                 'display_name' => 'Person',
@@ -432,19 +432,17 @@ check(
 );
 
 echo "Event DTOs carry the scheduling flag without title matching\n";
-$create = (new EventCreateCommand(title: 'Choir practice', assignmentSchedulingEnabled: true))->toArray();
-check('Create payload includes assignment_scheduling_enabled', $create['assignment_scheduling_enabled'] === true);
-$update = (new EventUpdateCommand(assignmentSchedulingEnabled: false))->toArray();
-check('Update payload can turn the flag off', $update['assignment_scheduling_enabled'] === false);
+$create = (new EventCreateCommand(title: 'Choir practice', usesServingSchedule: true))->toArray();
+check('Create payload includes uses_serving_schedule', $create['uses_serving_schedule'] === true);
+$update = (new EventUpdateCommand(usesServingSchedule: false))->toArray();
+check('Update payload can turn the flag off', $update['uses_serving_schedule'] === false);
 $leave = (new EventUpdateCommand(title: 'Choir practice'))->toArray();
-check('Update omits a decision when the flag is not supplied', $leave['assignment_scheduling_enabled'] === null);
+check('Update omits a decision when the flag is not supplied', $leave['uses_serving_schedule'] === null);
 
 echo "Source contracts\n";
-$migration = (string) file_get_contents($root . '/migrations/portal/013-assignment-scheduling-scope.sql');
-check('013 declares churchcrm as the target', (bool) preg_match('/@connection:\s*churchcrm/', $migration));
-check('013 adds assignment_scheduling_enabled', str_contains($migration, 'assignment_scheduling_enabled'));
-check('013 adds default_assignment_event_id on church_campus', str_contains($migration, 'default_assignment_event_id'));
-check('013 confines Sunday Service matching to bootstrap SQL', substr_count(strtolower($migration), 'sunday service') >= 1);
+$schema = (string) file_get_contents($root . '/database/members/001_schema.sql');
+check('Schema has events.uses_serving_schedule', str_contains($schema, 'uses_serving_schedule'));
+check('Schema has campuses.default_scheduling_event_id', str_contains($schema, 'default_scheduling_event_id'));
 
 $phpFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/app'));
 $runtimeTitleMatch = [];
@@ -459,8 +457,8 @@ foreach ($phpFiles as $file) {
 }
 check('No runtime PHP matches events by Sunday Service title', $runtimeTitleMatch === [], implode(', ', $runtimeTitleMatch));
 
-$adapter = (string) file_get_contents($root . '/app/Adapters/ChurchCRM/ChurchCrmScheduleAdapter.php');
-check('Schedule adapter lists only assignment_scheduling_enabled events', str_contains($adapter, 'assignment_scheduling_enabled'));
+$adapter = (string) file_get_contents($root . '/app/Adapters/Sql/SqlScheduleAdapter.php');
+check('Schedule adapter lists only uses_serving_schedule events', str_contains($adapter, 'uses_serving_schedule'));
 check('Schedule adapter filters occurrences by event id', str_contains($adapter, 'function eventIdPredicate'));
 check('Save diffs are scoped by event id', str_contains($adapter, 'save_event_'));
 

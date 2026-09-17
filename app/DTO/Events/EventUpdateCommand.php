@@ -18,7 +18,7 @@ final readonly class EventUpdateCommand
         // event filed under the wrong ministry stayed there. 0 clears it back
         // to church-wide; null leaves it alone.
         public ?int $ministryId = null,
-        public ?bool $assignmentSchedulingEnabled = null,
+        public ?bool $usesServingSchedule = null,
     ) {}
 
     public function toArray(): array
@@ -33,11 +33,11 @@ final readonly class EventUpdateCommand
 
         return [
             'title' => $this->title,
-            'description' => $this->description,
+            'summary' => $this->description,
             'campus_ids' => $campusIds,
             'event_type_id' => $this->eventTypeId,
             'ministry_id' => $this->ministryId,
-            'assignment_scheduling_enabled' => $this->assignmentSchedulingEnabled,
+            'uses_serving_schedule' => $this->usesServingSchedule,
         ];
     }
 }

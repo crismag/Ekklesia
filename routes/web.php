@@ -2360,17 +2360,15 @@ $webRoutes = [
             $svc = \App\Providers\PortalServiceProvider::makeEventTypeService();
             $resolved = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
             $action = (string) ($req['action'] ?? '');
-            $typeId = (int) ($req['type_id'] ?? 0);
-            $label = (string) ($req['label'] ?? '');
+            $typeId = (int) ($req['event_type_id'] ?? 0);
+            $label = (string) ($req['name'] ?? '');
             $audience = (string) ($req['audience'] ?? 'members');
             $color = (string) ($req['color'] ?? '');
-            $sort = (int) ($req['sort'] ?? 0);
+            $sort = (int) ($req['sort_order'] ?? 0);
             if ($action === 'add') {
                 $svc->add($resolved, $label, $audience, $color, $sort);
             } elseif ($action === 'update') {
                 $svc->update($resolved, $typeId, $label, $audience, $color, $sort);
-            } elseif ($action === 'adopt') {
-                $svc->adopt($resolved, $typeId, $audience, $color, $sort);
             } elseif ($action === 'set-default') {
                 $svc->makeDefault($resolved, $typeId);
             } elseif ($action === 'delete') {

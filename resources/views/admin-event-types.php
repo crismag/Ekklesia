@@ -7,7 +7,7 @@
  * @var array<string,mixed>|null $actor
  * @var array<string,mixed> $campusSelector
  * @var list<array<string,mixed>> $types
- * @var list<array{event_id:int,event_title:string,event_type:int}> $orphans
+ * @var list<array{event_id:int,title:string,event_type_id:int}> $orphans
  * @var string $notice
  * @var string $flash
  */
@@ -24,8 +24,7 @@ $audiences = [
     'leaders' => 'Leaders only — hidden from members everywhere',
 ];
 
-$portalTypes = array_values(array_filter($types, static fn (array $t): bool => ($t['portal_slug'] ?? null) !== null));
-$crmOnly     = array_values(array_filter($types, static fn (array $t): bool => ($t['portal_slug'] ?? null) === null));
+$portalTypes = $types;
 
 ob_start();
 ?>
@@ -86,9 +85,9 @@ ob_start();
     <div class="et-alert warn">
       <strong><?= count($orphans) ?> event<?= count($orphans) === 1 ? '' : 's' ?></strong>
       point at an event type that no longer exists, so <?= count($orphans) === 1 ? 'it is' : 'they are' ?>
-      treated as <em>Members</em>. This happens when a type is deleted in ChurchCRM.
+      treated as <em>Members</em>. This happens when a type row is removed outside the portal.
       Re-type <?= count($orphans) === 1 ? 'it' : 'them' ?> to restore the intended audience:
-      <?= $h(implode(', ', array_map(static fn (array $o): string => $o['event_title'], array_slice($orphans, 0, 8)))) ?><?= count($orphans) > 8 ? ', …' : '' ?>
+      <?= $h(implode(', ', array_map(static fn (array $o): string => $o['title'], array_slice($orphans, 0, 8)))) ?><?= count($orphans) > 8 ? ', …' : '' ?>
     </div>
   <?php endif; ?>
 
@@ -98,22 +97,22 @@ ob_start();
       <div class="et-row">
         <form method="post" action="<?= $base ?>/admin/event-types">
           <input type="hidden" name="action" value="update">
-          <input type="hidden" name="type_id" value="<?= (int) $t['type_id'] ?>">
-          <span class="et-swatch" style="background:<?= $h($t['portal_color'] ?? '#2c6ea5') ?>" aria-hidden="true"></span>
-          <?php $etName = $t['portal_label'] ?? $t['type_name']; ?>
+          <input type="hidden" name="event_type_id" value="<?= (int) $t['id'] ?>">
+          <span class="et-swatch" style="background:<?= $h($t['color'] ?? '#2c6ea5') ?>" aria-hidden="true"></span>
+          <?php $etName = $t['name']; ?>
           <!-- Every control names the category it belongs to. The row repeats
                per category, so a bare "Name" would leave a screen reader
                announcing four identical fields with no way to tell them apart. -->
-          <input type="text" name="label" value="<?= $h($etName) ?>" maxlength="64" required
+          <input type="text" name="name" value="<?= $h($etName) ?>" maxlength="64" required
                  aria-label="Name of the &quot;<?= $h($etName) ?>&quot; category">
           <select name="audience" aria-label="Who can see &quot;<?= $h($etName) ?>&quot; events">
             <?php foreach ($audiences as $value => $text): ?>
-              <option value="<?= $h($value) ?>"<?= ($t['portal_audience'] ?? 'members') === $value ? ' selected' : '' ?>><?= $h($text) ?></option>
+              <option value="<?= $h($value) ?>"<?= ($t['audience'] ?? 'members') === $value ? ' selected' : '' ?>><?= $h($text) ?></option>
             <?php endforeach; ?>
           </select>
-          <input type="color" name="color" value="<?= $h($t['portal_color'] ?? '#2c6ea5') ?>"
+          <input type="color" name="color" value="<?= $h($t['color'] ?? '#2c6ea5') ?>"
                  aria-label="Colour for &quot;<?= $h($etName) ?>&quot;" title="Colour">
-          <input type="number" name="sort" value="<?= (int) ($t['portal_sort'] ?? 0) ?>" min="0" max="999"
+          <input type="number" name="sort_order" value="<?= (int) ($t['sort_order'] ?? 0) ?>" min="0" max="999"
                  aria-label="Order of &quot;<?= $h($etName) ?>&quot; in lists" title="Order in lists">
           <button class="et-btn primary" type="submit">Save</button>
         </form>
@@ -122,34 +121,34 @@ ob_start();
              layer choices. An administrator needs it only when diagnosing why
              a choice did not stick, so it sits behind a disclosure rather than
              on every row. -->
-        <details class="et-tech"><summary aria-label="Technical details for &quot;<?= $h($t['portal_label'] ?? $t['type_name']) ?>&quot;">Details</summary>
-          <span class="et-slug">Layer key: events:<?= $h($t['portal_slug']) ?></span>
+        <details class="et-tech"><summary aria-label="Technical details for &quot;<?= $h($t['name']) ?>&quot;">Details</summary>
+          <span class="et-slug">Layer key: events:<?= $h($t['slug']) ?></span>
         </details>
-        <?php if (($t['portal_audience'] ?? '') === 'leaders'): ?><span class="et-tag leaders">Leaders only</span><?php endif; ?>
-        <?php if ($t['portal_is_default']): ?><span class="et-tag">Default</span><?php endif; ?>
+        <?php if (($t['audience'] ?? '') === 'leaders'): ?><span class="et-tag leaders">Leaders only</span><?php endif; ?>
+        <?php if ($t['is_default']): ?><span class="et-tag">Default</span><?php endif; ?>
         <span class="et-usage"><?= (int) $t['usage_count'] ?> event<?= (int) $t['usage_count'] === 1 ? '' : 's' ?></span>
 
-        <?php if (!$t['portal_is_default']): ?>
+        <?php if (!$t['is_default']): ?>
           <form method="post" action="<?= $base ?>/admin/event-types">
             <input type="hidden" name="action" value="set-default">
-            <input type="hidden" name="type_id" value="<?= (int) $t['type_id'] ?>">
+            <input type="hidden" name="event_type_id" value="<?= (int) $t['id'] ?>">
             <button class="et-btn" type="submit" title="New events get this type when none is chosen">Make default</button>
           </form>
         <?php endif; ?>
 
         <form method="post" action="<?= $base ?>/admin/event-types"
-              onsubmit="return confirm('Delete event type &quot;<?= $h($t['portal_label'] ?? $t['type_name']) ?>&quot;? This cannot be undone.');">
+              onsubmit="return confirm('Delete event type &quot;<?= $h($t['name']) ?>&quot;? This cannot be undone.');">
           <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="type_id" value="<?= (int) $t['type_id'] ?>">
+          <input type="hidden" name="event_type_id" value="<?= (int) $t['id'] ?>">
           <button class="et-btn danger" type="submit"
-                  <?= ((int) $t['usage_count'] > 0 || $t['portal_is_default']) ? 'disabled title="In use or default"' : '' ?>>Delete</button>
+                  <?= ((int) $t['usage_count'] > 0 || $t['is_default']) ? 'disabled title="In use or default"' : '' ?>>Delete</button>
         </form>
       </div>
     <?php endforeach; ?>
 
     <form class="et-add" method="post" action="<?= $base ?>/admin/event-types">
       <input type="hidden" name="action" value="add">
-      <input type="text" name="label" placeholder="New category name" maxlength="64" required
+      <input type="text" name="name" placeholder="New category name" maxlength="64" required
              aria-label="Name for the new category">
       <select name="audience" aria-label="Who can see events in the new category">
         <?php foreach ($audiences as $value => $text): ?>
@@ -157,7 +156,7 @@ ob_start();
         <?php endforeach; ?>
       </select>
       <input type="color" name="color" value="#2c6ea5" aria-label="Colour for the new category" title="Colour">
-      <input type="number" name="sort" value="50" min="0" max="999" aria-label="Order in lists" title="Order in lists">
+      <input type="number" name="sort_order" value="50" min="0" max="999" aria-label="Order in lists" title="Order in lists">
       <button class="et-btn primary" type="submit">Add type</button>
     </form>
     <p class="et-note" style="margin-top:10px">
@@ -167,35 +166,6 @@ ob_start();
     </p>
   </article>
 
-  <?php if ($crmOnly !== []): ?>
-    <article class="admin-card">
-      <h3>ChurchCRM event types</h3>
-      <p class="et-note">
-        These exist in ChurchCRM but the portal has never claimed them, so events using them
-        fall back to the <em>Members</em> audience and appear in no calendar layer of their own.
-        Adopt one to give it a layer, a colour and an audience.
-      </p>
-      <?php foreach ($crmOnly as $t): ?>
-        <div class="et-row">
-          <form method="post" action="<?= $base ?>/admin/event-types">
-            <input type="hidden" name="action" value="adopt">
-            <input type="hidden" name="type_id" value="<?= (int) $t['type_id'] ?>">
-            <strong><?= $h($t['type_name']) ?></strong>
-            <span class="muted">ChurchCRM name</span>
-            <select name="audience">
-              <?php foreach ($audiences as $value => $text): ?>
-                <option value="<?= $h($value) ?>"<?= $value === 'members' ? ' selected' : '' ?>><?= $h($text) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <input type="color" name="color" value="#5b6d8a" title="Layer colour">
-            <input type="number" name="sort" value="60" min="0" max="999" title="Sort order">
-            <span class="et-usage"><?= (int) $t['usage_count'] ?> event<?= (int) $t['usage_count'] === 1 ? '' : 's' ?></span>
-            <button class="et-btn" type="submit">Adopt into portal</button>
-          </form>
-        </div>
-      <?php endforeach; ?>
-    </article>
-  <?php endif; ?>
 
 <?php endif; ?>
 <?php $content = ob_get_clean();
