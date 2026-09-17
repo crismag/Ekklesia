@@ -29,7 +29,7 @@ spl_autoload_register(static function (string $class): void {
 
 use App\Core\Config\EnvLoader;
 use App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter;
-use App\Core\Database\ChurchCrmConnection;
+use App\Core\Database\MembersConnection;
 use App\Services\MinistryCatalog;
 
 $opts = getopt('', ['apply', 'help']);
@@ -42,7 +42,7 @@ $apply = isset($opts['apply']);
 EnvLoader::loadOnce(__DIR__ . '/../.env');
 
 $catalog = MinistryCatalog::fromFile(__DIR__ . '/../config/ministry-catalog.json');
-$pdo = ChurchCrmConnection::get();
+$pdo = MembersConnection::get();
 $adapter = new ChurchCrmMinistryAdapter($pdo);
 
 $existing = $adapter->listMinistriesAdmin(null);

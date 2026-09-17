@@ -31,7 +31,7 @@ spl_autoload_register(function (string $class): void {
 
 use App\Adapters\ChurchCRM\ChurchCrmCalendarAdapter;
 use App\Core\Config\EnvLoader;
-use App\Core\Database\ChurchCrmConnection;
+use App\Core\Database\MembersConnection;
 
 EnvLoader::loadOnce(__DIR__ . '/../.env');
 
@@ -42,7 +42,7 @@ $campusId = isset($argv[3]) && $argv[3] !== '' ? (int) $argv[3] : null;
 $startDt = new DateTimeImmutable($start);
 $endDt   = new DateTimeImmutable($end);
 
-$pdo = ChurchCrmConnection::get();
+$pdo = MembersConnection::get();
 if ($pdo === null) {
     fwrite(STDERR, "FAIL: ChurchCRM PDO not available.\n");
     exit(1);

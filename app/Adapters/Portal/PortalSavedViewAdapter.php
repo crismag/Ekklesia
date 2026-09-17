@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Adapters\Portal;
 
 use App\Contracts\SavedViewRepository;
-use App\Core\Database\PortalConnection;
+use App\Core\Database\MembersConnection;
 use PDO;
 
 /**
@@ -22,7 +22,7 @@ final class PortalSavedViewAdapter implements SavedViewRepository
     public function __construct(?PDO $connection = null)
     {
         try {
-            $this->connection = $connection ?? PortalConnection::get();
+            $this->connection = $connection ?? MembersConnection::get();
         } catch (\Throwable) {
             // A portal without its database still renders a calendar; it just
             // has no saved views.

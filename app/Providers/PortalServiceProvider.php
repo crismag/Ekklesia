@@ -21,8 +21,7 @@ use App\Contracts\MinistryRepository;
 use App\Contracts\ScheduleAdapter;
 use App\Contracts\ScheduleRepository;
 use App\Core\Config\EnvLoader;
-use App\Core\Database\ChurchCrmConnection;
-use App\Core\Database\PortalConnection;
+use App\Core\Database\MembersConnection;
 use App\Core\Security\PasswordHasher;
 use App\Repositories\DefaultAuthRepository;
 use App\Repositories\DefaultCalendarRepository;
@@ -50,7 +49,7 @@ final class PortalServiceProvider
      *                              ↑
      *                         ChurchCrmScheduleAdapter  (ChurchCRM SQL only)
      *                              ↑
-     *                         PDO from ChurchCrmConnection
+     *                         PDO from MembersConnection
      *
      * Swapping data source = swap the adapter binding only.
      *
@@ -91,7 +90,7 @@ final class PortalServiceProvider
     public static function makeScheduleService(): ScheduleService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $pdo = ChurchCrmConnection::get();
+        $pdo = MembersConnection::get();
         $adapter = new ChurchCrmScheduleAdapter($pdo);
         $repository = new DefaultScheduleRepository($adapter);
         return new ScheduleService($repository);
@@ -99,12 +98,12 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for MinistryService.
-     * Wires:  ChurchCrmConnection → ChurchCrmMinistryAdapter → DefaultMinistryRepository → MinistryService
+     * Wires:  MembersConnection → ChurchCrmMinistryAdapter → DefaultMinistryRepository → MinistryService
      */
     public static function makeMinistryService(): MinistryService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $pdo = ChurchCrmConnection::get();
+        $pdo = MembersConnection::get();
         $adapter = new ChurchCrmMinistryAdapter($pdo);
         $repository = new DefaultMinistryRepository($adapter);
         return new MinistryService($repository);
@@ -112,7 +111,7 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for EventService.
-     * Wires:  ChurchCrmConnection → ChurchCrmEventAdapter → DefaultEventRepository → EventService
+     * Wires:  MembersConnection → ChurchCrmEventAdapter → DefaultEventRepository → EventService
      */
     /** Saved calendar views: the print studio's reusable configurations. */
     public static function makeSavedViewService(): \App\Services\Calendar\SavedViewService
@@ -127,7 +126,7 @@ final class PortalServiceProvider
     public static function makeEventService(): EventService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $pdo = ChurchCrmConnection::get();
+        $pdo = MembersConnection::get();
         $adapter = new ChurchCrmEventAdapter($pdo);
         $repository = new \App\Repositories\DefaultEventRepository($adapter);
 
@@ -161,7 +160,7 @@ final class PortalServiceProvider
     public static function makeEventTypeService(): \App\Services\EventTypeService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $adapter = new \App\Adapters\ChurchCRM\ChurchCrmEventTypeAdapter(ChurchCrmConnection::get());
+        $adapter = new \App\Adapters\ChurchCRM\ChurchCrmEventTypeAdapter(MembersConnection::get());
         $repository = new \App\Repositories\DefaultEventTypeRepository($adapter);
 
         return new \App\Services\EventTypeService($repository);
@@ -174,7 +173,7 @@ final class PortalServiceProvider
     public static function makeCampusAdminService(): \App\Services\CampusAdminService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        return new \App\Services\CampusAdminService(ChurchCrmConnection::get());
+        return new \App\Services\CampusAdminService(MembersConnection::get());
     }
 
     /**
@@ -193,7 +192,7 @@ final class PortalServiceProvider
     public static function makePersonAdminService(): \App\Services\PersonAdminService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        return new \App\Services\PersonAdminService(ChurchCrmConnection::get());
+        return new \App\Services\PersonAdminService(MembersConnection::get());
     }
 
     public static function makeMaintenanceBackupService(): \App\Services\MaintenanceBackupService
@@ -205,7 +204,7 @@ final class PortalServiceProvider
     public static function makeMemberCampusImportService(): \App\Services\MemberCampusImportService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $db = ChurchCrmConnection::get();
+        $db = MembersConnection::get();
 
         // Ministry assignment: the workbook's ministry cell becomes memberships.
         // Built defensively — if any part is unavailable the import still runs
@@ -224,7 +223,7 @@ final class PortalServiceProvider
             $ministryRepo = new \App\Repositories\DefaultMinistryRepository(
                 new \App\Adapters\ChurchCRM\ChurchCrmMinistryAdapter($db)
             );
-            $portalAuth = new \App\Adapters\Portal\PortalAuthAdapter(\App\Core\Database\PortalConnection::get());
+            $portalAuth = new \App\Adapters\Portal\PortalAuthAdapter(\App\Core\Database\MembersConnection::get());
         } catch (\Throwable) {
             $assigner = null;
             $ministryRepo = null;
@@ -264,14 +263,14 @@ final class PortalServiceProvider
     public static function makeFamilyAdminService(): \App\Services\FamilyAdminService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        return new \App\Services\FamilyAdminService(ChurchCrmConnection::get());
+        return new \App\Services\FamilyAdminService(MembersConnection::get());
     }
 
     /** Option manager (list_lst). Direct-PDO, no ChurchCRM dependency. */
     public static function makeOptionAdminService(): \App\Services\OptionAdminService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        return new \App\Services\OptionAdminService(ChurchCrmConnection::get());
+        return new \App\Services\OptionAdminService(MembersConnection::get());
     }
 
     /** Related-families map (portal-owned JSON). No database columns. */
@@ -287,17 +286,17 @@ final class PortalServiceProvider
     public static function makeSystemUserService(): \App\Services\SystemUserService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        return new \App\Services\SystemUserService(PortalConnection::get(), new \App\Core\Security\PasswordHasher());
+        return new \App\Services\SystemUserService(MembersConnection::get(), new \App\Core\Security\PasswordHasher());
     }
 
     /**
      * Standalone-scaffold factory for CalendarService.
-     * Wires:  ChurchCrmConnection → ChurchCrmCalendarAdapter → DefaultCalendarRepository → CalendarService
+     * Wires:  MembersConnection → ChurchCrmCalendarAdapter → DefaultCalendarRepository → CalendarService
      */
     public static function makeCalendarService(): CalendarService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $pdo = ChurchCrmConnection::get();
+        $pdo = MembersConnection::get();
         $adapter = new ChurchCrmCalendarAdapter($pdo);
         $repository = new DefaultCalendarRepository($adapter);
         return new CalendarService($repository);
@@ -305,12 +304,12 @@ final class PortalServiceProvider
 
     /**
      * Standalone-scaffold factory for AvailabilityService.
-     * Wires:  PortalConnection → PortalAvailabilityAdapter → DefaultAvailabilityRepository → AvailabilityService
+     * Wires:  MembersConnection → PortalAvailabilityAdapter → DefaultAvailabilityRepository → AvailabilityService
      */
     public static function makeAvailabilityService(): AvailabilityService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $pdo = PortalConnection::get();
+        $pdo = MembersConnection::get();
         $adapter = new PortalAvailabilityAdapter($pdo);
         $repository = new DefaultAvailabilityRepository($adapter);
         return new AvailabilityService($repository);
@@ -325,22 +324,22 @@ final class PortalServiceProvider
     public static function makeRosterScheduleService(): \App\Services\RosterScheduleService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $portal    = PortalConnection::get();
-        $churchcrm = ChurchCrmConnection::get();
+        $portal    = MembersConnection::get();
+        $churchcrm = MembersConnection::get();
         return new \App\Services\RosterScheduleService($portal, $churchcrm);
     }
 
     /**
      * Standalone-scaffold factory for AuthService.
-     * Wires:  PortalConnection → PortalAuthAdapter → DefaultAuthRepository → AuthService
+     * Wires:  MembersConnection → PortalAuthAdapter → DefaultAuthRepository → AuthService
      */
     public static function makeAuthService(): AuthService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
-        $portalPdo = PortalConnection::get();
+        $portalPdo = MembersConnection::get();
         $authAdapter = new PortalAuthAdapter($portalPdo);
         $authRepository = new DefaultAuthRepository($authAdapter);
-        $churchCrmPdo = ChurchCrmConnection::get();
+        $churchCrmPdo = MembersConnection::get();
         $ministryAdapter = new ChurchCrmMinistryAdapter($churchCrmPdo);
         $ministryRepository = new DefaultMinistryRepository($ministryAdapter);
         // ChurchCRM identity resolver lets AuthService accept email or mobile

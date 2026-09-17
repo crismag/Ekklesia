@@ -26,7 +26,7 @@ spl_autoload_register(function (string $class): void {
 });
 
 use App\Core\Config\EnvLoader;
-use App\Core\Database\PortalConnection;
+use App\Core\Database\MembersConnection;
 use App\Adapters\Portal\PortalAuthAdapter;
 use App\Repositories\DefaultAuthRepository;
 use App\Core\Security\PasswordHasher;
@@ -49,7 +49,7 @@ if (strlen($newPassword) < 10) {
 }
 
 EnvLoader::loadOnce(dirname(__DIR__) . '/.env');
-$pdo = PortalConnection::get();
+$pdo = MembersConnection::get();
 if ($pdo === null) {
     fwrite(STDERR, "Failed to obtain portal DB connection. Check .env and DB connectivity.\n");
     exit(3);
