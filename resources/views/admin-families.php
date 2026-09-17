@@ -1,7 +1,6 @@
 <?php
 /**
  * Admin · Families — list with search + counts. Data via FamilyAdminService.
- * No ChurchCRM dependency.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -92,7 +91,7 @@ ob_start();
             <td><?= (int) $f['members'] ?></td>
             <td><?= $h($f['city']) ?: '<span class="muted">—</span>' ?></td>
             <td class="muted"><?= $h($f['email']) ?></td>
-            <td><span class="fm-badge <?= $f['deactivated'] === null ? 'fm-on' : 'fm-off' ?>"><?= $f['deactivated'] === null ? 'Active' : 'Inactive' ?></span></td>
+            <td><span class="fm-badge <?= $f['deactivated_on'] === null ? 'fm-on' : 'fm-off' ?>"><?= $f['deactivated_on'] === null ? 'Active' : 'Inactive' ?></span></td>
             <?php if ($isAdmin): ?><td><a class="fm-btn" href="<?= $base ?>/admin/families/edit?id=<?= $fid ?>">Manage</a></td><?php endif; ?>
           </tr>
         <?php endforeach; ?>

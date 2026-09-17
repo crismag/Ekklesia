@@ -477,7 +477,7 @@ check('Event editor copy distinguishes calendar from assignments', str_contains(
 check('Event editor copy says the tick nominates a campus default', str_contains($eventEditor, 'nominates a default'));
 
 $campusAdmin = (string) file_get_contents($root . '/resources/views/admin-campuses.php');
-check('Campus admin can set the default assignment event', str_contains($campusAdmin, 'default_assignment_event_id'));
+check('Campus admin can set the default assignment event', str_contains($campusAdmin, 'default_scheduling_event_id'));
 
 $outOfScope = new ActorContext(
     actorId: 9,

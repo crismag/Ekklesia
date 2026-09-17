@@ -36,8 +36,8 @@ $e = static fn (mixed $v): string => htmlspecialchars(trim((string) $v), ENT_QUO
 $field = static fn (string $key): string => trim((string) ($person[$key] ?? ''));
 
 $fullName = trim(implode(' ', array_filter([
-    $field('per_Title'), $field('per_FirstName'), $field('per_MiddleName'),
-    $field('per_LastName'), $field('per_Suffix'),
+    $field('first_name'), $field('middle_name'),
+    $field('last_name'), $field('suffix'),
 ])));
 if ($fullName === '') {
     $fullName = (string) ($actor['displayName'] ?? 'Portal user');
@@ -53,29 +53,23 @@ $initials = mb_strtoupper(mb_substr($initials, 0, 2)) ?: '?';
 $primaryCampusName = '';
 foreach ($affiliations as $aff) {
     if ((int) ($aff['is_primary'] ?? 0) === 1) {
-        $primaryCampusName = (string) ($aff['campus_name'] ?? '');
+        $primaryCampusName = (string) ($aff['name'] ?? '');
     }
 }
-$primaryCampusId = (int) ($person['primary_campus_id'] ?? 0);
+$primaryCampusId = (int) ($person['campus_id'] ?? 0);
 
 // A birthday is printed without the year: the year is on the edit form for the
 // person who owns it, and a directory does not need to announce anybody's age.
-$birthMonth = (int) ($person['per_BirthMonth'] ?? 0);
-$birthDay = (int) ($person['per_BirthDay'] ?? 0);
-$birthYear = (int) ($person['per_BirthYear'] ?? 0);
+$birthMonth = (int) ($person['birth_month'] ?? 0);
+$birthDay = (int) ($person['birth_day'] ?? 0);
+$birthYear = (int) ($person['birth_year'] ?? 0);
 $birthdayLabel = ($birthMonth > 0 && $birthDay > 0)
     ? date('F j', (int) mktime(0, 0, 0, $birthMonth, $birthDay, 2000))
     : '';
 
 $addressLine = (string) ($profile['address_line'] ?? '');
-$addressIsFamily = $addressLine !== '' && $field('per_Address1') === '' && $field('per_City') === '';
+$addressIsFamily = $addressLine !== '' && $field('address_line1') === '' && $field('city') === '';
 $hasCoords = ($profile['lat'] ?? null) !== null && ($profile['lng'] ?? null) !== null;
-
-$socials = array_filter([
-    'Facebook' => $field('per_Facebook'),
-    'Twitter' => $field('per_Twitter'),
-    'LinkedIn' => $field('per_LinkedIn'),
-], static fn (string $v): bool => $v !== '');
 
 $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -305,59 +299,48 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
                     <div class="panel-body" id="detailsRead">
                         <dl class="detail-list">
                             <div class="detail-row"><dt>Name</dt><dd><?= $e($fullName) ?></dd></div>
-                            <div class="detail-row"><dt>Email</dt><dd><?= $field('per_Email') !== '' ? '<a href="mailto:' . $e($field('per_Email')) . '">' . $e($field('per_Email')) . '</a>' : '<span class="muted">Not listed</span>' ?></dd></div>
-                            <div class="detail-row"><dt>Mobile</dt><dd><?= $field('per_CellPhone') !== '' ? '<a href="tel:' . $e($field('per_CellPhone')) . '">' . $e($field('per_CellPhone')) . '</a>' : '<span class="muted">Not listed</span>' ?></dd></div>
-                            <div class="detail-row"><dt>Home phone</dt><dd><?= $field('per_HomePhone') !== '' ? '<a href="tel:' . $e($field('per_HomePhone')) . '">' . $e($field('per_HomePhone')) . '</a>' : '<span class="muted">Not listed</span>' ?></dd></div>
+                            <div class="detail-row"><dt>Email</dt><dd><?= $field('email') !== '' ? '<a href="mailto:' . $e($field('email')) . '">' . $e($field('email')) . '</a>' : '<span class="muted">Not listed</span>' ?></dd></div>
+                            <div class="detail-row"><dt>Mobile</dt><dd><?= $field('mobile_phone') !== '' ? '<a href="tel:' . $e($field('mobile_phone')) . '">' . $e($field('mobile_phone')) . '</a>' : '<span class="muted">Not listed</span>' ?></dd></div>
+                            <div class="detail-row"><dt>Home phone</dt><dd><?= $field('home_phone') !== '' ? '<a href="tel:' . $e($field('home_phone')) . '">' . $e($field('home_phone')) . '</a>' : '<span class="muted">Not listed</span>' ?></dd></div>
                             <div class="detail-row"><dt>Address</dt><dd><?= $addressLine !== '' ? $e($addressLine) . ($addressIsFamily ? ' <span class="mini">(from your household)</span>' : '') : '<span class="muted">Not listed</span>' ?></dd></div>
                             <div class="detail-row"><dt>Birthday</dt><dd><?= $birthdayLabel !== '' ? $e($birthdayLabel) . ($birthYear > 0 ? ' <span class="mini">' . $birthYear . '</span>' : '') : '<span class="muted">Not listed</span>' ?></dd></div>
-                            <div class="detail-row"><dt>Links</dt><dd><?php
-                                if ($socials === []) { echo '<span class="muted">None added</span>'; }
-                                else { foreach ($socials as $nameLabel => $url) {
-                                    echo '<div><a href="' . $e($url) . '" rel="noopener noreferrer" target="_blank">' . $e($nameLabel) . '</a></div>';
-                                } }
-                            ?></dd></div>
                         </dl>
                         <div class="btn-row"><button type="button" id="editProfileOpen">Edit your details</button></div>
                     </div>
 
                     <form class="panel-body" id="detailsForm" hidden>
                         <div class="field-row thirds">
-                            <div><label for="per_FirstName">First name</label><input id="per_FirstName" name="per_FirstName" maxlength="50" value="<?= $e($field('per_FirstName')) ?>"></div>
-                            <div><label for="per_MiddleName">Middle name</label><input id="per_MiddleName" name="per_MiddleName" maxlength="50" value="<?= $e($field('per_MiddleName')) ?>"></div>
-                            <div><label for="per_LastName">Last name</label><input id="per_LastName" name="per_LastName" maxlength="50" required value="<?= $e($field('per_LastName')) ?>"></div>
+                            <div><label for="first_name">First name</label><input id="first_name" name="first_name" maxlength="50" value="<?= $e($field('first_name')) ?>"></div>
+                            <div><label for="middle_name">Middle name</label><input id="middle_name" name="middle_name" maxlength="50" value="<?= $e($field('middle_name')) ?>"></div>
+                            <div><label for="last_name">Last name</label><input id="last_name" name="last_name" maxlength="50" required value="<?= $e($field('last_name')) ?>"></div>
                         </div>
                         <div class="field-row">
-                            <div><label for="per_Email">Email</label><input id="per_Email" name="per_Email" type="email" autocomplete="email" value="<?= $e($field('per_Email')) ?>"></div>
-                            <div><label for="per_CellPhone">Mobile</label><input id="per_CellPhone" name="per_CellPhone" type="tel" autocomplete="tel" value="<?= $e($field('per_CellPhone')) ?>"></div>
+                            <div><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" value="<?= $e($field('email')) ?>"></div>
+                            <div><label for="mobile_phone">Mobile</label><input id="mobile_phone" name="mobile_phone" type="tel" autocomplete="tel" value="<?= $e($field('mobile_phone')) ?>"></div>
                         </div>
                         <div class="field-row">
-                            <div><label for="per_HomePhone">Home phone</label><input id="per_HomePhone" name="per_HomePhone" type="tel" value="<?= $e($field('per_HomePhone')) ?>"></div>
-                            <div><label for="per_WorkPhone">Work phone</label><input id="per_WorkPhone" name="per_WorkPhone" type="tel" value="<?= $e($field('per_WorkPhone')) ?>"></div>
+                            <div><label for="home_phone">Home phone</label><input id="home_phone" name="home_phone" type="tel" value="<?= $e($field('home_phone')) ?>"></div>
+                            <div><label for="preferred_name">Preferred name</label><input id="preferred_name" name="preferred_name" maxlength="60" value="<?= $e($field('preferred_name')) ?>"></div>
                         </div>
                         <div class="field-row thirds">
-                            <div><label for="per_BirthMonth">Birth month</label>
-                                <select id="per_BirthMonth" name="per_BirthMonth">
+                            <div><label for="birth_month">Birth month</label>
+                                <select id="birth_month" name="birth_month">
                                     <option value="0">—</option>
                                     <?php foreach ($monthNames as $num => $mn): ?>
                                     <option value="<?= $num ?>"<?= $birthMonth === $num ? ' selected' : '' ?>><?= $mn ?></option>
                                     <?php endforeach; ?>
                                 </select></div>
-                            <div><label for="per_BirthDay">Birth day</label><input id="per_BirthDay" name="per_BirthDay" type="number" min="0" max="31" value="<?= $birthDay > 0 ? $birthDay : '' ?>"></div>
-                            <div><label for="per_BirthYear">Birth year</label><input id="per_BirthYear" name="per_BirthYear" type="number" min="1900" max="<?= date('Y') ?>" value="<?= $birthYear > 0 ? $birthYear : '' ?>"></div>
+                            <div><label for="birth_day">Birth day</label><input id="birth_day" name="birth_day" type="number" min="0" max="31" value="<?= $birthDay > 0 ? $birthDay : '' ?>"></div>
+                            <div><label for="birth_year">Birth year</label><input id="birth_year" name="birth_year" type="number" min="1900" max="<?= date('Y') ?>" value="<?= $birthYear > 0 ? $birthYear : '' ?>"></div>
                         </div>
                         <div class="field-row">
-                            <div><label for="per_Address1">Address</label><input id="per_Address1" name="per_Address1" maxlength="120" value="<?= $e($field('per_Address1')) ?>"></div>
-                            <div><label for="per_Address2">Apartment, unit</label><input id="per_Address2" name="per_Address2" maxlength="120" value="<?= $e($field('per_Address2')) ?>"></div>
+                            <div><label for="address_line1">Address</label><input id="address_line1" name="address_line1" maxlength="120" value="<?= $e($field('address_line1')) ?>"></div>
+                            <div><label for="address_line2">Apartment, unit</label><input id="address_line2" name="address_line2" maxlength="120" value="<?= $e($field('address_line2')) ?>"></div>
                         </div>
                         <div class="field-row thirds">
-                            <div><label for="per_City">City</label><input id="per_City" name="per_City" maxlength="60" value="<?= $e($field('per_City')) ?>"></div>
-                            <div><label for="per_State">Province or state</label><input id="per_State" name="per_State" maxlength="40" value="<?= $e($field('per_State')) ?>"></div>
-                            <div><label for="per_Zip">Postal code</label><input id="per_Zip" name="per_Zip" maxlength="20" value="<?= $e($field('per_Zip')) ?>"></div>
-                        </div>
-                        <div class="field-row thirds">
-                            <div><label for="per_Facebook">Facebook</label><input id="per_Facebook" name="per_Facebook" maxlength="180" value="<?= $e($field('per_Facebook')) ?>"></div>
-                            <div><label for="per_Twitter">X or Twitter</label><input id="per_Twitter" name="per_Twitter" maxlength="180" value="<?= $e($field('per_Twitter')) ?>"></div>
-                            <div><label for="per_LinkedIn">LinkedIn</label><input id="per_LinkedIn" name="per_LinkedIn" maxlength="180" value="<?= $e($field('per_LinkedIn')) ?>"></div>
+                            <div><label for="city">City</label><input id="city" name="city" maxlength="60" value="<?= $e($field('city')) ?>"></div>
+                            <div><label for="region">Province or state</label><input id="region" name="region" maxlength="40" value="<?= $e($field('region')) ?>"></div>
+                            <div><label for="postal_code">Postal code</label><input id="postal_code" name="postal_code" maxlength="20" value="<?= $e($field('postal_code')) ?>"></div>
                         </div>
                         <div class="btn-row">
                             <button type="submit" id="detailsSave">Save your details</button>
@@ -394,7 +377,7 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
                             <select id="campusChoice">
                                 <option value="0">Not set</option>
                                 <?php foreach ($profileCampuses as $c): ?>
-                                <option value="<?= (int) $c['campus_id'] ?>"<?= $primaryCampusId === (int) $c['campus_id'] ? ' selected' : '' ?>><?= $e($c['campus_name']) ?></option>
+                                <option value="<?= (int) $c['id'] ?>"<?= $primaryCampusId === (int) $c['id'] ? ' selected' : '' ?>><?= $e($c['name']) ?></option>
                                 <?php endforeach; ?>
                             </select></div>
                         <div class="btn-row"><button type="button" id="campusSave">Save campus</button></div>
@@ -411,7 +394,7 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
         <div class="two-col">
             <section class="panel">
                 <div class="panel-head">
-                    <h2><?= $family !== null && trim((string) ($family['fam_Name'] ?? '')) !== '' ? $e($family['fam_Name']) . ' household' : 'Your household' ?></h2>
+                    <h2><?= $family !== null && trim((string) ($family['name'] ?? '')) !== '' ? $e($family['name']) . ' household' : 'Your household' ?></h2>
                     <p>The people the church has recorded at your address.</p>
                 </div>
                 <div class="panel-body">
@@ -736,7 +719,7 @@ $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June',
         if (!detailsRead || !detailsForm) return;
         detailsRead.hidden = on;
         detailsForm.hidden = !on;
-        if (on) $('per_FirstName')?.focus();
+        if (on) $('first_name')?.focus();
         else $('editProfileOpen')?.focus();
     }
     $('editProfileOpen')?.addEventListener('click', () => showForm(true));

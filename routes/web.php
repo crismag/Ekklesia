@@ -851,17 +851,17 @@ $webRoutes = [
             $psvc = \App\Providers\PortalServiceProvider::makePersonAdminService();
             $ownerCampuses = $psvc->campuses();
             $pd = $psvc->find($personId);
-            $ownerPrimaryCampus = (int) ($pd['primary_campus_id'] ?? 0);
+            $ownerPrimaryCampus = (int) ($pd['campus_id'] ?? 0);
         }
         ob_start();
         require __DIR__ . '/../resources/views/person-detail.php';
         return (string) ob_get_clean();
     },
 
-    // Public photo serve (portal folder first, legacy churchcrm image as fallback).
+    // Public photo serve (portal-owned Images/Person folder).
     'GET /people/photo' => function (array $req): string {
         $id = (int) ($req['id'] ?? 0);
-        foreach ([__DIR__ . '/../Images/Person/', __DIR__ . '/../../churchcrm/Images/Person/'] as $root) {
+        foreach ([__DIR__ . '/../Images/Person/'] as $root) {
             foreach (['png', 'jpg', 'jpeg'] as $ext) {
                 $file = $root . $id . '.' . $ext;
                 if ($id > 0 && is_file($file)) {
@@ -1197,8 +1197,8 @@ $webRoutes = [
         $data = $svc->viewData((int) ($req['id'] ?? 0));
         // Household context: related families (map) + shared-residence families (derived).
         $relatedLinks = []; $residenceMates = [];
-        if ($data !== null && (int) ($data['person']['per_fam_ID'] ?? 0) > 0) {
-            $fid = (int) $data['person']['per_fam_ID'];
+        if ($data !== null && (int) ($data['person']['household_id'] ?? 0) > 0) {
+            $fid = (int) $data['person']['household_id'];
             $fsvc = \App\Providers\PortalServiceProvider::makeFamilyAdminService();
             $rel = \App\Providers\PortalServiceProvider::makeRelatedFamiliesService();
             $raw = $rel->forFamily($fid);
@@ -1213,13 +1213,11 @@ $webRoutes = [
         require __DIR__ . '/../resources/views/admin-person-view.php';
         return (string) ob_get_clean();
     },
-    // Person photo — served from the portal-owned Images/Person folder, with a
-    // read-only fallback to the legacy churchcrm image dir (no ChurchCRM PHP).
+    // Person photo — served from the portal-owned Images/Person folder.
     'GET /admin/people/photo' => function (array $req): string {
         $id = (int) ($req['id'] ?? 0);
         $roots = [
             __DIR__ . '/../Images/Person/',
-            __DIR__ . '/../../churchcrm/Images/Person/',
         ];
         foreach ($roots as $root) {
             foreach (['png', 'jpg', 'jpeg'] as $ext) {
@@ -1288,8 +1286,8 @@ $webRoutes = [
             header('Location: ' . $basePath . '/admin/people/edit?id=' . $id . '&notice=saved', true, 302);
         } catch (\Throwable $e) {
             $_SESSION['people_flash'] = $e->getMessage();
-            $back = (int) ($req['per_ID'] ?? 0) > 0
-                ? '/admin/people/edit?id=' . (int) $req['per_ID'] . '&notice=error'
+            $back = (int) ($req['id'] ?? 0) > 0
+                ? '/admin/people/edit?id=' . (int) $req['id'] . '&notice=error'
                 : '/admin/people/edit?notice=error';
             header('Location: ' . $basePath . $back, true, 302);
         }
@@ -1603,7 +1601,7 @@ $webRoutes = [
     },
     'GET /admin/outreach'   => fn (array $req) => _adminSectionRender($req, 'admin-outreach.php',   $resolvePortalActor, $resolveCampusSelector),
 
-    // Campus locations — self-contained CRUD over church_campus (no ChurchCRM deps).
+    // Campus locations — self-contained CRUD over campuses.
     'GET /admin/campuses' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         $basePath = (string) ($req['_base_path'] ?? '');
@@ -1613,8 +1611,8 @@ $webRoutes = [
         $campuses = $svc->all();
         $stats = $svc->stats();
         $editingCampus = $svc->find((int) ($req['campus_id'] ?? 0)) ?? $svc->blank();
-        $assignmentEvents = ((int) ($editingCampus['campus_id'] ?? 0) > 0)
-            ? $svc->eligibleAssignmentEvents((int) $editingCampus['campus_id'])
+        $assignmentEvents = ((int) ($editingCampus['id'] ?? 0) > 0)
+            ? $svc->eligibleAssignmentEvents((int) $editingCampus['id'])
             : [];
         $notice = (string) ($req['notice'] ?? '');
         $flash = (string) ($_SESSION['campus_flash'] ?? '');
@@ -1656,7 +1654,7 @@ $webRoutes = [
             return '';
         } catch (\Throwable $e) {
             $_SESSION['campus_flash'] = $e->getMessage();
-            $back = $action === 'save' && (int) ($req['campus_id'] ?? 0) > 0 ? '&campus_id=' . (int) $req['campus_id'] : '';
+            $back = $action === 'save' && (int) ($req['id'] ?? 0) > 0 ? '&campus_id=' . (int) $req['id'] : '';
             header('Location: ' . $target . '?notice=error' . $back, true, 302);
             return '';
         }
@@ -1775,7 +1773,7 @@ $webRoutes = [
         }
     },
 
-    // Family management — self-contained CRUD over family_fam (no ChurchCRM).
+    // Family management — self-contained CRUD over households.
     'GET /admin/families' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         $basePath = (string) ($req['_base_path'] ?? '');
@@ -1864,8 +1862,8 @@ $webRoutes = [
             header('Location: ' . $basePath . '/admin/families/edit?id=' . $id . '&notice=saved', true, 302);
         } catch (\Throwable $e) {
             $_SESSION['family_flash'] = $e->getMessage();
-            $back = (int) ($req['fam_ID'] ?? 0) > 0
-                ? '/admin/families/edit?id=' . (int) $req['fam_ID'] . '&notice=error'
+            $back = (int) ($req['id'] ?? 0) > 0
+                ? '/admin/families/edit?id=' . (int) $req['id'] . '&notice=error'
                 : '/admin/families/edit?notice=error';
             header('Location: ' . $basePath . $back, true, 302);
         }
@@ -1950,7 +1948,7 @@ $webRoutes = [
         return '';
     },
 
-    // Option manager — edit list_lst option lists (classifications, family roles, member types).
+    // Option manager — edit membership statuses, household roles and member types.
     'GET /admin/event-types' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         $basePath = (string) ($req['_base_path'] ?? '');
@@ -2414,7 +2412,7 @@ $webRoutes = [
         }
         $svc = \App\Providers\PortalServiceProvider::makeOptionAdminService();
         $action = (string) ($req['action'] ?? '');
-        $listId = (int) ($req['list_id'] ?? 0);
+        $listId = (string) ($req['list'] ?? '');
         $optId = (int) ($req['option_id'] ?? 0);
         try {
             if ($action === 'add') {
@@ -2702,12 +2700,12 @@ $webRoutes['POST /admin/maintenance/export-xlsx'] = function (array $req) use ($
         $campusId = (int) ($req['campus_id'] ?? 0);
         $sheets = [];
         foreach ($people->campuses() as $c) {
-            if ($campusId > 0 && (int) $c['campus_id'] !== $campusId) {
+            if ($campusId > 0 && (int) $c['id'] !== $campusId) {
                 continue;
             }
             $sheets[] = [
-                'campus' => (string) $c['campus_name'],
-                'rows' => $people->exportCampus((int) $c['campus_id']),
+                'campus' => (string) $c['name'],
+                'rows' => $people->exportCampus((int) $c['id']),
             ];
         }
         if ($sheets === []) {

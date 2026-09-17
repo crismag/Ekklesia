@@ -1,8 +1,7 @@
 <?php
 /**
  * Admin · Person Profile — read view with photo, quick info, contact (call/text/
- * copy), address map, campus affiliations, family members, and an actions menu.
- * Inspired by ChurchCRM PersonView.php; portal-owned, no ChurchCRM dependency.
+ * copy), address map, campus, family members, and an actions menu.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -23,17 +22,17 @@ if ($data === null) {
     echo '<article class="admin-card"><div class="admin-card-body">Person not found. <a href="' . $base . '/admin/people">Back to list</a></div></article>';
 } else {
     $p = $data['person'];
-    $pid = (int) $p['per_ID'];
-    $name = trim(($p['per_FirstName'] ?? '') . ' ' . ($p['per_LastName'] ?? ''));
-    $initials = strtoupper(substr((string) ($p['per_FirstName'] ?? ''), 0, 1) . substr((string) ($p['per_LastName'] ?? ''), 0, 1));
-    $gender = (int) ($p['per_Gender'] ?? 0) === 1 ? 'Male' : ((int) ($p['per_Gender'] ?? 0) === 2 ? 'Female' : '');
+    $pid = (int) $p['id'];
+    $name = trim(($p['first_name'] ?? '') . ' ' . ($p['last_name'] ?? ''));
+    $initials = strtoupper(substr((string) ($p['first_name'] ?? ''), 0, 1) . substr((string) ($p['last_name'] ?? ''), 0, 1));
+    $gender = ($p['gender'] ?? null) === 'male' ? 'Male' : (($p['gender'] ?? null) === 'female' ? 'Female' : '');
     $L = $data['labels'];
     $addr = (string) $data['address_line'];
     $lat = $data['lat']; $lng = $data['lng'];
     $mapsQ = rawurlencode($addr);
     $noticeMap = ['saved' => ['ok', 'Person saved.'], 'error' => ['err', $flash !== '' ? $flash : 'Something went wrong.']];
-    $membershipSince = !empty($p['per_MembershipDate']) && strtotime((string) $p['per_MembershipDate'])
-        ? date('M j, Y', (int) strtotime((string) $p['per_MembershipDate'])) : '';
+    $membershipSince = !empty($p['member_since']) && strtotime((string) $p['member_since'])
+        ? date('M j, Y', (int) strtotime((string) $p['member_since'])) : '';
     ?>
     <style>
       .pv-alert{padding:10px 14px;border-radius:8px;margin:0 0 14px;font-size:14px}
@@ -87,7 +86,7 @@ if ($data === null) {
           <div class="pv-drop">
             <a href="<?= $base ?>/admin/people/edit?id=<?= $pid ?>">&#9998; Edit person</a>
             <a href="<?= $base ?>/people/<?= $pid ?>" target="_blank">&#128065; View public profile</a>
-            <?php if ((int) ($p['per_fam_ID'] ?? 0) > 0): ?>
+            <?php if ((int) ($p['household_id'] ?? 0) > 0): ?>
               <a href="<?= $base ?>/admin/people/edit?id=<?= $pid ?>">&#128106; Change family / role</a>
             <?php endif; ?>
             <a href="<?= $base ?>/admin/people/photo?id=<?= $pid ?>" target="_blank">&#128247; View photo</a>
@@ -116,7 +115,7 @@ if ($data === null) {
               <?php if ($L['member_type'] !== ''): ?><li><span class="k">Member type</span><span class="pv-badge"><?= $h($L['member_type']) ?></span></li><?php endif; ?>
               <?php if ($L['family_role'] !== ''): ?><li><span class="k">Family role</span><span><?= $h($L['family_role']) ?></span></li><?php endif; ?>
               <?php if ($membershipSince !== ''): ?><li><span class="k">Member since</span><span><?= $h($membershipSince) ?></span></li><?php endif; ?>
-              <?php if ((int) ($p['per_BirthMonth'] ?? 0) > 0): ?><li><span class="k">Birthday</span><span><?= $h(date('M j', mktime(0, 0, 0, (int) $p['per_BirthMonth'], (int) $p['per_BirthDay'] ?: 1))) ?><?= (int) ($p['per_BirthYear'] ?? 0) > 0 ? ', ' . (int) $p['per_BirthYear'] : '' ?></span></li><?php endif; ?>
+              <?php if ((int) ($p['birth_month'] ?? 0) > 0): ?><li><span class="k">Birthday</span><span><?= $h(date('M j', mktime(0, 0, 0, (int) $p['birth_month'], (int) $p['birth_day'] ?: 1))) ?><?= (int) ($p['birth_year'] ?? 0) > 0 ? ', ' . (int) $p['birth_year'] : '' ?></span></li><?php endif; ?>
             </ul>
           </div>
         </div>
@@ -126,7 +125,7 @@ if ($data === null) {
           <div class="pv-card" style="margin-top:12px"><div class="pv-sec">
             <h4>Campus</h4>
             <?php foreach ($data['affiliations'] as $a): ?>
-              <span class="pv-badge <?= (int) $a['is_primary'] === 1 ? 'pri' : '' ?>"><?= $h($a['campus_name']) ?><?= (int) $a['is_primary'] === 1 ? ' ★' : '' ?></span>
+              <span class="pv-badge <?= (int) $a['is_primary'] === 1 ? 'pri' : '' ?>"><?= $h($a['name']) ?><?= (int) $a['is_primary'] === 1 ? ' ★' : '' ?></span>
             <?php endforeach; ?>
           </div></div>
         <?php endif; ?>
@@ -139,9 +138,9 @@ if ($data === null) {
             <h4>Contact</h4>
             <?php
             $phones = array_filter([
-                'Mobile' => $p['per_CellPhone'] ?? '', 'Home' => $p['per_HomePhone'] ?? '', 'Work' => $p['per_WorkPhone'] ?? '',
+                'Mobile' => $p['mobile_phone'] ?? '', 'Home' => $p['home_phone'] ?? '',
             ], static fn ($v) => trim((string) $v) !== '');
-            $emails = array_filter(['' => $p['per_Email'] ?? '', 'Work' => $p['per_WorkEmail'] ?? ''], static fn ($v) => trim((string) $v) !== '');
+            $emails = array_filter(['' => $p['email'] ?? ''], static fn ($v) => trim((string) $v) !== '');
             ?>
             <?php if (!$phones && !$emails): ?><span class="muted">No contact details.</span><?php endif; ?>
             <?php foreach ($phones as $label => $num): $digits = preg_replace('/[^0-9+]/', '', (string) $num); ?>
@@ -168,8 +167,8 @@ if ($data === null) {
             <div class="pv-line">
               <a href="https://www.google.com/maps/search/?api=1&query=<?= $mapsQ ?>" target="_blank" rel="noopener">Open in Google Maps</a>
               <a href="https://www.openstreetmap.org/search?query=<?= $mapsQ ?>" target="_blank" rel="noopener">OpenStreetMap</a>
-              <?php if ($isAdmin && (int) ($p['per_fam_ID'] ?? 0) > 0): ?>
-                <button type="button" class="pv-mini" id="refreshCoordsBtn" data-family-id="<?= (int) $p['per_fam_ID'] ?>"
+              <?php if ($isAdmin && (int) ($p['household_id'] ?? 0) > 0): ?>
+                <button type="button" class="pv-mini" id="refreshCoordsBtn" data-family-id="<?= (int) $p['household_id'] ?>"
                         title="Look up latitude/longitude from this address">&#10227; Refresh coordinates</button>
                 <span id="refreshCoordsMsg" class="muted"></span>
               <?php endif; ?>
@@ -184,7 +183,7 @@ if ($data === null) {
 
         <?php if ($data['family']): ?>
           <div class="pv-card" style="margin-top:12px"><div class="pv-sec">
-            <h4>Family — <?= $h($data['family']['fam_Name']) ?></h4>
+            <h4>Family — <?= $h($data['family']['name']) ?></h4>
             <?php if ($data['members']): ?>
               <table class="pv-fam"><tbody>
                 <?php foreach ($data['members'] as $m): ?>
@@ -266,7 +265,7 @@ $content = ob_get_clean();
 echo admin_render_page([
     'basePath' => $basePath, 'activeId' => 'people',
     'pageTitle' => 'Person · Admin', 'pageSubtitle' => 'Profile.',
-    'sectionTitle' => $data !== null ? trim(($data['person']['per_FirstName'] ?? '') . ' ' . ($data['person']['per_LastName'] ?? '')) : 'Person',
+    'sectionTitle' => $data !== null ? trim(($data['person']['first_name'] ?? '') . ' ' . ($data['person']['last_name'] ?? '')) : 'Person',
     'sectionDescription' => 'Profile, contact, campus, and family.',
     'actor' => $actor, 'campusSelector' => $campusSelector, 'isAdmin' => $isAdmin,
 ], static fn (): string => $content);

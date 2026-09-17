@@ -104,12 +104,12 @@ listed above.
 
 ### Settings the portal writes, and why deploy must not carry them
 
-Eight files under `config/` are edited through the admin screens and belong to
+Seven files under `config/` are edited through the admin screens and belong to
 the server that owns them:
 
 ```
 announcements.json  chrome.json   church-info.json  hero.json
-ministries.json     people.json   related-families.json   theme.json
+ministries.json     people.json   theme.json
 ```
 
 They used to ship from the repository on every deploy, so a change made in
@@ -122,7 +122,7 @@ for a **new** installation — copy them across once, by hand, when first settin
 a server up, and never again:
 
 ```bash
-rsync -az config/{announcements,chrome,church-info,hero,ministries,people,related-families,theme}.json \
+rsync -az config/{announcements,chrome,church-info,hero,ministries,people,theme}.json \
   Hostinger:<production path>/config/
 ```
 

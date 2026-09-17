@@ -23,7 +23,6 @@ final class AdminDashboardService
         'chrome.json' => ['label' => 'Header & footer', 'route' => '/admin/header'],
         'church-info.json' => ['label' => 'Church information', 'route' => '/admin/church-info'],
         'ministries.json' => ['label' => 'Ministry catalog', 'route' => '/admin/ministries'],
-        'related-families.json' => ['label' => 'Related families', 'route' => null],
     ];
 
     /** @param callable():mixed $fn */

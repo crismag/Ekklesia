@@ -5,7 +5,7 @@
  * @var string $basePath
  * @var array<string,mixed>|null $actor
  * @var array<string,mixed> $campusSelector
- * @var list<array{campus_id:int,campus_name:string}> $campuses
+ * @var list<array{id:int,name:string}> $campuses
  * @var int $campusId
  * @var string $notice
  * @var string $flash
@@ -150,7 +150,7 @@ ob_start();
           <select id="exportCampus" name="campus_id">
             <option value="0">Everyone (one sheet per campus)</option>
             <?php foreach ($campuses as $c): ?>
-              <option value="<?= (int) $c['campus_id'] ?>"<?= (int) $campusId === (int) $c['campus_id'] ? ' selected' : '' ?>><?= $h($c['campus_name']) ?></option>
+              <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>

@@ -9,78 +9,77 @@ use PDO;
 use RuntimeException;
 
 /**
- * Option manager — edit the shared `list_lst` option lists used across the
- * portal (classifications, family roles, Member Type). Direct-PDO, self-contained,
- * NO dependency on any ChurchCRM PHP.
+ * Option manager — edit the small named lists used across the portal
+ * (membership statuses, household roles, member types). Direct-PDO,
+ * self-contained.
  *
- * Only a whitelisted set of list ids is manageable, and each knows where its
+ * Only a whitelisted set of tables is manageable, and each knows where its
  * options are referenced so a delete can be blocked when an option is in use.
  */
 final readonly class OptionAdminService
 {
-    /** listId => [label, usageTable, usageCol]. */
+    /** table => label, description, and the people column that references it. */
     private const LISTS = [
-        1  => ['label' => 'Classifications', 'desc' => "A person's status (Member, Guest, …).", 'table' => 'person_per',    'col' => 'per_cls_ID'],
-        2  => ['label' => 'Family roles',    'desc' => 'How each person relates to their household: Husband, Wife, Child. Deliberately not "head of household" — one household can hold more than one family, and nobody needs to be nominated as its head.', 'table' => 'person_per', 'col' => 'per_fmr_ID'],
-        13 => ['label' => 'Member types',    'desc' => 'Ministry grouping (Radical, Trailblazer, G&A).', 'table' => 'person_custom', 'col' => 'c1'],
+        'membership_statuses' => ['label' => 'Classifications', 'desc' => "A person's status (Member, Guest, …).", 'col' => 'membership_status_id'],
+        'household_roles'     => ['label' => 'Family roles',    'desc' => 'How each person relates to their household: Husband, Wife, Child. Deliberately not "head of household" — one household can hold more than one family, and nobody needs to be nominated as its head.', 'col' => 'household_role_id'],
+        'member_types'        => ['label' => 'Member types',    'desc' => 'Ministry grouping (Radical, Trailblazer, G&A).', 'col' => 'member_type_id'],
     ];
 
     public function __construct(private PDO $db)
     {
     }
 
-    private function assertList(int $listId): array
+    /** @return array{label:string,desc:string,col:string} */
+    private function assertList(string $list): array
     {
-        if (!isset(self::LISTS[$listId])) {
+        if (!isset(self::LISTS[$list])) {
             throw new InvalidArgumentException('That option list cannot be edited here.');
         }
-        return self::LISTS[$listId];
+        return self::LISTS[$list];
     }
 
-    /** @return array<int,array{label:string,desc:string,options:list<array<string,mixed>>}> */
+    /** @return array<string,array{label:string,desc:string,options:list<array<string,mixed>>}> */
     public function all(): array
     {
         $out = [];
-        foreach (self::LISTS as $listId => $meta) {
-            $out[$listId] = [
+        foreach (self::LISTS as $list => $meta) {
+            $out[$list] = [
                 'label' => $meta['label'],
                 'desc' => $meta['desc'],
-                'options' => $this->options($listId),
+                'options' => $this->options($list),
             ];
         }
         return $out;
     }
 
-    /** @return list<array{id:int,name:string,sequence:int,usage:int}> */
-    public function options(int $listId): array
+    /** @return list<array{id:int,name:string,sort_order:int,usage:int}> */
+    public function options(string $list): array
     {
-        $meta = $this->assertList($listId);
-        $stmt = $this->db->prepare('SELECT lst_OptionID AS id, lst_OptionName AS name, lst_OptionSequence AS seq
-                                      FROM list_lst WHERE lst_ID = :l ORDER BY lst_OptionSequence, lst_OptionName');
-        $stmt->execute([':l' => $listId]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $this->assertList($list);
+        $rows = $this->db->query("SELECT id, name, sort_order FROM `$list` ORDER BY sort_order, name")
+            ->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $out = [];
         foreach ($rows as $r) {
             $out[] = [
-                'id' => (int) $r['id'], 'name' => (string) $r['name'], 'sequence' => (int) $r['seq'],
-                'usage' => $this->usage($listId, (int) $r['id']),
+                'id' => (int) $r['id'], 'name' => (string) $r['name'], 'sort_order' => (int) $r['sort_order'],
+                'usage' => $this->usage($list, (int) $r['id']),
             ];
         }
         return $out;
     }
 
-    /** How many records currently use this option. */
-    public function usage(int $listId, int $optionId): int
+    /** How many people currently use this option. */
+    public function usage(string $list, int $optionId): int
     {
-        $meta = $this->assertList($listId);
-        $stmt = $this->db->prepare("SELECT COUNT(*) FROM `{$meta['table']}` WHERE `{$meta['col']}` = :o");
+        $meta = $this->assertList($list);
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM people WHERE `{$meta['col']}` = :o");
         $stmt->execute([':o' => $optionId]);
         return (int) $stmt->fetchColumn();
     }
 
-    public function add(int $listId, string $name): void
+    public function add(string $list, string $name): void
     {
-        $this->assertList($listId);
+        $this->assertList($list);
         $name = trim($name);
         if ($name === '') {
             throw new InvalidArgumentException('Option name is required.');
@@ -88,28 +87,30 @@ final readonly class OptionAdminService
         if (mb_strlen($name) > 50) {
             $name = mb_substr($name, 0, 50);
         }
-        $nextId = (int) $this->scalar('SELECT COALESCE(MAX(lst_OptionID), 0) + 1 FROM list_lst WHERE lst_ID = :l', $listId);
-        $nextSeq = (int) $this->scalar('SELECT COALESCE(MAX(lst_OptionSequence), 0) + 1 FROM list_lst WHERE lst_ID = :l', $listId);
-        $this->db->prepare('INSERT INTO list_lst (lst_ID, lst_OptionID, lst_OptionSequence, lst_OptionName) VALUES (:l, :o, :s, :n)')
-            ->execute([':l' => $listId, ':o' => $nextId, ':s' => $nextSeq, ':n' => $name]);
+        $this->assertNameFree($list, $name, 0);
+        $nextSeq = (int) $this->db->query("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM `$list`")->fetchColumn();
+        $this->db->prepare("INSERT INTO `$list` (name, sort_order) VALUES (:n, :s)")
+            ->execute([':n' => $name, ':s' => $nextSeq]);
     }
 
-    public function rename(int $listId, int $optionId, string $name): void
+    public function rename(string $list, int $optionId, string $name): void
     {
-        $this->assertList($listId);
+        $this->assertList($list);
         $name = trim($name);
         if ($name === '') {
             throw new InvalidArgumentException('Option name is required.');
         }
-        $this->db->prepare('UPDATE list_lst SET lst_OptionName = :n WHERE lst_ID = :l AND lst_OptionID = :o')
-            ->execute([':n' => mb_substr($name, 0, 50), ':l' => $listId, ':o' => $optionId]);
+        $name = mb_substr($name, 0, 50);
+        $this->assertNameFree($list, $name, $optionId);
+        $this->db->prepare("UPDATE `$list` SET name = :n WHERE id = :o")
+            ->execute([':n' => $name, ':o' => $optionId]);
     }
 
-    /** Move an option up or down by swapping sequence with its neighbour. */
-    public function move(int $listId, int $optionId, string $dir): void
+    /** Move an option up or down by swapping sort order with its neighbour. */
+    public function move(string $list, int $optionId, string $dir): void
     {
-        $this->assertList($listId);
-        $opts = $this->options($listId);
+        $this->assertList($list);
+        $opts = $this->options($list);
         $idx = null;
         foreach ($opts as $i => $o) {
             if ($o['id'] === $optionId) { $idx = $i; break; }
@@ -123,11 +124,13 @@ final readonly class OptionAdminService
         }
         $a = $opts[$idx];
         $b = $opts[$swapIdx];
-        $upd = $this->db->prepare('UPDATE list_lst SET lst_OptionSequence = :s WHERE lst_ID = :l AND lst_OptionID = :o');
+        // Equal sort orders would swap to nothing; fall back to list positions.
+        [$seqA, $seqB] = $a['sort_order'] === $b['sort_order'] ? [$swapIdx + 1, $idx + 1] : [$b['sort_order'], $a['sort_order']];
+        $upd = $this->db->prepare("UPDATE `$list` SET sort_order = :s WHERE id = :o");
         $this->db->beginTransaction();
         try {
-            $upd->execute([':s' => $b['sequence'], ':l' => $listId, ':o' => $a['id']]);
-            $upd->execute([':s' => $a['sequence'], ':l' => $listId, ':o' => $b['id']]);
+            $upd->execute([':s' => $seqA, ':o' => $a['id']]);
+            $upd->execute([':s' => $seqB, ':o' => $b['id']]);
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -136,21 +139,23 @@ final readonly class OptionAdminService
     }
 
     /** Delete an option. Refuses when it's still assigned to people. */
-    public function delete(int $listId, int $optionId): void
+    public function delete(string $list, int $optionId): void
     {
-        $meta = $this->assertList($listId);
-        $used = $this->usage($listId, $optionId);
+        $this->assertList($list);
+        $used = $this->usage($list, $optionId);
         if ($used > 0) {
             throw new RuntimeException("This option is used by $used record(s). Reassign them first.");
         }
-        $this->db->prepare('DELETE FROM list_lst WHERE lst_ID = :l AND lst_OptionID = :o')
-            ->execute([':l' => $listId, ':o' => $optionId]);
+        $this->db->prepare("DELETE FROM `$list` WHERE id = :o")->execute([':o' => $optionId]);
     }
 
-    private function scalar(string $sql, int $listId)
+    /** Names are unique per list; say so rather than surfacing a key violation. */
+    private function assertNameFree(string $list, string $name, int $exceptId): void
     {
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([':l' => $listId]);
-        return $stmt->fetchColumn();
+        $stmt = $this->db->prepare("SELECT COUNT(*) FROM `$list` WHERE name = :n AND id <> :id");
+        $stmt->execute([':n' => $name, ':id' => $exceptId]);
+        if ((int) $stmt->fetchColumn() > 0) {
+            throw new InvalidArgumentException('An option with that name already exists.');
+        }
     }
 }

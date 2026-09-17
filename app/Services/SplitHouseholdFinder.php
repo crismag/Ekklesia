@@ -173,7 +173,7 @@ final class SplitHouseholdFinder
     /**
      * Surnames held by this family's members.
      *
-     * Taken from the people rather than from fam_Name, which lags behind edits
+     * Taken from the people rather than from the household name, which lags behind edits
      * and is not what anyone is actually called.
      *
      * @param array<string,mixed> $family

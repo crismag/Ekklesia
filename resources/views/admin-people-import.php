@@ -6,7 +6,7 @@
  * @var string $basePath
  * @var array<string,mixed>|null $actor
  * @var array<string,mixed> $campusSelector
- * @var list<array{campus_id:int,campus_name:string}> $campuses
+ * @var list<array{id:int,name:string}> $campuses
  * @var int $campusId
  * @var string $hubSheet
  * @var string $nySheet
@@ -193,7 +193,7 @@ ob_start();
           <select name="campus_id" required>
             <option value="">Choose campus…</option>
             <?php foreach ($campuses as $c): ?>
-              <option value="<?= (int) $c['campus_id'] ?>"<?= (int) $campusId === (int) $c['campus_id'] ? ' selected' : '' ?>><?= $h($c['campus_name']) ?></option>
+              <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -238,7 +238,7 @@ ob_start();
           <select name="campus_id" required>
             <option value="">Choose campus…</option>
             <?php foreach ($campuses as $c): ?>
-              <option value="<?= (int) $c['campus_id'] ?>"<?= (int) $campusId === (int) $c['campus_id'] ? ' selected' : '' ?>><?= $h($c['campus_name']) ?></option>
+              <option value="<?= (int) $c['id'] ?>"<?= (int) $campusId === (int) $c['id'] ? ' selected' : '' ?>><?= $h($c['name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -264,8 +264,8 @@ ob_start();
   <?php
     $campusName = '';
     foreach ($campuses as $c) {
-        if ((int) $c['campus_id'] === (int) $batch['campus_id']) {
-            $campusName = (string) $c['campus_name'];
+        if ((int) $c['id'] === (int) $batch['campus_id']) {
+            $campusName = (string) $c['name'];
         }
     }
     $applied = ($batch['status'] ?? '') === 'applied';

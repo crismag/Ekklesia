@@ -2,7 +2,7 @@
 /**
  * Admin · Family editor — add/edit a household + view its members.
  * Data via FamilyAdminService. Reuses /admin/people/geocode-family for the
- * refresh-coordinates button. No ChurchCRM dependency.
+ * refresh-coordinates button.
  *
  * @var string $basePath
  * @var array<string,mixed>|null $actor
@@ -19,9 +19,9 @@ $base = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
 $h = static fn ($v): string => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 $f = $family;
 $v = static fn (string $k) => htmlspecialchars((string) ($f[$k] ?? ''), ENT_QUOTES, 'UTF-8');
-$fid = (int) ($f['fam_ID'] ?? 0);
+$fid = (int) ($f['id'] ?? 0);
 $editing = $fid > 0;
-$active = ($f['fam_DateDeactivated'] ?? null) === null;
+$active = ($f['deactivated_on'] ?? null) === null;
 $noticeMap = ['saved' => ['ok', 'Family saved.'], 'error' => ['err', $flash !== '' ? $flash : 'Something went wrong.']];
 
 ob_start();
@@ -59,7 +59,7 @@ ob_start();
   <a class="fe-btn sec" href="<?= $base ?>/admin/families">&larr; Families</a>
   <span style="flex:1"></span>
   <?php if ($editing): ?>
-    <form method="post" action="<?= $base ?>/admin/families/delete" onsubmit="return confirm('Delete family &quot;<?= $h($f['fam_Name']) ?>&quot;? Only works if it has no members.');">
+    <form method="post" action="<?= $base ?>/admin/families/delete" onsubmit="return confirm('Delete family &quot;<?= $h($f['name']) ?>&quot;? Only works if it has no members.');">
       <input type="hidden" name="id" value="<?= $fid ?>">
       <button class="fe-btn danger" type="submit">Delete family</button>
     </form>
@@ -68,25 +68,25 @@ ob_start();
 
 <article class="admin-card">
   <div class="admin-card-head"><div><h2><?= $editing ? 'Edit family' : 'Add family' ?></h2>
-    <p><?= $editing ? $h($f['fam_Name']) . ' · #' . $fid : 'A household groups people and shares an address.' ?></p></div></div>
+    <p><?= $editing ? $h($f['name']) . ' · #' . $fid : 'A household groups people and shares an address.' ?></p></div></div>
   <div class="admin-card-body">
     <form method="post" action="<?= $base ?>/admin/families/save">
-      <input type="hidden" name="fam_ID" value="<?= $fid ?>">
+      <input type="hidden" name="id" value="<?= $fid ?>">
       <div class="fe-grid">
-        <div class="fe-field full"><label>Family name <span class="fe-req">*</span></label><input type="text" name="fam_Name" maxlength="50" required value="<?= $v('fam_Name') ?>" placeholder="e.g. The Smith Family"></div>
-        <div class="fe-field full"><label>Address line 1</label><input type="text" name="fam_Address1" maxlength="255" value="<?= $v('fam_Address1') ?>"></div>
-        <div class="fe-field full"><label>Address line 2</label><input type="text" name="fam_Address2" maxlength="255" value="<?= $v('fam_Address2') ?>"></div>
-        <div class="fe-field"><label>City</label><input type="text" name="fam_City" maxlength="50" value="<?= $v('fam_City') ?>"></div>
-        <div class="fe-field"><label>Province / State</label><input type="text" name="fam_State" maxlength="50" value="<?= $v('fam_State') ?>"></div>
-        <div class="fe-field"><label>Postal code</label><input type="text" name="fam_Zip" maxlength="50" value="<?= $v('fam_Zip') ?>"></div>
-        <div class="fe-field"><label>Country</label><input type="text" name="fam_Country" maxlength="50" value="<?= $v('fam_Country') ?>"></div>
-        <div class="fe-field"><label>Home phone</label><input type="tel" name="fam_HomePhone" maxlength="30" value="<?= $v('fam_HomePhone') ?>"></div>
-        <div class="fe-field"><label>Email</label><input type="email" name="fam_Email" maxlength="100" value="<?= $v('fam_Email') ?>"></div>
-        <div class="fe-field"><label>Wedding / anniversary date</label><input type="date" name="fam_WeddingDate" value="<?= $f['fam_WeddingDate'] ? $h(substr((string) $f['fam_WeddingDate'], 0, 10)) : '' ?>"></div>
+        <div class="fe-field full"><label>Family name <span class="fe-req">*</span></label><input type="text" name="name" maxlength="100" required value="<?= $v('name') ?>" placeholder="e.g. The Smith Family"></div>
+        <div class="fe-field full"><label>Address line 1</label><input type="text" name="address_line1" maxlength="150" value="<?= $v('address_line1') ?>"></div>
+        <div class="fe-field full"><label>Address line 2</label><input type="text" name="address_line2" maxlength="150" value="<?= $v('address_line2') ?>"></div>
+        <div class="fe-field"><label>City</label><input type="text" name="city" maxlength="100" value="<?= $v('city') ?>"></div>
+        <div class="fe-field"><label>Province / State</label><input type="text" name="region" maxlength="50" value="<?= $v('region') ?>"></div>
+        <div class="fe-field"><label>Postal code</label><input type="text" name="postal_code" maxlength="20" value="<?= $v('postal_code') ?>"></div>
+        <div class="fe-field"><label>Country</label><input type="text" name="country" maxlength="60" value="<?= $v('country') ?>"></div>
+        <div class="fe-field"><label>Home phone</label><input type="tel" name="home_phone" maxlength="40" value="<?= $v('home_phone') ?>"></div>
+        <div class="fe-field"><label>Email</label><input type="email" name="email" maxlength="120" value="<?= $v('email') ?>"></div>
+        <div class="fe-field"><label>Wedding / anniversary date</label><input type="date" name="wedding_date" value="<?= $f['wedding_date'] ? $h(substr((string) $f['wedding_date'], 0, 10)) : '' ?>"></div>
       </div>
       <div class="fe-checks">
         <label><input type="hidden" name="is_active" value="0"><input type="checkbox" name="is_active" value="1" <?= $active ? 'checked' : '' ?>> Active</label>
-        <label><input type="hidden" name="fam_SendNewsLetter" value="0"><input type="checkbox" name="fam_SendNewsLetter" value="1" <?= ($f['fam_SendNewsLetter'] ?? '') === 'TRUE' ? 'checked' : '' ?>> Send newsletter</label>
+        <label><input type="hidden" name="send_newsletter" value="0"><input type="checkbox" name="send_newsletter" value="1" <?= (int) ($f['send_newsletter'] ?? 0) === 1 ? 'checked' : '' ?>> Send newsletter</label>
       </div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
         <button class="fe-btn" type="submit"><?= $editing ? 'Save changes' : 'Create family' ?></button>
@@ -111,7 +111,7 @@ ob_start();
           <tr>
             <td><a href="<?= $base ?>/admin/people/view?id=<?= (int) $m['id'] ?>" style="font-weight:700;color:var(--blue-ink,#0f4e97);text-decoration:none"><?= $h(trim($m['first_name'] . ' ' . $m['last_name'])) ?></a></td>
             <td class="muted"><?= $h($m['family_role'] ?? '') ?></td>
-            <td class="muted"><?= $h($m['email'] ?: $m['cell'] ?: '') ?></td>
+            <td class="muted"><?= $h($m['email'] ?: $m['mobile_phone'] ?: '') ?></td>
             <td><a class="fe-mini" href="<?= $base ?>/admin/people/edit?id=<?= (int) $m['id'] ?>">Edit</a></td>
           </tr>
         <?php endforeach; ?>
@@ -121,11 +121,11 @@ ob_start();
       <p class="muted">No members yet.</p>
     <?php endif; ?>
     <p style="margin-top:12px"><a class="fe-btn sec" href="<?= $base ?>/admin/people/edit">&#43; Add a person</a>
-      <span class="muted" style="font-size:12px">— set their Family to “<?= $h($f['fam_Name']) ?>” to add them here.</span></p>
+      <span class="muted" style="font-size:12px">— set their Family to “<?= $h($f['name']) ?>” to add them here.</span></p>
   </div>
 </article>
 
-<!-- Related families (admin-confirmed map — no schema change) -->
+<!-- Related families (admin-confirmed links) -->
 <article class="admin-card">
   <div class="admin-card-head"><div><h2>Related families</h2>
     <p>Link this household to another family record — for a married child's family, extended family, or a shared household.</p></div></div>
@@ -211,7 +211,7 @@ ob_start();
   var rel = document.getElementById('relSelect');
   var dir = document.getElementById('dirWrap');
   if (!rel || !dir) return;
-  function sync() { dir.style.display = rel.value === 'parent-child' ? '' : 'none'; }
+  function sync() { dir.style.display = rel.value === 'parent_child' ? '' : 'none'; }
   rel.addEventListener('change', sync); sync();
 })();
 </script>
