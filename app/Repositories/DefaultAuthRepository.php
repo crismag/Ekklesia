@@ -170,4 +170,64 @@ final class DefaultAuthRepository implements AuthRepository
             $at,
         );
     }
+
+    /* ---------------------------------------------------------- credentials */
+
+    public function findAccountByCredential(string $provider, string $subject): ?array
+    {
+        return $this->adapter->findAccountByCredential($provider, $subject);
+    }
+
+    public function findActiveAccountsByEmail(string $email): array
+    {
+        return $this->adapter->findActiveAccountsByEmail($email);
+    }
+
+    public function linkCredential(
+        int $accountId,
+        string $provider,
+        string $subject,
+        ?string $linkedEmail,
+        DateTimeImmutable $at,
+    ): void {
+        $this->adapter->linkCredential($accountId, $provider, $subject, $linkedEmail, $at);
+    }
+
+    public function touchCredential(string $provider, string $subject, DateTimeImmutable $at): void
+    {
+        $this->adapter->touchCredential($provider, $subject, $at);
+    }
+
+    /* ------------------------------------------------------- sign-in links */
+
+    public function createMagicLoginToken(
+        int $accountId,
+        string $tokenHash,
+        DateTimeImmutable $createdAt,
+        DateTimeImmutable $expiresAt,
+    ): void {
+        $this->adapter->createMagicLoginToken($accountId, $tokenHash, $createdAt, $expiresAt);
+    }
+
+    public function consumeMagicLoginToken(string $tokenHash, DateTimeImmutable $now): ?int
+    {
+        return $this->adapter->consumeMagicLoginToken($tokenHash, $now);
+    }
+
+    /* --------------------------------------------------------- rate limits */
+
+    public function recordAuthAttempt(string $kind, string $bucket, DateTimeImmutable $at): void
+    {
+        $this->adapter->recordAuthAttempt($kind, $bucket, $at);
+    }
+
+    public function countAuthAttempts(string $kind, string $bucket, DateTimeImmutable $since): int
+    {
+        return $this->adapter->countAuthAttempts($kind, $bucket, $since);
+    }
+
+    public function purgeAuthAttempts(DateTimeImmutable $before): void
+    {
+        $this->adapter->purgeAuthAttempts($before);
+    }
 }

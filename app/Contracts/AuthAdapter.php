@@ -141,6 +141,51 @@ interface AuthAdapter
 
     public function updatePasswordHash(int $accountId, string $passwordHash): void;
 
+    /* ---------------------------------------------------------- credentials */
+
+    /**
+     * @param 'google' $provider
+     * @return array{id:int,email:string,is_active:bool,display_name:?string}|null
+     */
+    public function findAccountByCredential(string $provider, string $subject): ?array;
+
+    /** @return list<array{id:int,email:string,is_active:bool,display_name:?string}> */
+    public function findActiveAccountsByEmail(string $email): array;
+
+    /** @param 'google' $provider */
+    public function linkCredential(
+        int $accountId,
+        string $provider,
+        string $subject,
+        ?string $linkedEmail,
+        DateTimeImmutable $at,
+    ): void;
+
+    /** @param 'google' $provider */
+    public function touchCredential(string $provider, string $subject, DateTimeImmutable $at): void;
+
+    /* ------------------------------------------------------- sign-in links */
+
+    public function createMagicLoginToken(
+        int $accountId,
+        string $tokenHash,
+        DateTimeImmutable $createdAt,
+        DateTimeImmutable $expiresAt,
+    ): void;
+
+    /** Marks the token used in one statement; null when it was not this call's to spend. */
+    public function consumeMagicLoginToken(string $tokenHash, DateTimeImmutable $now): ?int;
+
+    /* --------------------------------------------------------- rate limits */
+
+    /** @param 'password'|'magic_link'|'google' $kind */
+    public function recordAuthAttempt(string $kind, string $bucket, DateTimeImmutable $at): void;
+
+    /** @param 'password'|'magic_link'|'google' $kind */
+    public function countAuthAttempts(string $kind, string $bucket, DateTimeImmutable $since): int;
+
+    public function purgeAuthAttempts(DateTimeImmutable $before): void;
+
     /**
      * Append a row to audit_log. The adapter is responsible for
      * JSON-encoding $details.

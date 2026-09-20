@@ -14,6 +14,7 @@ use App\DTO\Auth\AuthSession;
 use App\Exceptions\LoginChoiceRequired;
 use App\Exceptions\PermissionDenied;
 use App\Exceptions\ValidationFailed;
+use App\Services\Auth\LoginRateLimiter;
 use DateTimeImmutable;
 
 /**
@@ -47,7 +48,38 @@ final readonly class AuthService
         private PasswordHasher $hasher,
         private int $sessionLifetimeSeconds = 60 * 60 * 12,   // 12 hours default
         private ?PersonContactDirectory $identityResolver = null,
+        private ?LoginRateLimiter $rateLimiter = null,
     ) {
+    }
+
+    /**
+     * Start a session for an account whose identity has already been proven
+     * some other way — a Google identity, or a sign-in link.
+     *
+     * **The single door those methods come through, and the only thing they
+     * may do.** They establish who somebody is; this checks the account is one
+     * that may sign in at all, and then produces exactly the session a
+     * password sign-in produces — same table, same lifetime, same cookie.
+     * Neither method creates a person, an account, a role or an assignment,
+     * and nothing here grants anything: what the account may do still comes
+     * from account_roles.
+     */
+    public function startVerifiedSession(
+        int $accountId,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): AuthSession {
+        $profile = $this->repository->loadUserProfile($accountId);
+        if ($profile === null || !$profile['is_active']) {
+            throw new PermissionDenied('Invalid credentials.');
+        }
+
+        return $this->finalizeLogin([
+            'id'                   => $profile['id'],
+            'email'                => $profile['email'],
+            'display_name'         => $profile['display_name'],
+            'must_change_password' => $this->repository->isMustChangePassword($accountId),
+        ], $ipAddress, $userAgent);
     }
 
     /**
@@ -64,6 +96,17 @@ final readonly class AuthService
         $identifier = trim($email);
         if ($identifier === '' || $plainPassword === '') {
             throw new ValidationFailed('Username and password are required.');
+        }
+
+        /* Counted before the password is looked at, and recorded whatever
+           happens next: a wrong password, a right one and an unknown username
+           all cost the same attempt, so the limit cannot be read as an answer
+           about who exists. The dummy-hash timing defence below is unchanged —
+           this sits in front of it, it does not replace it. */
+        if ($this->rateLimiter !== null) {
+            $now = new DateTimeImmutable();
+            $this->rateLimiter->ensureWithinLimit('password', $identifier, $ipAddress, $now);
+            $this->rateLimiter->record('password', $identifier, $ipAddress, $now);
         }
 
         // 1. Hard-coded "Church Admin" recovery account — always honored when

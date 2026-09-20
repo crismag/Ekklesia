@@ -207,6 +207,15 @@ try {
         }
         echo json_encode($payload);
     return;
+} catch (\App\Exceptions\TooManyAttempts $e) {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code(429);
+    header('Retry-After: ' . $e->retryAfterSeconds);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => $e->getMessage(), 'kind' => 'too_many_attempts']);
+    return;
 } catch (ValidationFailed $e) {
     while (ob_get_level() > 0) {
         ob_end_clean();

@@ -38,6 +38,13 @@ return [
         PortalServiceProvider::makeRequestContext(),
     ))->choose($req),
 
+    // "Email me a sign-in link". Answers the same way whether or not the
+    // address has an account here, so the form cannot be used to ask who does.
+    'POST /api/login/link' => fn (array $req) => (new AuthController(
+        PortalServiceProvider::makeAuthService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->requestSignInLink($req),
+
     'POST /api/logout' => fn (array $req) => (new AuthController(
         PortalServiceProvider::makeAuthService(),
         PortalServiceProvider::makeRequestContext(),

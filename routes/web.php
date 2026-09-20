@@ -459,10 +459,35 @@ $webRoutes = [
         }
         /** @var string $next used by the template */
 
+        // Which other ways in this installation offers. Configuration only —
+        // no database, no network: the screen must not draw a button that
+        // cannot work, and must not be slow to say so.
+        \App\Core\Config\EnvLoader::loadOnce(__DIR__ . '/../.env');
+        $appUrlSet = \App\Core\Config\AppUrl::isConfigured();
+        /** @var bool $googleAvailable used by the template */
+        $googleAvailable = $appUrlSet
+            && trim((string) \App\Core\Config\EnvLoader::get('GOOGLE_CLIENT_ID', '')) !== ''
+            && trim((string) \App\Core\Config\EnvLoader::get('GOOGLE_CLIENT_SECRET', '')) !== '';
+        /** @var bool $magicLinkAvailable used by the template */
+        $magicLinkAvailable = $appUrlSet
+            && \App\Services\Mail\MailerFactory::isConfigured(dirname(__DIR__));
+
         ob_start();
         require __DIR__ . '/../resources/views/login.php';
         return (string) ob_get_clean();
     },
+
+    // Signing in with Google, and following a sign-in link from an email.
+    // Both are browser round trips that end in a session cookie; both refuse
+    // in the same words, and neither creates an account.
+    'GET /auth/google/start' => fn (array $req): string
+        => (new \App\Http\Controllers\Web\SignInMethodController())->googleStart($req),
+
+    'GET /auth/google/callback' => fn (array $req): string
+        => (new \App\Http\Controllers\Web\SignInMethodController())->googleCallback($req),
+
+    'GET /login/link/{token}' => fn (array $req): string
+        => (new \App\Http\Controllers\Web\SignInMethodController())->magicLink($req),
 
     'GET /schedules' => $renderScheduleEditor,
 

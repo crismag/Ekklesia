@@ -486,4 +486,184 @@ final class SqlAuthAdapter implements AuthAdapter
         $stmt->bindValue(':ua', $userAgent !== null ? mb_substr($userAgent, 0, 255) : null, $userAgent === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $stmt->execute();
     }
+
+    /* ---------------------------------------------------------- credentials */
+
+    /**
+     * @return array{id:int,email:string,is_active:bool,display_name:?string}|null
+     */
+    public function findAccountByCredential(string $provider, string $subject): ?array
+    {
+        $stmt = $this->connection->prepare(
+            'SELECT u.id, u.email, u.is_active, u.display_name
+               FROM account_credentials c
+               JOIN user_accounts u ON u.id = c.account_id
+              WHERE c.provider = :provider AND c.subject = :subject
+              LIMIT 1'
+        );
+        $stmt->bindValue(':provider', $provider, PDO::PARAM_STR);
+        $stmt->bindValue(':subject', $subject, PDO::PARAM_STR);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row === false ? null : self::hydrateAccount($row);
+    }
+
+    /**
+     * @return list<array{id:int,email:string,is_active:bool,display_name:?string}>
+     */
+    public function findActiveAccountsByEmail(string $email): array
+    {
+        $stmt = $this->connection->prepare(
+            'SELECT id, email, is_active, display_name
+               FROM user_accounts
+              WHERE email = :email AND is_active = 1'
+        );
+        $stmt->bindValue(':email', $email, PDO::PARAM_STR);
+        $stmt->execute();
+
+        return array_map(self::hydrateAccount(...), $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+    }
+
+    public function linkCredential(
+        int $accountId,
+        string $provider,
+        string $subject,
+        ?string $linkedEmail,
+        DateTimeImmutable $at,
+    ): void {
+        /* No ON DUPLICATE KEY UPDATE: both unique keys are the point. An
+           identity already linked elsewhere, or an account that already has
+           one, is a conflict for the caller to see rather than overwrite. */
+        $stmt = $this->connection->prepare(
+            'INSERT INTO account_credentials
+                (account_id, provider, subject, linked_email, created_at, last_used_at)
+             VALUES (:account, :provider, :subject, :email, :created, :used)'
+        );
+        $stmt->bindValue(':account', $accountId, PDO::PARAM_INT);
+        $stmt->bindValue(':provider', $provider, PDO::PARAM_STR);
+        $stmt->bindValue(':subject', $subject, PDO::PARAM_STR);
+        $stmt->bindValue(':email', $linkedEmail, $linkedEmail === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        /* One value, two placeholders: a prepared statement binds each name
+           once, and a name reused is refused when the statement runs. */
+        $stmt->bindValue(':created', $at->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->bindValue(':used', $at->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->execute();
+    }
+
+    public function touchCredential(string $provider, string $subject, DateTimeImmutable $at): void
+    {
+        $stmt = $this->connection->prepare(
+            'UPDATE account_credentials
+                SET last_used_at = :at
+              WHERE provider = :provider AND subject = :subject'
+        );
+        $stmt->bindValue(':at', $at->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->bindValue(':provider', $provider, PDO::PARAM_STR);
+        $stmt->bindValue(':subject', $subject, PDO::PARAM_STR);
+        $stmt->execute();
+    }
+
+    /* ------------------------------------------------------- sign-in links */
+
+    public function createMagicLoginToken(
+        int $accountId,
+        string $tokenHash,
+        DateTimeImmutable $createdAt,
+        DateTimeImmutable $expiresAt,
+    ): void {
+        $stmt = $this->connection->prepare(
+            'INSERT INTO account_tokens (token_hash, account_id, purpose, created_at, expires_at)
+             VALUES (:hash, :account, \'magic_login\', :created, :expires)'
+        );
+        $stmt->bindValue(':hash', $tokenHash, PDO::PARAM_STR);
+        $stmt->bindValue(':account', $accountId, PDO::PARAM_INT);
+        $stmt->bindValue(':created', $createdAt->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->bindValue(':expires', $expiresAt->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->execute();
+    }
+
+    public function consumeMagicLoginToken(string $tokenHash, DateTimeImmutable $now): ?int
+    {
+        $at = $now->format('Y-m-d H:i:s');
+
+        /* The claim and the check are one statement. Two browsers opening the
+           same link at the same moment both run this; only one can match
+           used_at IS NULL, so only one of them signs in. */
+        $claim = $this->connection->prepare(
+            'UPDATE account_tokens
+                SET used_at = :used
+              WHERE token_hash = :hash
+                AND purpose = \'magic_login\'
+                AND used_at IS NULL
+                AND expires_at > :now'
+        );
+        /* Two placeholders for one value: a prepared statement binds each name
+           once, and a name reused is refused when the statement runs. */
+        $claim->bindValue(':used', $at, PDO::PARAM_STR);
+        $claim->bindValue(':now', $at, PDO::PARAM_STR);
+        $claim->bindValue(':hash', $tokenHash, PDO::PARAM_STR);
+        $claim->execute();
+
+        if ($claim->rowCount() !== 1) {
+            return null;
+        }
+
+        $stmt = $this->connection->prepare(
+            'SELECT account_id FROM account_tokens WHERE token_hash = :hash LIMIT 1'
+        );
+        $stmt->bindValue(':hash', $tokenHash, PDO::PARAM_STR);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row === false ? null : (int) $row['account_id'];
+    }
+
+    /* --------------------------------------------------------- rate limits */
+
+    public function recordAuthAttempt(string $kind, string $bucket, DateTimeImmutable $at): void
+    {
+        $stmt = $this->connection->prepare(
+            'INSERT INTO auth_attempts (bucket, kind, occurred_at) VALUES (:bucket, :kind, :at)'
+        );
+        $stmt->bindValue(':bucket', $bucket, PDO::PARAM_STR);
+        $stmt->bindValue(':kind', $kind, PDO::PARAM_STR);
+        $stmt->bindValue(':at', $at->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->execute();
+    }
+
+    public function countAuthAttempts(string $kind, string $bucket, DateTimeImmutable $since): int
+    {
+        $stmt = $this->connection->prepare(
+            'SELECT COUNT(*) FROM auth_attempts
+              WHERE kind = :kind AND bucket = :bucket AND occurred_at >= :since'
+        );
+        $stmt->bindValue(':kind', $kind, PDO::PARAM_STR);
+        $stmt->bindValue(':bucket', $bucket, PDO::PARAM_STR);
+        $stmt->bindValue(':since', $since->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function purgeAuthAttempts(DateTimeImmutable $before): void
+    {
+        $stmt = $this->connection->prepare('DELETE FROM auth_attempts WHERE occurred_at < :before');
+        $stmt->bindValue(':before', $before->format('Y-m-d H:i:s'), PDO::PARAM_STR);
+        $stmt->execute();
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array{id:int,email:string,is_active:bool,display_name:?string}
+     */
+    private static function hydrateAccount(array $row): array
+    {
+        return [
+            'id'           => (int) $row['id'],
+            'email'        => (string) $row['email'],
+            'is_active'    => (int) $row['is_active'] === 1,
+            'display_name' => $row['display_name'] !== null ? (string) $row['display_name'] : null,
+        ];
+    }
 }

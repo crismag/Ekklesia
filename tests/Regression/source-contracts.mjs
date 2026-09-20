@@ -648,6 +648,47 @@ ok(read('resources/views/about.php').includes('Designed and developed by'),
   'the About page credits its developer');
 ok(read('resources/views/_portal-shell.php').includes("$basePath . '/about'"),
   'the sidebar and drawer link to About');
+/* Signing in with Google or a link authenticates an account that already
+   exists. These hold the wiring in place; sign-in-methods.php holds the
+   behaviour. */
+ok(read('routes/web.php').includes("'GET /auth/google/callback'"),
+  'the Google callback is routed at the documented path');
+ok(read('app/Providers/PortalServiceProvider.php').includes("AppUrl::to('/auth/google/callback')"),
+  'the callback address is built from configuration, not written into the code');
+ok(!/https:\/\/[a-z0-9.-]*crishub\.com/.test(read('app/Services/Auth/GoogleSignInService.php')
+  + read('app/Services/Auth/GoogleOidcClient.php') + read('app/Providers/PortalServiceProvider.php')),
+  'no deployment’s own URL is hard-coded into authentication');
+ok(read('app/Services/Auth/GoogleOidcClient.php').includes("public const SCOPES = 'openid email profile'"),
+  'Google is asked for identity only');
+ok(read('app/Services/Auth/GoogleSignInService.php').includes('count($candidates) !== 1'),
+  'a Google identity links only to a single unambiguous account');
+ok(read('app/Services/Auth/MagicLinkService.php').includes('count($accounts) !== 1'),
+  'a sign-in link is sent only for a single unambiguous account');
+ok(read('app/Services/Auth/MagicLinkService.php').includes("hash('sha256', $token)"),
+  'only a hash of a sign-in link is stored');
+ok(read('app/Services/AuthService.php').includes('public function startVerifiedSession'),
+  'both new methods end at the one session funnel');
+for (const secret of ['GOOGLE_CLIENT_SECRET', 'MAIL_PASSWORD']) {
+  ok(new RegExp(`^${secret}=\\s*$`, 'm').test(read('.env.example')),
+    `${secret} is documented in .env.example and left empty`);
+}
+/* A named placeholder bound once cannot appear twice in one statement: PDO
+   refuses it when the statement runs, which is a failure no unit test with a
+   fake repository can see. Cheap to check here, once, for every adapter. */
+{
+  const offenders = [];
+  for (const file of fs.readdirSync(path.join(root, 'app/Adapters/Sql'))) {
+    if (!file.endsWith('.php')) continue;
+    const source = read(`app/Adapters/Sql/${file}`);
+    for (const [, statement] of source.matchAll(/prepare\(\s*((?:'[^']*'|\s|\.|\n)+?)\)\s*;/g)) {
+      const names = [...statement.matchAll(/:([a-zA-Z_][a-zA-Z0-9_]*)/g)].map((m) => m[1]);
+      const twice = names.filter((n, i) => names.indexOf(n) !== i);
+      if (twice.length) offenders.push(`${file}: :${[...new Set(twice)].join(', :')}`);
+    }
+  }
+  ok(offenders.length === 0,
+    `no prepared statement reuses a placeholder name${offenders.length ? ' — ' + offenders.join('; ') : ''}`);
+}
 
 console.log(`\nPassed: ${passed}; failed: ${failed}`);
 process.exit(failed === 0 ? 0 : 1);

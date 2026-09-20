@@ -3,12 +3,16 @@
  * @var string $error
  * @var string $next
  * @var string $basePath
+ * @var bool   $googleAvailable    Google credentials and APP_URL are set
+ * @var bool   $magicLinkAvailable a mail transport and APP_URL are set
  */
 
 $errorEsc = htmlspecialchars($error, ENT_QUOTES, 'UTF-8');
 $nextEsc = htmlspecialchars($next, ENT_QUOTES, 'UTF-8');
 $basePathEsc = htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8');
 $loginUrl = $basePathEsc . '/api/login';
+$googleAvailable = !empty($googleAvailable);
+$magicLinkAvailable = !empty($magicLinkAvailable);
 require_once __DIR__ . '/_portal-shell.php';
 ?>
 <!doctype html>
@@ -42,6 +46,12 @@ require_once __DIR__ . '/_portal-shell.php';
         .choice input { min-height: 0; width: 18px; height: 18px; accent-color: var(--deep); }
         .choice:focus-within { outline: 2px solid var(--deep); outline-offset: 2px; }
         .link-btn { background: transparent; color: var(--ink); border: 1px solid var(--line); margin-top: 8px; }
+        .alt-sep { display: flex; align-items: center; gap: 10px; margin: 18px 0 4px; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+        .alt-sep::before, .alt-sep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+        .alt-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 48px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font: inherit; font-weight: 800; text-decoration: none; cursor: pointer; }
+        .alt-btn:hover { background: var(--soft, #eef4f0); }
+        .alt-btn svg { flex: none; }
+        .alt-note { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
         
         @media (max-width: 760px) {
             .hero { grid-template-columns: 1fr; }
@@ -97,7 +107,47 @@ require_once __DIR__ . '/_portal-shell.php';
             <input type="password" id="password" name="password" autocomplete="current-password" required>
             <input type="hidden" name="_next" value="<?= $nextEsc ?>">
             <button type="submit">Sign in</button>
+
+            <?php if ($googleAvailable || $magicLinkAvailable): ?>
+                <!-- The other ways in, beside the password rather than instead
+                     of it. Each is shown only where it is configured, and each
+                     signs in an account that already exists: neither creates
+                     one, and neither grants anything. -->
+                <div class="alt-sep">or</div>
+
+                <?php if ($googleAvailable): ?>
+                    <a class="alt-btn" id="googleBtn" href="<?= $basePathEsc ?>/auth/google/start?next=<?= rawurlencode($next) ?>">
+                        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"/>
+                            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"/>
+                            <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z"/>
+                            <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"/>
+                        </svg>
+                        Continue with Google
+                    </a>
+                <?php endif; ?>
+
+                <?php if ($magicLinkAvailable): ?>
+                    <button type="button" class="alt-btn" id="linkBtn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                        Email me a sign-in link
+                    </button>
+                <?php endif; ?>
+            <?php endif; ?>
         </form>
+
+        <?php if ($magicLinkAvailable): ?>
+            <form class="panel panel-inner" id="linkForm" hidden>
+                <h2>Email me a sign-in link</h2>
+                <p class="muted">We send a link to the address your account uses. It works once, for 15 minutes.</p>
+                <div class="err" id="linkError" role="alert" hidden></div>
+                <p class="alt-note" id="linkSent" role="status" hidden></p>
+                <label for="linkEmail">Email address</label>
+                <input type="email" id="linkEmail" name="email" autocomplete="email" required>
+                <button type="submit" id="linkSubmit">Send the link</button>
+                <button type="button" class="link-btn" id="linkCancel">Use a password instead</button>
+            </form>
+        <?php endif; ?>
 
         <form class="panel panel-inner" id="choiceForm" hidden>
             <h2 id="choiceTitle">Choose your Ekklesia account</h2>
@@ -215,6 +265,65 @@ function finishSignIn(data, form) {
     }
     window.location = form._next.value || (basePath + '/my-schedule');
 }
+
+<?php if ($magicLinkAvailable): ?>
+/* "Email me a sign-in link": swap the password panel for the address form, ask
+   the server, and show the one answer the server gives — the same sentence
+   whether or not that address has an account here. */
+(function () {
+    const openBtn = document.getElementById('linkBtn');
+    const linkForm = document.getElementById('linkForm');
+    const loginForm = document.getElementById('loginForm');
+    const cancel = document.getElementById('linkCancel');
+    const errorBox = document.getElementById('linkError');
+    const sentBox = document.getElementById('linkSent');
+    const submit = document.getElementById('linkSubmit');
+    if (!openBtn || !linkForm || !loginForm) return;
+
+    openBtn.addEventListener('click', function () {
+        loginForm.hidden = true;
+        linkForm.hidden = false;
+        const typed = loginForm.email.value.trim();
+        if (typed.includes('@')) linkForm.email.value = typed;
+        linkForm.email.focus();
+    });
+
+    cancel.addEventListener('click', function () {
+        linkForm.hidden = true;
+        loginForm.hidden = false;
+        loginForm.email.focus();
+    });
+
+    linkForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        errorBox.hidden = true;
+        sentBox.hidden = true;
+        submit.disabled = true;
+        try {
+            const res = await fetch(<?= json_encode($basePath . '/api/login/link') ?>, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+                body: new URLSearchParams({ email: linkForm.email.value }),
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (!res.ok) {
+                errorBox.textContent = data.error || 'That did not work. Try again in a moment.';
+                errorBox.hidden = false;
+                return;
+            }
+            sentBox.textContent = data.message || '';
+            sentBox.hidden = false;
+            linkForm.email.value = '';
+        } catch (err) {
+            errorBox.textContent = 'That did not work. Try again in a moment.';
+            errorBox.hidden = false;
+        } finally {
+            submit.disabled = false;
+        }
+    });
+})();
+<?php endif; ?>
 </script>
 </body>
 </html>

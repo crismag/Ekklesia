@@ -408,6 +408,76 @@ final class PortalServiceProvider
             new PasswordHasher(),
             60 * 60 * 12,
             $identityResolver,
+            new \App\Services\Auth\LoginRateLimiter($authRepository),
+        );
+    }
+
+    /**
+     * Signing in with Google, or null when this installation has no Google
+     * credentials — the sign-in screen then does not offer a button that
+     * cannot work.
+     *
+     * GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and APP_URL are all required:
+     * the callback address is built from APP_URL, never from the request, and
+     * a deployment's own URL is configuration rather than code.
+     */
+    public static function makeGoogleSignInService(): ?\App\Services\Auth\GoogleSignInService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+
+        $clientId = trim((string) EnvLoader::get('GOOGLE_CLIENT_ID', ''));
+        $clientSecret = trim((string) EnvLoader::get('GOOGLE_CLIENT_SECRET', ''));
+        if ($clientId === '' || $clientSecret === '' || !\App\Core\Config\AppUrl::isConfigured()) {
+            return null;
+        }
+
+        $authRepository = new DefaultAuthRepository(new SqlAuthAdapter(MembersConnection::get()));
+
+        return new \App\Services\Auth\GoogleSignInService(
+            $authRepository,
+            self::makeAuthService(),
+            new \App\Services\Auth\GoogleOidcClient(
+                clientId: $clientId,
+                clientSecret: $clientSecret,
+                redirectUri: \App\Core\Config\AppUrl::to('/auth/google/callback'),
+                http: new \App\Services\Geocoding\StreamHttpGet(),
+                httpPost: new \App\Services\Auth\StreamHttpPostForm(),
+            ),
+            new \App\Services\Auth\LoginRateLimiter($authRepository),
+        );
+    }
+
+    /**
+     * Sign-in links, or null when this installation cannot send mail or does
+     * not know its own address. Both are needed to send a link somebody can
+     * follow, so without either the option is not offered.
+     */
+    public static function makeMagicLinkService(): ?\App\Services\Auth\MagicLinkService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+
+        $root = dirname(__DIR__, 2);
+        $mailer = \App\Services\Mail\MailerFactory::fromEnvironment($root);
+        if ($mailer === null || !\App\Core\Config\AppUrl::isConfigured()) {
+            return null;
+        }
+
+        $authRepository = new DefaultAuthRepository(new SqlAuthAdapter(MembersConnection::get()));
+        $churchName = 'Ekklesia';
+        try {
+            $churchName = trim((string) (self::makeChurchInfoService()->load()['name'] ?? '')) ?: $churchName;
+        } catch (\Throwable) {
+            // The church's own name is a nicety in a subject line, not a
+            // reason to be unable to sign in.
+        }
+
+        return new \App\Services\Auth\MagicLinkService(
+            $authRepository,
+            self::makeAuthService(),
+            $mailer,
+            new \App\Services\Auth\LoginRateLimiter($authRepository),
+            \App\Core\Config\AppUrl::to('/login/link/{token}'),
+            $churchName,
         );
     }
 

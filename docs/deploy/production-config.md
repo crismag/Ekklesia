@@ -14,6 +14,39 @@ why they are written down here.
 Set on 2026-08-25. Both were previously `APP_DEBUG=true` and `APP_ENV=local`.
 A timestamped backup of the prior `.env` is on the host.
 
+## Signing in with Google, and sign-in links
+
+Both are off until configured, and a sign-in screen never offers a method that
+cannot work. Full descriptions are in `.env.example`; what a host needs:
+
+| Variable | For | Without it |
+|---|---|---|
+| `APP_URL` | The callback address and the links sent by mail | Neither method is offered |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Signing in with Google | Google is not offered |
+| `MAIL_TRANSPORT` and its settings | Sending a sign-in link | Links are not offered |
+
+`APP_URL` is read from configuration and never from the request's `Host`
+header: a header is something the client sends, so a callback or sign-in link
+built from one is one somebody can point at their own server.
+
+In the Google Cloud console, the OAuth client must be a **Web application**
+with this exact authorized redirect URI, which is `APP_URL` plus the fixed
+path:
+
+    ${APP_URL}/auth/google/callback
+
+For the demo that is `https://ekklesiademo.crishub.com/auth/google/callback`.
+
+Both methods **authenticate an account that already exists** and create
+nothing — no person, account, role or assignment — so a Google identity or an
+address with no account here is refused rather than welcomed. A Google
+identity is matched to an account once, by a verified address held by exactly
+one active account, and by Google's own subject afterwards; a shared address
+is refused rather than guessed at.
+
+The member database needs migration `001-google-and-magic-login.sql`
+(`php tools/migrate.php --apply`, which `tools/deploy.sh` already runs).
+
 ## What `APP_DEBUG` actually controls
 
 `public/index.php`, in the top-level exception handler:

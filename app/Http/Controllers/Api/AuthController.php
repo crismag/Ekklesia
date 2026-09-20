@@ -97,6 +97,50 @@ final readonly class AuthController
         return $this->startedSession($session, $request);
     }
 
+    /**
+     * POST /api/login/link
+     *
+     * Body: { "email": "..." }
+     *
+     * Sends a single-use sign-in link, when there is exactly one active
+     * account with that address. The answer is the same sentence either way —
+     * for an address with an account, without one, or belonging to somebody
+     * deactivated — because a different answer would make this form a way to
+     * ask who attends this church.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    public function requestSignInLink(array $request): array
+    {
+        $sent = ['sent' => true, 'message' => self::LINK_SENT];
+
+        $email = trim((string) ($request['email'] ?? ''));
+        if ($email === '') {
+            throw new ValidationFailed('Enter the email address you use here.');
+        }
+
+        $service = \App\Providers\PortalServiceProvider::makeMagicLinkService();
+        if ($service === null) {
+            /* Not offered on this installation. The screen does not show the
+               option, so this is somebody posting directly. */
+            throw new ValidationFailed('Sign-in links are not available here.');
+        }
+
+        /* TooManyAttempts is deliberately not caught: it is about this browser,
+           not about whether the address exists, and the router answers it with
+           429 and a Retry-After. */
+        $service->requestLink(
+            email: $email,
+            ipAddress: $request['_remote_addr'] ?? null,
+        );
+
+        return $sent;
+    }
+
+    /** One sentence, whatever happened. */
+    private const LINK_SENT = 'If that address has an account here, a sign-in link is on its way. It works once, for 15 minutes.';
+
     private const CHOICE_KEY = 'login_choice';
     private const CHOICE_LIFETIME_SECONDS = 600;
 
