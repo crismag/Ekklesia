@@ -23,6 +23,11 @@ final class DefaultMemberImportRepository implements MemberImportRepository
         return $this->adapter->createBatch($batch, $rows);
     }
 
+    public function saveDuplicateReport(int $batchId, array $report): void
+    {
+        $this->adapter->saveDuplicateReport($batchId, $report);
+    }
+
     public function listBatches(int $limit): array
     {
         return $this->adapter->listBatches($limit);

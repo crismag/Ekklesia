@@ -1537,6 +1537,12 @@ $webRoutes = [
         unset($_SESSION['people_flash']);
         $batches = [];
         $batch = null;
+        /** @var list<array<string,mixed>> $duplicateGroups used by the template */
+        $duplicateGroups = [];
+        /** @var list<array{name:string,kept:string}> $legacyDuplicates used by the template */
+        $legacyDuplicates = [];
+        /** @var list<string> $matchRuleLabels used by the template */
+        $matchRuleLabels = [];
         $rows = [];
         $counts = ['draft' => 0, 'ready' => 0, 'skip' => 0, 'applied' => 0, 'total' => 0];
         $statusFilter = (string) ($req['status'] ?? '');
@@ -1553,6 +1559,9 @@ $webRoutes = [
                 if ($bid > 0) {
                     $batch = $imp->batch($bid);
                     if ($batch) {
+                        $duplicateGroups = $imp->duplicateGroups($bid);
+                        $legacyDuplicates = $imp->legacyDuplicates($batch);
+                        $matchRuleLabels = $imp->batchRules($batch)->labels();
                         $listed = $imp->rows($bid, $statusFilter);
                         $rows = $listed['rows'];
                         $counts = $listed['counts'];
@@ -1693,16 +1702,20 @@ $webRoutes = [
                 throw new \InvalidArgumentException('Upload an Excel workbook (.xlsx) or paste a Google Sheets link.');
             }
             $actorId = (int) ($actor['actorId'] ?? 0);
-            $result = $imp->ingest($tmp, $campusId, $actorId, $hubSheet, $nySheet, (string) ($_FILES['workbook']['name'] ?? 'Google Sheet'));
+            $rules = new \App\Services\MemberMatchRules(is_array($req['match'] ?? null) ? $req['match'] : []);
+            $result = $imp->ingest(
+                $tmp, $campusId, $actorId, $hubSheet, $nySheet,
+                (string) ($_FILES['workbook']['name'] ?? 'Google Sheet'),
+                rules: $rules,
+            );
             $batchId = (int) ($result['batch']['id'] ?? 0);
-            $dupes = $result['batch']['duplicate_report'] ?? [];
-            $dupN = is_array($dupes) ? count($dupes) : 0;
+            $dupN = count($imp->duplicateGroups($batchId));
             $_SESSION['people_flash'] = sprintf(
                 'Staged %d members (%d ready, %d need review).%s Nothing has been written to member records yet.',
                 (int) ($result['counts']['total'] ?? 0),
                 (int) ($result['counts']['ready'] ?? 0),
                 (int) ($result['counts']['draft'] ?? 0),
-                $dupN > 0 ? ' Removed ' . $dupN . ' duplicate worksheet rows (listed on the staging page).' : ''
+                $dupN > 0 ? ' Found ' . $dupN . ' possible ' . ($dupN === 1 ? 'duplicate' : 'duplicates') . ': check the decision on each before applying.' : ''
             );
             header('Location: ' . $basePath . '/admin/maintenance/import?notice=ingested&batch=' . $batchId, true, 302);
         } catch (\Throwable $e) {
@@ -1799,6 +1812,37 @@ $webRoutes = [
         } catch (\Throwable $e) {
             $_SESSION['people_flash'] = $e->getMessage();
             header('Location: ' . $basePath . '/admin/maintenance/import?notice=error&batch=' . $batchId, true, 302);
+        }
+        return '';
+    },
+    // Decide one duplicate group on a staged batch: keep one row as the
+    // person, or keep every row as a different person. Writes staging only.
+    'POST /admin/maintenance/import/duplicate' => function (array $req) use ($resolvePortalActor): string {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        if ($actor === null || empty($actor['isPortalWideAdmin'])) {
+            $_SESSION['people_flash'] = 'Only a portal-wide admin can import members.';
+            header('Location: ' . $basePath . '/admin/maintenance/import?notice=error', true, 302);
+            return '';
+        }
+        $batchId = (int) ($req['batch_id'] ?? 0);
+        // One field carries the choice: a row id to keep, or "separate".
+        $choice = (string) ($req['choice'] ?? '');
+        try {
+            \App\Providers\PortalServiceProvider::makeMemberCampusImportService()->resolveDuplicate(
+                $batchId,
+                (int) ($req['group'] ?? 0),
+                $choice === 'separate' ? 'separate' : 'keep',
+                $choice === 'separate' ? 0 : (int) $choice,
+            );
+            $_SESSION['people_flash'] = $choice === 'separate'
+                ? 'Kept every row in that group as a different person.'
+                : 'Kept the chosen row; the others in that group are set to Skip.';
+            header('Location: ' . $basePath . '/admin/maintenance/import?notice=ok&batch=' . $batchId . '#mi-dup-' . (int) ($req['group'] ?? 0), true, 303);
+        } catch (\Throwable $e) {
+            $_SESSION['people_flash'] = $e->getMessage();
+            header('Location: ' . $basePath . '/admin/maintenance/import?notice=error&batch=' . $batchId, true, 303);
         }
         return '';
     },

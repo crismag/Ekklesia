@@ -34,6 +34,9 @@ interface MemberImportRepository
     public function createBatch(array $batch, array $rows): int;
 
     /** @return list<array<string,mixed>> */
+    /** @param array<string,mixed> $report */
+    public function saveDuplicateReport(int $batchId, array $report): void;
+
     public function listBatches(int $limit): array;
 
     /** @return array<string,mixed>|null */

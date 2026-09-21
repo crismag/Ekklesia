@@ -22,6 +22,10 @@ namespace App\Services;
  *  2. rows still unmatched fall back to email, but only when exactly one person
  *     in the database has that address and nobody else has claimed them — the
  *     case of a changed or misspelt name, with nothing ambiguous about who it is.
+ *
+ * The importer's match rules (MemberMatchRules) narrow both passes: a person
+ * who disagrees with the row on a chosen rule is never its match. "Full first
+ * name" turns pass 2 off, since pass 2 exists for names that do not agree.
  */
 final class MemberImportPlanner
 {
@@ -39,7 +43,7 @@ final class MemberImportPlanner
      *   warnings:list<string>
      * }
      */
-    public function plan(array $fileRows, array $people, int $campusId): array
+    public function plan(array $fileRows, array $people, int $campusId, MemberMatchRules $rules = new MemberMatchRules()): array
     {
         /** @var array<string,list<int>> $byEmail */
         $byEmail = [];
@@ -53,7 +57,7 @@ final class MemberImportPlanner
             if ($email !== '') {
                 $byEmail[$email][] = $id;
             }
-            $key = $this->parser->nameKey((string) $p['last_name'], (string) $p['first_name']);
+            $key = $rules->nameKey((string) $p['last_name'], (string) $p['first_name']);
             if ($key !== '|') {
                 $byName[$key][] = $id;
             }
@@ -66,37 +70,29 @@ final class MemberImportPlanner
 
         // Pass 1: the name.
         foreach ($fileRows as $i => $row) {
-            $key = $this->parser->nameKey((string) $row['last_name'], (string) $row['first_name']);
+            $key = $rules->nameKey((string) $row['last_name'], (string) $row['first_name']);
+            $sameName = $byName[$key] ?? [];
+            $agreeing = array_values(array_filter(
+                $sameName,
+                static fn (int $id): bool => $rules->agree($row, $peopleById[$id]),
+            ));
             $candidates = array_values(array_filter(
-                $byName[$key] ?? [],
+                $agreeing,
                 static fn (int $id): bool => !isset($usedIds[$id]),
             ));
             if ($candidates === []) {
-                if (($byName[$key] ?? []) !== []) {
+                if ($sameName !== [] && $agreeing === []) {
+                    $warnings[] = $row['name_raw'] . ' has the same name as ' . count($sameName)
+                        . ' existing ' . (count($sameName) === 1 ? 'person' : 'people')
+                        . ' but differs on ' . strtolower(implode(' or ', $rules->labels(false)))
+                        . '; kept apart from ' . (count($sameName) === 1 ? 'them' : 'each of them') . '.';
+                } elseif ($agreeing !== []) {
                     $warnings[] = 'Duplicate match for ' . $row['name_raw']
                         . ' (everyone with that name is already matched); a new record will be created unless the email identifies someone.';
                 }
                 continue;
             }
-            $email = strtolower(trim((string) ($row['email'] ?? '')));
-            $pick = null;
-            if ($email !== '') {
-                foreach ($candidates as $id) {
-                    if (strtolower(trim((string) $peopleById[$id]['email'])) === $email) {
-                        $pick = $id;
-                        break;
-                    }
-                }
-            }
-            if ($pick === null) {
-                foreach ($candidates as $id) {
-                    if ((int) ($peopleById[$id]['campus_id'] ?? 0) === $campusId) {
-                        $pick = $id;
-                        break;
-                    }
-                }
-            }
-            $pick ??= $candidates[0];
+            $pick = $this->bestCandidate($row, $candidates, $peopleById, $campusId);
             $matches[$i] = $pick;
             $usedIds[$pick] = true;
         }
@@ -106,9 +102,12 @@ final class MemberImportPlanner
             if (isset($matches[$i])) {
                 continue;
             }
+            if ($rules->has(MemberMatchRules::FULL_FIRST_NAME)) {
+                break;
+            }
             $email = strtolower(trim((string) ($row['email'] ?? '')));
             $owners = $email !== '' ? ($byEmail[$email] ?? []) : [];
-            if (count($owners) !== 1 || isset($usedIds[$owners[0]])) {
+            if (count($owners) !== 1 || isset($usedIds[$owners[0]]) || !$rules->agree($row, $peopleById[$owners[0]])) {
                 continue;
             }
             $id = $owners[0];
@@ -123,11 +122,12 @@ final class MemberImportPlanner
         $update = [];
         foreach ($fileRows as $i => $row) {
             if (!isset($matches[$i])) {
-                $create[] = ['row' => $row];
+                $create[] = ['row' => $row, 'index' => $i];
                 continue;
             }
             $existing = $peopleById[$matches[$i]];
             $update[] = [
+                'index' => $i,
                 'row' => $row,
                 'person_id' => $matches[$i],
                 'existing' => $existing,
@@ -158,5 +158,42 @@ final class MemberImportPlanner
             'remove' => $remove,
             'warnings' => $warnings,
         ];
+    }
+
+    /**
+     * Among people who share the row's name, the likeliest one: the same full
+     * first name first ("Jessie James" is not "Jessie" when both are on file),
+     * then the same email, then already on this campus; ties go to the first.
+     *
+     * @param array<string,mixed> $row
+     * @param list<int> $candidates
+     * @param array<int,array<string,mixed>> $peopleById
+     */
+    private function bestCandidate(array $row, array $candidates, array $peopleById, int $campusId): int
+    {
+        $norm = static fn (mixed $v): string => (string) preg_replace('/[^a-z0-9]+/', '', strtolower(trim((string) $v)));
+        $first = $norm($row['first_name'] ?? '');
+        $email = strtolower(trim((string) ($row['email'] ?? '')));
+        $best = $candidates[0];
+        $bestScore = -1;
+        foreach ($candidates as $id) {
+            $p = $peopleById[$id];
+            $score = 0;
+            if ($first !== '' && $norm($p['first_name'] ?? '') === $first) {
+                $score += 4;
+            }
+            if ($email !== '' && strtolower(trim((string) ($p['email'] ?? ''))) === $email) {
+                $score += 2;
+            }
+            if ((int) ($p['campus_id'] ?? 0) === $campusId) {
+                $score += 1;
+            }
+            if ($score > $bestScore) {
+                $best = $id;
+                $bestScore = $score;
+            }
+        }
+
+        return $best;
     }
 }

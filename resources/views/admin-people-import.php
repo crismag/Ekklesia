@@ -24,6 +24,9 @@
  * @var list<array<string,mixed>> $rows
  * @var array<string,int> $counts
  * @var string $statusFilter
+ * @var list<array{group:int,decision:string,keep:?int,suggested:int,rows:list<array<string,mixed>>,filled:array<string,mixed>}> $duplicateGroups
+ * @var list<array{name:string,kept:string}> $legacyDuplicates
+ * @var list<string> $matchRuleLabels
  * @var list<array{relative:string,filename:string,bytes:int,mtime:int}> $exports
  */
 require_once __DIR__ . '/_records-kit.php';
@@ -67,6 +70,14 @@ echo records_styles();
   .mi-confirm{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:0;max-width:56ch}
   .mi-confirm input{width:18px;height:18px;margin-top:2px;flex:0 0 auto}
   .mi-form{display:grid;gap:var(--sp-3,12px)}
+  .mi-rules{display:grid;gap:var(--sp-2,8px);margin:0;padding:var(--sp-3,12px);border:1px solid var(--line,#d9e4dd);border-radius:8px}
+  .mi-rules legend{font-weight:650;padding:0 4px}
+  .mi-dup-list{display:grid;gap:var(--sp-3,12px)}
+  .mi-dup-list h3{margin:0}
+  .mi-dup{display:grid;gap:var(--sp-2,8px);padding:var(--sp-3,12px);border:1px solid var(--line,#d9e4dd);border-radius:8px;scroll-margin-top:80px}
+  .mi-dup-state{margin:0;font-size:13px}
+  .mi-dup-table td{padding:6px 8px;vertical-align:top}
+  .mi-tag{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid var(--line,#d9e4dd);border-radius:999px;font-size:11px;color:var(--muted,#627169)}
 
   /* ---- Staging grid and ministry-name table: unchanged editor styles ---- */
   .mi-scroll{overflow:auto;max-height:70vh;border:1px solid var(--line,#dbe4ec);border-radius:8px}
@@ -244,6 +255,18 @@ echo records_styles();
           <input class="ek-input" id="mi-google" type="url" name="google_url" value="<?= $h($googleUrl) ?>" placeholder="https://docs.google.com/spreadsheets/d/…">
           <span class="ek-hint">The sheet must be shared with anyone who has the link.</span>
         </div>
+        <fieldset class="mi-rules">
+          <legend>When are two rows the same person?</legend>
+          <p class="mi-help">Always when the surname and the first word of the first name match. Tick what must
+            also agree when that is not enough — for example a parent and child sharing a name, email and address.
+            A blank cell never counts as a difference.</p>
+          <?php foreach (\App\Services\MemberMatchRules::LABELS as $ruleKey => $rule): ?>
+            <label class="mi-confirm">
+              <input type="checkbox" name="match[]" value="<?= $h($ruleKey) ?>">
+              <span><strong><?= $h($rule['label']) ?></strong> — <?= $h($rule['hint']) ?></span>
+            </label>
+          <?php endforeach; ?>
+        </fieldset>
         <div><button class="ek-btn ek-btn-primary" type="submit">Load into staging</button></div>
       </form>
     </div>
@@ -344,7 +367,9 @@ echo records_styles();
     </div>
     <div class="ek-card-body" style="display:grid;gap:var(--sp-3,12px)">
       <?php
-        $dupes = is_array($batch['duplicate_report'] ?? null) ? $batch['duplicate_report'] : [];
+        $duplicateGroups = $duplicateGroups ?? [];
+        $legacyDuplicates = $legacyDuplicates ?? [];
+        $matchRuleLabels = $matchRuleLabels ?? [];
         $otherWarnings = [];
         foreach (preg_split("/\r\n|\n|\r/", (string) ($batch['warnings'] ?? '')) as $line) {
             $line = trim($line);
@@ -357,18 +382,96 @@ echo records_styles();
             $otherWarnings[] = $line;
         }
       ?>
-      <?php if ($dupes !== []): ?>
+      <p class="mi-help">
+        Same person when the surname and first word of the first name match<?= $matchRuleLabels === []
+          ? '.'
+          : ', and ' . $h(strtolower(implode(', ', $matchRuleLabels))) . ' agree.' ?>
+      </p>
+      <?php if ($legacyDuplicates !== []): ?>
         <div class="ek-alert" style="border-left-color:var(--gold,#c98a2b)">
           <div>
-            <strong><?= count($dupes) ?> duplicate <?= count($dupes) === 1 ? 'row was' : 'rows were' ?> removed before any member record update.</strong>
-            The kept row is the copy with more filled fields (email, phone, address). Review the list, then apply.
+            <strong><?= count($legacyDuplicates) ?> duplicate <?= count($legacyDuplicates) === 1 ? 'row was' : 'rows were' ?> removed before any member record update.</strong>
+            This spreadsheet was loaded before duplicates could be decided one by one. To decide them, discard it and load it again.
             <ul class="mi-dupes">
-              <?php foreach ($dupes as $d): ?>
+              <?php foreach ($legacyDuplicates as $d): ?>
                 <li>Removed <?= $h($d['name'] ?? '') ?> · kept <?= $h($d['kept'] ?? '') ?></li>
               <?php endforeach; ?>
             </ul>
           </div>
         </div>
+      <?php endif; ?>
+      <?php if ($duplicateGroups !== []): ?>
+        <section class="mi-dup-list" aria-labelledby="mi-dups-title">
+          <h3 id="mi-dups-title"><?= count($duplicateGroups) ?> possible <?= count($duplicateGroups) === 1 ? 'duplicate' : 'duplicates' ?></h3>
+          <p class="mi-help">
+            These rows look like the same person. For each group, keep the row that is the person — the others are
+            set to Skip and fill its blank cells — or keep every row if they are different people.
+            The suggestion is the row with more filled fields. You can change a decision until the batch is applied.
+          </p>
+          <?php foreach ($duplicateGroups as $g): $gid = (int) $g['group']; ?>
+            <form class="mi-dup" id="mi-dup-<?= $gid ?>" method="post" action="<?= $base ?>/admin/maintenance/import/duplicate">
+              <input type="hidden" name="batch_id" value="<?= (int) $batch['id'] ?>">
+              <input type="hidden" name="group" value="<?= $gid ?>">
+              <p class="mi-dup-state">
+                <?php if ($g['decision'] === 'separate'): ?>
+                  <strong>Decided: different people.</strong> Every row is kept.
+                <?php else:
+                  $keptName = '';
+                  foreach ($g['rows'] as $r) {
+                      if ((int) $r['id'] === (int) $g['keep']) {
+                          $keptName = trim($r['last_name'] . ', ' . ($r['first_name'] ?? ''));
+                      }
+                  } ?>
+                  <strong>Decided: same person.</strong> Keeping <?= $h($keptName) ?>.
+                  <?php if (($g['filled'] ?? []) !== []):
+                    $filledText = [];
+                    foreach ($g['filled'] as $field => $value) {
+                        $filledText[] = str_replace('_', ' ', (string) $field) . ': ' . (string) $value;
+                    } ?>
+                    Filled on the kept row from the others — <?= $h(implode('; ', $filledText)) ?>.
+                  <?php endif; ?>
+                <?php endif; ?>
+              </p>
+              <div class="mi-scroll">
+                <table class="mi mi-dup-table">
+                  <thead>
+                    <tr><th>Keep</th><th>Name</th><th>Email</th><th>Phone</th><th>Birthday</th><th>Type</th><th>Address</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                  <?php foreach ($g['rows'] as $r):
+                    $rid = (int) $r['id'];
+                    $bm = (int) ($r['birth_month'] ?? 0);
+                    $bd = (int) ($r['birth_day'] ?? 0);
+                    $by = (int) ($r['birth_year'] ?? 0);
+                    $birthday = $bm > 0 && $bd > 0 ? $bm . '/' . $bd . ($by > 0 ? '/' . $by : '') : '';
+                    $checked = $g['decision'] === 'keep' && (int) $g['keep'] === $rid; ?>
+                    <tr>
+                      <td><input type="radio" name="choice" value="<?= $rid ?>" id="mi-dup-<?= $gid ?>-<?= $rid ?>"<?= $checked ? ' checked' : '' ?><?= $applied ? ' disabled' : '' ?>></td>
+                      <td><label for="mi-dup-<?= $gid ?>-<?= $rid ?>"><?= $h(trim($r['last_name'] . ', ' . ($r['first_name'] ?? '') . ' ' . ($r['middle_name'] ?? ''))) ?></label>
+                        <?= $rid === (int) $g['suggested'] ? '<span class="mi-tag">Suggested</span>' : '' ?></td>
+                      <td><?= $h($r['email'] ?? '') ?></td>
+                      <td><?= $h($r['phone'] ?? '') ?></td>
+                      <td><?= $h($birthday) ?></td>
+                      <td><?= $h($r['member_type'] ?? '') ?></td>
+                      <td><?= $h($r['address_raw'] ?? '') ?></td>
+                      <td><?= $h(ucfirst((string) $r['status'])) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+              <div class="mi-actions">
+                <label class="mi-confirm">
+                  <input type="radio" name="choice" value="separate"<?= $g['decision'] === 'separate' ? ' checked' : '' ?><?= $applied ? ' disabled' : '' ?>>
+                  <span><strong>Different people</strong> — keep every row</span>
+                </label>
+                <?php if (!$applied): ?>
+                  <button class="ek-btn" type="submit">Save decision</button>
+                <?php endif; ?>
+              </div>
+            </form>
+          <?php endforeach; ?>
+        </section>
       <?php endif; ?>
       <?php if ($otherWarnings !== []): ?>
         <div class="ek-alert is-error"><div><strong>Check these before applying.</strong><br><?= nl2br($h(implode("\n", $otherWarnings))) ?></div></div>
@@ -442,7 +545,8 @@ echo records_styles();
           <?php endif; ?>
           <?php foreach ($rows as $r): $rid = (int) $r['id']; ?>
             <tr data-id="<?= $rid ?>">
-              <td><span class="mi-badge <?= $h($r['source']) ?>"><?= $h($r['source']) ?></span></td>
+              <td><span class="mi-badge <?= $h($r['source']) ?>"><?= $h($r['source']) ?></span>
+                <?php if ((int) ($r['duplicate_group'] ?? 0) > 0): ?><a class="mi-tag" href="#mi-dup-<?= (int) $r['duplicate_group'] ?>" title="Possible duplicate: see the decision">Dup</a><?php endif; ?></td>
               <td><select <?= $applied ? 'disabled' : '' ?> data-field="status">
                 <?php foreach (['draft' => 'Draft', 'ready' => 'Ready', 'skip' => 'Skip'] as $sv => $sl): ?>
                   <option value="<?= $sv ?>"<?= ($r['status'] ?? '') === $sv ? ' selected' : '' ?>><?= $sl ?></option>

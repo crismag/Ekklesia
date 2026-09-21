@@ -569,6 +569,9 @@ CREATE TABLE member_import_batches (
   ny_updated             VARCHAR(190) NULL,
   warnings               JSON NULL,
   duplicate_report       JSON NULL,
+  -- What must agree, beyond the name, for two rows to be one person
+  -- (MemberMatchRules). NULL is the default name-only rule.
+  match_rules            JSON NULL,
   created_by_account_id  INT UNSIGNED NULL,
   created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   applied_at             DATETIME NULL,
@@ -604,6 +607,9 @@ CREATE TABLE member_import_rows (
   status             ENUM('draft','ready','skip','applied') NOT NULL DEFAULT 'draft',
   matched_person_id  INT UNSIGNED NULL,
   notes              TEXT NULL,
+  -- Rows that look like the same person share a group; the administrator
+  -- decides each group on the staging page (duplicate_report on the batch).
+  duplicate_group    SMALLINT UNSIGNED NULL,
   PRIMARY KEY (id),
   KEY ix_member_import_rows_batch (batch_id),
   CONSTRAINT fk_member_import_rows_batch FOREIGN KEY (batch_id) REFERENCES member_import_batches (id) ON DELETE CASCADE,

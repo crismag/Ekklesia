@@ -35,6 +35,13 @@ interface MemberImportAdapter
     public function createBatch(array $batch, array $rows): int;
 
     /** @return list<array<string,mixed>> */
+    /**
+     * Store the batch's duplicate groups and the decision on each.
+     *
+     * @param array<string,mixed> $report
+     */
+    public function saveDuplicateReport(int $batchId, array $report): void;
+
     public function listBatches(int $limit): array;
 
     /** @return array<string,mixed>|null */

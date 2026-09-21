@@ -20,6 +20,7 @@ declare(strict_types=1);
  */
 
 require __DIR__ . '/../../app/Services/MemberWorkbookParser.php';
+require __DIR__ . '/../../app/Services/MemberMatchRules.php';
 require __DIR__ . '/../../app/Services/MemberImportDeduper.php';
 
 use App\Services\MemberImportDeduper;
