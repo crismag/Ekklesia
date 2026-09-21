@@ -48,6 +48,204 @@ function _campusContext(array $req, string $queryKey = 'campus'): ?int
     return null;
 }
 
+/**
+ * Everything one printed calendar needs, gathered once: the configuration,
+ * the dates, the calendar items for the chosen campus, and every option the
+ * composer takes. Shared by the printed page and the PowerPoint export, so the
+ * two can never carry different data.
+ *
+ * @return array{config:\App\Services\Calendar\PrintConfig,items:list<array<string,mixed>>,
+ *               start:DateTimeImmutable,end:DateTimeImmutable,options:array<string,mixed>}
+ */
+function _calendarPrintJob(array $req, callable $resolveCampusSelector): array
+{
+    $basePath = (string) ($req['_base_path'] ?? '');
+    // The campus the sheet is for: an explicit ?current_campus_id= or
+    // ?campus=, else the top-bar selection (the portal_campus_id cookie),
+    // exactly as the calendar screen uses it. Every read below is filtered
+    // by it, and the header names it — they used to disagree, with the
+    // data unfiltered while the header showed the chosen campus.
+    $printCampus = (int) (_campusContext($req) ?? 0);
+    $req['current_campus_id'] = $printCampus > 0 ? $printCampus : 0;
+
+    // One configuration object, built once. These settings used to be a
+    // dozen loose parameters read here and defaulted again in two other
+    // files; once a configuration can be saved and reopened next month,
+    // "what was the default?" has to have exactly one answer.
+    $config = \App\Services\Calendar\PrintConfig::fromQuery($req);
+    $template = (string) $config->get('layout');
+    $paper = (string) $config->get('page.paper');
+    $orientation = (string) $config->get('page.orientation');
+    $sources = (array) $config->get('content.sources', []);
+    $sources = $sources === [] ? null : $sources;
+
+    $today = new DateTimeImmutable('today');
+    [$start, $end] = $config->resolveRange($today);
+    // Widen before fetching, not after composing. A template that needs
+    // whole months — or twelve of them — must have the feed for them, or it
+    // draws the extra months empty.
+    [$start, $end] = \App\Services\Calendar\PrintTemplates::rangeFor($template, $start, $end);
+    // A year is the most anybody prints in one go, and the ceiling keeps a
+    // mistyped date from asking the database for a century.
+    if ($end > $start->modify('+1 year')) {
+        $end = $start->modify('+1 year');
+    }
+
+    $items = [];
+    $colors = [];
+    $labels = [];
+    try {
+        $controller = new \App\Http\Controllers\Api\CalendarController(
+            \App\Providers\PortalServiceProvider::makeCalendarService(),
+            \App\Providers\PortalServiceProvider::makeRequestContext(),
+            \App\Providers\PortalServiceProvider::makeRosterScheduleService(),
+            \App\Providers\PortalServiceProvider::makeEventTypeService(),
+        );
+        // array_merge, not `+`: the union operator keeps the LEFT operand's
+        // keys, so $req's own start/end won and the corrected range here was
+        // silently thrown away. Harmless until a template widened the window,
+        // at which point the extra months printed empty from data nobody had
+        // asked the database for.
+        $feed = $controller->printSources(array_merge($req, [
+            'start' => $start->format('Y-m-d'),
+            'end' => $end->format('Y-m-d'),
+        ]));
+        $items = $feed['items'] ?? [];
+        foreach (($controller->layers($req)['layers'] ?? []) as $layer) {
+            $colors[$layer['source']] = $layer['color'];
+            $labels[$layer['source']] = $layer['label'];
+        }
+    } catch (\Throwable) {
+        // An empty calendar prints as an empty calendar; it does not 500.
+    }
+
+    $church = [];
+    try {
+        $church = \App\Providers\PortalServiceProvider::makeChurchInfoService()->load();
+    } catch (\Throwable) {
+        $church = [];
+    }
+
+    // Name the campus on the page. A calendar pinned to one campus and a
+    // calendar showing all of them look identical once printed.
+    $campusName = '';
+    $chosen = $printCampus;
+    if ($chosen > 0) {
+        foreach (($resolveCampusSelector($req)['campuses'] ?? []) as $campus) {
+            if ((int) $campus['id'] === $chosen) {
+                $campusName = (string) $campus['name'];
+            }
+        }
+    } else {
+        $campusName = 'All campuses';
+    }
+
+    // The background picture, if the design has one and this viewer may see
+    // it. A picture that has gone, or belongs to someone else's private
+    // design, is left out and the preview says so; the calendar prints.
+    $background = null;
+    $backgroundMissing = false;
+    if ($config->get('background.mode') === 'image') {
+        try {
+            $opened = \App\Providers\PortalServiceProvider::makePrintBackgroundService()->open(
+                \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                (int) $config->get('background.id'),
+            );
+        } catch (\Throwable) {
+            $opened = null;
+        }
+        if ($opened === null) {
+            $backgroundMissing = true;
+        } else {
+            $background = [
+                'url' => $basePath . '/print/backgrounds/' . (int) $opened['record']['id'],
+                'width' => (int) $opened['record']['width'],
+                'height' => (int) $opened['record']['height'],
+                'fit' => (string) $config->get('background.fit'),
+                'x' => (string) $config->get('background.x'),
+                'y' => (string) $config->get('background.y'),
+                'opacity' => (float) $config->get('background.opacity'),
+                'overlay' => (float) $config->get('background.overlay'),
+            ];
+        }
+    }
+
+    // A PowerPoint theme: its artwork model, if this viewer may use it. A
+    // retired or unshared theme prints in Classic and the preview says so.
+    $pptx = null;
+    $pptxNote = '';
+    if (preg_match('/^pptx:(\d+)$/', (string) $config->get('appearance.theme'), $pm) === 1) {
+        try {
+            $opened = \App\Providers\PortalServiceProvider::makePrintThemeService()->openVersion(
+                \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                (int) $pm[1], (int) $config->get('appearance.themeVersion'),
+            );
+        } catch (\Throwable) {
+            $opened = null;
+        }
+        if ($opened === null) {
+            $pptxNote = 'The PowerPoint theme chosen for this calendar is not available to you (it may have been retired), so it prints in Classic.';
+        } else {
+            $pptx = [
+                'model' => $opened['model'],
+                'assetBase' => $basePath . '/print/themes/' . (int) $pm[1] . '/' . (int) $opened['version'] . '/',
+                'name' => (string) $opened['name'],
+                'version' => (int) $opened['version'],
+                'current' => (int) $opened['current'],
+            ];
+        }
+    }
+
+
+    return [
+        'config' => $config,
+        'items' => $items,
+        'start' => $start,
+        'end' => $end,
+        'options' => [
+            'template' => $template,
+            'paper' => $paper,
+            'orientation' => $orientation !== '' ? $orientation : null,
+            'sources' => $sources,
+            'colors' => $colors,
+            'sourceLabels' => $labels,
+            'background' => $background,
+            'backgroundMissing' => $backgroundMissing,
+            'editable' => (string) ($req['edit'] ?? '') === '1',
+            'pptx' => $pptx,
+            'pptxNote' => $pptxNote,
+            'pageHeight' => $config->get('page.height'),
+            'legend' => $config->get('appearance.legend'),
+            'memberMark' => $config->get('appearance.memberMark'),
+            'church' => (string) ($church['name'] ?? 'Church Portal'),
+            'subtitle' => $campusName,
+            'website' => (string) ($church['website'] ?? ''),
+            'footer' => 'Printed ' . $today->format('j M Y'),
+            'accent' => $config->get('appearance.accent') !== '' ? $config->get('appearance.accent') : '#0c5a45',
+            'today' => $today->format('Y-m-d'),
+            'typeScale' => $config->get('appearance.typeScale'),
+            'nameStyle' => $config->get('appearance.names'),
+            'font' => $config->get('appearance.font'),
+            'density' => $config->get('appearance.density'),
+            'titleStyle' => $config->get('appearance.titleStyle'),
+            'theme' => $config->get('appearance.theme'),
+            'entryDisplay' => $config->get('appearance.entryDisplay'),
+            'artwork' => $config->get('appearance.artwork'),
+            'decoration' => $config->get('appearance.decoration'),
+            'inkFriendly' => $config->get('appearance.inkFriendly'),
+            'headerShow' => $config->get('header.show'),
+            'headerTitle' => $config->get('header.title'),
+            'headerSubtitle' => $config->get('header.subtitle'),
+            'footerShow' => $config->get('footer.show'),
+            'footerNote' => $config->get('footer.note'),
+            // Already sanitised by PrintConfig — the one place that judgement
+            // is made — and empty when the region has nothing in it.
+            'topInfo' => $config->get('additional.top.enabled') ? $config->get('additional.top.html') : '',
+            'bottomInfo' => $config->get('additional.bottom.enabled') ? $config->get('additional.bottom.html') : '',
+        ],
+    ];
+}
+
 function _adminSectionRender(array $req, string $viewFile, callable $resolvePortalActor, callable $resolveCampusSelector): string
 {
     $basePath = (string) ($req['_base_path'] ?? '');
@@ -2664,187 +2862,45 @@ $webRoutes = [
     // lets the printed calendar be set for paper instead of exported from a
     // screen.
     'GET /calendar/print' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
-        $basePath = (string) ($req['_base_path'] ?? '');
-        // The campus the sheet is for: an explicit ?current_campus_id= or
-        // ?campus=, else the top-bar selection (the portal_campus_id cookie),
-        // exactly as the calendar screen uses it. Every read below is filtered
-        // by it, and the header names it — they used to disagree, with the
-        // data unfiltered while the header showed the chosen campus.
-        $printCampus = (int) (_campusContext($req) ?? 0);
-        $req['current_campus_id'] = $printCampus > 0 ? $printCampus : 0;
-        $actor = $resolvePortalActor($req);
-
-        // One configuration object, built once. These settings used to be a
-        // dozen loose parameters read here and defaulted again in two other
-        // files; once a configuration can be saved and reopened next month,
-        // "what was the default?" has to have exactly one answer.
-        $config = \App\Services\Calendar\PrintConfig::fromQuery($req);
-        $template = (string) $config->get('layout');
-        $paper = (string) $config->get('page.paper');
-        $orientation = (string) $config->get('page.orientation');
-        $sources = (array) $config->get('content.sources', []);
-        $sources = $sources === [] ? null : $sources;
-
-        $today = new DateTimeImmutable('today');
-        [$start, $end] = $config->resolveRange($today);
-        // Widen before fetching, not after composing. A template that needs
-        // whole months — or twelve of them — must have the feed for them, or it
-        // draws the extra months empty.
-        [$start, $end] = \App\Services\Calendar\PrintTemplates::rangeFor($template, $start, $end);
-        // A year is the most anybody prints in one go, and the ceiling keeps a
-        // mistyped date from asking the database for a century.
-        if ($end > $start->modify('+1 year')) {
-            $end = $start->modify('+1 year');
-        }
-
-        $items = [];
-        $colors = [];
-        $labels = [];
-        try {
-            $controller = new \App\Http\Controllers\Api\CalendarController(
-                \App\Providers\PortalServiceProvider::makeCalendarService(),
-                \App\Providers\PortalServiceProvider::makeRequestContext(),
-                \App\Providers\PortalServiceProvider::makeRosterScheduleService(),
-                \App\Providers\PortalServiceProvider::makeEventTypeService(),
-            );
-            // array_merge, not `+`: the union operator keeps the LEFT operand's
-            // keys, so $req's own start/end won and the corrected range here was
-            // silently thrown away. Harmless until a template widened the window,
-            // at which point the extra months printed empty from data nobody had
-            // asked the database for.
-            $feed = $controller->printSources(array_merge($req, [
-                'start' => $start->format('Y-m-d'),
-                'end' => $end->format('Y-m-d'),
-            ]));
-            $items = $feed['items'] ?? [];
-            foreach (($controller->layers($req)['layers'] ?? []) as $layer) {
-                $colors[$layer['source']] = $layer['color'];
-                $labels[$layer['source']] = $layer['label'];
-            }
-        } catch (\Throwable) {
-            // An empty calendar prints as an empty calendar; it does not 500.
-        }
-
-        $church = [];
-        try {
-            $church = \App\Providers\PortalServiceProvider::makeChurchInfoService()->load();
-        } catch (\Throwable) {
-            $church = [];
-        }
-
-        // Name the campus on the page. A calendar pinned to one campus and a
-        // calendar showing all of them look identical once printed.
-        $campusName = '';
-        $chosen = $printCampus;
-        if ($chosen > 0) {
-            foreach (($resolveCampusSelector($req)['campuses'] ?? []) as $campus) {
-                if ((int) $campus['id'] === $chosen) {
-                    $campusName = (string) $campus['name'];
-                }
-            }
-        } else {
-            $campusName = 'All campuses';
-        }
-
-        // The background picture, if the design has one and this viewer may see
-        // it. A picture that has gone, or belongs to someone else's private
-        // design, is left out and the preview says so; the calendar prints.
-        $background = null;
-        $backgroundMissing = false;
-        if ($config->get('background.mode') === 'image') {
-            try {
-                $opened = \App\Providers\PortalServiceProvider::makePrintBackgroundService()->open(
-                    \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
-                    (int) $config->get('background.id'),
-                );
-            } catch (\Throwable) {
-                $opened = null;
-            }
-            if ($opened === null) {
-                $backgroundMissing = true;
-            } else {
-                $background = [
-                    'url' => $basePath . '/print/backgrounds/' . (int) $opened['record']['id'],
-                    'width' => (int) $opened['record']['width'],
-                    'height' => (int) $opened['record']['height'],
-                    'fit' => (string) $config->get('background.fit'),
-                    'x' => (string) $config->get('background.x'),
-                    'y' => (string) $config->get('background.y'),
-                    'opacity' => (float) $config->get('background.opacity'),
-                    'overlay' => (float) $config->get('background.overlay'),
-                ];
-            }
-        }
-
-        // A PowerPoint theme: its artwork model, if this viewer may use it. A
-        // retired or unshared theme prints in Classic and the preview says so.
-        $pptx = null;
-        $pptxNote = '';
-        if (preg_match('/^pptx:(\d+)$/', (string) $config->get('appearance.theme'), $pm) === 1) {
-            try {
-                $opened = \App\Providers\PortalServiceProvider::makePrintThemeService()->openVersion(
-                    \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
-                    (int) $pm[1], (int) $config->get('appearance.themeVersion'),
-                );
-            } catch (\Throwable) {
-                $opened = null;
-            }
-            if ($opened === null) {
-                $pptxNote = 'The PowerPoint theme chosen for this calendar is not available to you (it may have been retired), so it prints in Classic.';
-            } else {
-                $pptx = [
-                    'model' => $opened['model'],
-                    'assetBase' => $basePath . '/print/themes/' . (int) $pm[1] . '/' . (int) $opened['version'] . '/',
-                    'name' => (string) $opened['name'],
-                    'version' => (int) $opened['version'],
-                    'current' => (int) $opened['current'],
-                ];
-            }
-        }
-
+        // One print job, shared with the editable PowerPoint export
+        // (GET /calendar/export.pptx), so both carry the same calendar.
+        $job = _calendarPrintJob($req, $resolveCampusSelector);
         $composer = new \App\Services\Calendar\PrintComposer(dirname(__DIR__) . '/resources/views');
 
-        return $composer->render($items, $start, $end, [
-            'template' => $template,
-            'paper' => $paper,
-            'orientation' => $orientation !== '' ? $orientation : null,
-            'sources' => $sources,
-            'colors' => $colors,
-            'sourceLabels' => $labels,
-            'background' => $background,
-            'backgroundMissing' => $backgroundMissing,
-            'editable' => (string) ($req['edit'] ?? '') === '1',
-            'pptx' => $pptx,
-            'pptxNote' => $pptxNote,
-            'pageHeight' => $config->get('page.height'),
-            'legend' => $config->get('appearance.legend'),
-            'memberMark' => $config->get('appearance.memberMark'),
-            'church' => (string) ($church['name'] ?? 'Church Portal'),
-            'subtitle' => $campusName,
-            'website' => (string) ($church['website'] ?? ''),
-            'footer' => 'Printed ' . $today->format('j M Y'),
-            'accent' => $config->get('appearance.accent') !== '' ? $config->get('appearance.accent') : '#0c5a45',
-            'today' => $today->format('Y-m-d'),
-            'typeScale' => $config->get('appearance.typeScale'),
-            'nameStyle' => $config->get('appearance.names'),
-            'font' => $config->get('appearance.font'),
-            'density' => $config->get('appearance.density'),
-            'titleStyle' => $config->get('appearance.titleStyle'),
-            'theme' => $config->get('appearance.theme'),
-            'entryDisplay' => $config->get('appearance.entryDisplay'),
-            'artwork' => $config->get('appearance.artwork'),
-            'decoration' => $config->get('appearance.decoration'),
-            'inkFriendly' => $config->get('appearance.inkFriendly'),
-            'headerShow' => $config->get('header.show'),
-            'headerTitle' => $config->get('header.title'),
-            'headerSubtitle' => $config->get('header.subtitle'),
-            'footerShow' => $config->get('footer.show'),
-            'footerNote' => $config->get('footer.note'),
-            // Already sanitised by PrintConfig — the one place that judgement
-            // is made — and empty when the region has nothing in it.
-            'topInfo' => $config->get('additional.top.enabled') ? $config->get('additional.top.html') : '',
-            'bottomInfo' => $config->get('additional.bottom.enabled') ? $config->get('additional.bottom.html') : '',
-        ]);
+        return $composer->render($job['items'], $job['start'], $job['end'], $job['options']);
+    },
+
+    // The same calendar as an editable PowerPoint file: title, month, dates,
+    // events and birthdays as separate text boxes; grid lines as shapes; a
+    // PowerPoint theme's artwork as its own shapes and pictures.
+    'GET /calendar/export.pptx' => function (array $req) use ($resolveCampusSelector): string {
+        // The export is the month grid, whatever layout the studio shows.
+        $job = _calendarPrintJob(array_merge($req, ['template' => 'monthly']), $resolveCampusSelector);
+        $writer = new \App\Services\Calendar\PptxCalendarWriter(dirname(__DIR__) . '/resources/print/pptx/skeleton.pptx');
+        $themeFiles = null;
+        if (is_array($job['options']['pptx'] ?? null) && preg_match('/^pptx:(\d+)$/', (string) $job['config']->get('appearance.theme'), $pm) === 1) {
+            $service = \App\Providers\PortalServiceProvider::makePrintThemeService();
+            $actor = \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req);
+            $version = (int) $job['options']['pptx']['version'];
+            $themeFiles = static fn (string $name): ?string => $service->filePath($actor, (int) $pm[1], $version, $name);
+        }
+        $backgroundFile = null;
+        if (is_array($job['options']['background'] ?? null)) {
+            $opened = \App\Providers\PortalServiceProvider::makePrintBackgroundService()->open(
+                \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                (int) $job['config']->get('background.id'),
+            );
+            $backgroundFile = $opened['path'] ?? null;
+        }
+        $bytes = $writer->write($job['items'], $job['start'], $job['end'], $job['options'], $themeFiles, $backgroundFile);
+        $name = 'calendar-' . $job['start']->format('Y-m') . '.pptx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation');
+        header('Content-Disposition: attachment; filename="' . $name . '"');
+        header('Content-Length: ' . strlen($bytes));
+        header('Cache-Control: private, no-store');
+        echo $bytes;
+
+        return '';
     },
 
     // Holiday calendars: add, sync, hide, remove.

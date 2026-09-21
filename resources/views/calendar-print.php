@@ -294,6 +294,12 @@ ob_start();
         <p class="pc-hint" id="pcPdfHint">Saving opens the same print dialog: choose
           <strong>Save as PDF</strong> as the destination. Turn on <strong>background graphics</strong>
           for fills and decoration to print; without them the calendar is still complete.</p>
+        <h3 class="pc-lab">Edit it in PowerPoint</h3>
+        <a class="pc-btn pc-btn--ghost" id="pcPptx" href="#" download>Export editable PowerPoint</a>
+        <!-- A download, not a print: the same calendar as native slides. -->
+        <p class="pc-hint" id="pcPptxHint">One slide per month: the title, dates, events and birthdays are text boxes
+          you can change, and a PowerPoint theme's artwork comes along as its own shapes and pictures.
+          <span id="pcPptxLayout" hidden>It is always the month grid, whichever layout is chosen here.</span></p>
         <h3 class="pc-lab">Start again</h3>
         <button class="pc-mini" type="button" id="pcDefaults">Restore the default settings</button>
         <p class="pc-hint">Keeps the calendars and dates you chose; resets everything about how it looks.</p>
@@ -699,6 +705,7 @@ ob_start();
   var form = document.getElementById('pcForm');
   var frame = document.getElementById('pcFrame');
   var openLink = document.getElementById('pcOpen');
+  var pptxLink = document.getElementById('pcPptx');
   var status = document.getElementById('pcStatus');
   var dates = document.getElementById('pcDates');
   var base = <?= json_encode($basePath) ?>;
@@ -1590,6 +1597,8 @@ ob_start();
       status.textContent = 'Preparing…';
       frame.src = next;
       openLink.href = next;
+      pptxLink.href = next.replace('/calendar/print?', '/calendar/export.pptx?').replace(/([?&])edit=1(&|$)/, '$1').replace(/[?&]$/, '');
+      document.getElementById('pcPptxLayout').hidden = read().layout === 'monthly';
       fit();
     }, 200);
   }

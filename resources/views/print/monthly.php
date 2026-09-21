@@ -152,72 +152,16 @@ CSS;
  * error does not spill the grid onto a second sheet. $paperHeightIn already
  * accounts for orientation, and for the paper actually chosen.
  */
-$paperHeightIn = (float) ($paperHeightIn ?? 8.5);
-$paperWidthIn = (float) ($paperWidthIn ?? 11.0);
-$gridHeightIn = max(3.0, $paperHeightIn - 0.945 - 1.102 - (float) ($mastheadIn ?? 0.66) - 0.222 - 0.05);
-// The member-type key under the grid is a line of its own.
-if (($legendRows ?? []) !== []) {
-    $gridHeightIn -= 0.24;
-}
-// Growing, the row height above is the *least* a week gets, not the most: a
-// busy week takes what it needs and the month may continue on another sheet.
-$grow = ($pageHeight ?? 'fit') === 'grow';
-// A theme that spends more of the page on its masthead has that much less to
-// give the grid. Measured per theme and expressed as a difference from
-// Classic, so Classic's arithmetic above is untouched.
-$gridHeightIn = max(3.0, $gridHeightIn - (float) ($themeChromeIn ?? 0.0));
-// A theme with decoration around the edges keeps that much of the page clear.
-$safe = is_array($safeZone ?? null) ? $safeZone : ['top' => 0.0, 'bottom' => 0.0, 'left' => 0.0, 'right' => 0.0];
-$gridHeightIn = max(3.0, $gridHeightIn - (float) $safe['top'] - (float) $safe['bottom']);
-
-$rowCount = 0;
-foreach ($model['months'] as $m) {
-    $rowCount = max($rowCount, count($m['weeks']));
-}
-$rowCount = max(1, $rowCount);
-$rowHeightIn = $gridHeightIn / $rowCount;
-
-// The text column inside one day, which is what decides whether a name wraps.
-// Seven columns across whatever is left of the page, less the cell's own
-// padding (4pt each side) and the entry's rule and indent (7pt).
-$gridWidthIn = max(3.0, $paperWidthIn - 0.945 - 1.102 - (float) $safe['left'] - (float) $safe['right']);
-// A PowerPoint theme gives the grid its region instead: that area is where
-// the design left room. The key goes inside it unless the design has its own.
-if (is_array($gridBox ?? null)) {
-    $inRegionKey = ($legendRows ?? []) !== [] && !isset($pptx['model']['regions']['LEGEND']) ? 0.24 : 0.0;
-    $gridHeightIn = max(2.0, (float) $gridBox['h'] - 0.222 - $inRegionKey);
-    $gridWidthIn = max(3.0, (float) $gridBox['w']);
-    $rowCount = 0;
-    foreach ($model['months'] as $m) {
-        $rowCount = max($rowCount, count($m['weeks']));
-    }
-    $rowHeightIn = $gridHeightIn / max(1, $rowCount);
-}
-$cellTextWidthIn = max(0.5, ($gridWidthIn / 7) - (11.0 / 72.0));
-
-// How tightly the grid is set — a separate axis from type size, and from the
-// per-cell tier. Density owns the chrome (padding, leading, the gap between
-// entries); the tier owns the type. Auto still resolves against the content.
-$busiest = [];
-foreach ($model['months'] as $m) {
-    foreach ($m['weeks'] as $week) {
-        foreach ($week as $day) {
-            $busiest[] = count($day['entries']);
-        }
-    }
-}
-$resolved = PrintDensity::resolve((string) ($density ?? 'standard'), $busiest, $rowHeightIn, $ts);
-$densityMode = $resolved['mode'];
-$dm = PrintDensity::metrics($densityMode);
-
-// What is left of a cell once the date number and the cell's own padding are
-// paid for. This is the budget every tier is measured against.
-$usableIn = max(0.1, $rowHeightIn - (($dm['cellPad'] + (float) ($themeCellPadIn ?? 0.0)) * $ts) - ($dm['numHeight'] * $ts));
-
-$hiddenCount = 0;
+// The grid, decided once (MonthGridPlan), so the editable PowerPoint export
+// prints exactly what this page prints.
+$gridPlan = \App\Services\Calendar\MonthGridPlan::fromContext(get_defined_vars());
+$grow = $gridPlan['grow'];
+$gridHeightIn = $gridPlan['gridHeightIn'];
+$densityMode = $gridPlan['densityMode'];
+$hiddenCount = $gridPlan['hidden'];
 
 ob_start();
-foreach ($model['months'] as $mi => $month): ?>
+foreach ($gridPlan['months'] as $mi => $planned): $month = $planned['month']; ?>
   <?php
     // Printed in "auto", each month wears its own monthly theme: its tokens
     // on the section restyle everything inside it.
@@ -230,45 +174,10 @@ foreach ($model['months'] as $mi => $month): ?>
     <table class="cal<?= $grow ? ' is-grow' : '' ?>" style="<?= $e(PrintDensity::cssVars($densityMode)) ?>;--ts:<?= $e(number_format($ts, 3)) ?>;--grid-h:<?= $e(number_format($gridHeightIn, 2)) ?>in;--rows:<?= (int) count($month['weeks']) ?>">
       <thead><tr><?php foreach ($weekdays as $w): ?><th scope="col"><?= $e($w) ?></th><?php endforeach; ?></tr></thead>
       <tbody>
-      <?php foreach ($month['weeks'] as $week): ?>
+      <?php foreach ($planned['weeks'] as $week): ?>
         <tr>
-          <?php foreach ($week as $day): ?>
-            <?php
-              $out = !($day['in_range'] ?? true);
-
-              // Project each entry into primary/secondary before planning, so
-              // the plan measures the text that will actually be set rather
-              // than the raw title. Wrapping is offered where a tier can
-              // afford it, which is what lets a full name survive.
-              // Compact is the promise that the old sheet is still available:
-              // no splitting, no wrapping, and the same number of entries a
-              // day that PrintDensity has always allowed.
-              $legacy = $entryMode === 'compact';
-              $items = [];
-              foreach ($day['entries'] as $entry) {
-                  $items[] = EntryPresentation::of($entry, $shortNames, !$legacy, !$legacy)
-                      + ['source' => $entry['source'], 'href' => (string) ($entry['href'] ?? '')];
-              }
-
-              // Growing, a day may take a quarter as much height again before the
-              // type tightens, so a busy day is not set in the smallest tier
-              // inside a row that has grown to hold it anyway.
-              $plan = CellPlan::plan(
-                  $items, $entryMode, $grow ? $usableIn * 1.25 : $usableIn, $cellTextWidthIn, $ts, $dm['moreHeight'],
-                  $legacy && !$grow ? PrintDensity::perDay($densityMode, $rowHeightIn, $ts) : null,
-              );
-              if ($grow) {
-                  // The plan still chooses the type tier, so a busy day is set
-                  // as densely as before; it just no longer hides anything.
-                  $plan['shown'] = count($items);
-                  $plan['hidden'] = 0;
-                  $plan['wrap'] = true;
-                  if ($plan['state'] === 'overflow') {
-                      $plan['state'] = 'dense';
-                  }
-              }
-              $hiddenCount += $plan['hidden'];
-            ?>
+          <?php foreach ($week as $cell): $day = $cell['day']; $items = $cell['items']; $plan = $cell['plan']; ?>
+            <?php $out = !($day['in_range'] ?? true); ?>
             <td class="<?= $out ? 'out' : ($day['is_weekend'] ? 'wknd' : '') ?>">
               <div class="cell t-<?= $e($plan['tier']) ?> s-<?= $e($plan['state']) ?><?= $plan['wrap'] ? '' : ' w-tight' ?>">
               <div class="num"><?= (int) $day['day'] ?><?php if ((int) $day['day'] === 1): ?><span class="mon"><?= $e($day['month_short']) ?></span><?php endif; ?></div>

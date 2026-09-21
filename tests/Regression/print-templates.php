@@ -164,10 +164,14 @@ $cellPlan = file_get_contents(__DIR__ . '/../../app/Services/Calendar/CellPlan.p
 // The cell budget moved out of the template and into CellPlan when each cell
 // gained its own type tier. These assert the same properties against where
 // they now live rather than against the shape they used to have.
+// The grid is planned in MonthGridPlan, shared by the page and the PowerPoint
+// export; the template draws from it.
+$gridPlanSrc = (string) file_get_contents(__DIR__ . '/../../app/Services/Calendar/MonthGridPlan.php');
 check('how much a day can show still depends on how many week rows the month has',
-    str_contains($monthly, '$rowHeightIn = $gridHeightIn / $rowCount')
-    && str_contains($monthly, '$usableIn')
-    && str_contains($monthly, 'CellPlan::plan('));
+    str_contains($gridPlanSrc, '$rowHeightIn = $gridHeightIn / $rowCount')
+    && str_contains($gridPlanSrc, '$usableIn')
+    && str_contains($gridPlanSrc, 'CellPlan::plan(')
+    && str_contains($monthly, 'MonthGridPlan::fromContext('));
 check('and the "+n more" line is still paid for in advance',
     str_contains($cellPlan, "\$usableIn - (\$moreHeightIn"));
 check('the tightest tier keeps entries to one predictable line',
@@ -237,7 +241,7 @@ $presentation = file_get_contents(__DIR__ . '/../../app/Services/Calendar/EntryP
 // template carries a copy of it.
 check('both grids share one shortening rule rather than a copy each',
     str_contains($weekly, 'EntryPresentation::of(')
-    && str_contains($monthly, 'EntryPresentation::of(')
+    && str_contains($gridPlanSrc, 'EntryPresentation::of(')
     && !str_contains($weekly, 'DisplayName::')
     && !str_contains($monthly, 'DisplayName::')
     && str_contains($presentation, 'DisplayName::forEntry')

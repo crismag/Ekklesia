@@ -33,13 +33,15 @@ final class PrintComposer
      *   church?:string, subtitle?:string, footer?:string, website?:string,
      *   accent?:string, today?:?string, weekStartsOn?:int
      * } $options
+     * @return array<string,mixed> the resolved context: model, template, theme,
+     *         page size, title, key, colours and every presentation choice
      */
-    public function render(
+    public function context(
         array $items,
         DateTimeImmutable $start,
         DateTimeImmutable $end,
         array $options = [],
-    ): string {
+    ): array {
         $templateId = (string) ($options['template'] ?? 'monthly');
         if (!PrintTemplates::exists($templateId)) {
             $templateId = 'monthly';
@@ -239,11 +241,6 @@ final class PrintComposer
             ) !== [];
         }
 
-        // Each template writes $body and $styles from $model and $colors.
-        $body = '';
-        $styles = '';
-        require $this->viewPath . '/print/' . $template['file'];
-
         $branding = [
             'church' => (string) ($options['church'] ?? 'Church Portal'),
             'subtitle' => (string) ($options['subtitle'] ?? ''),
@@ -267,6 +264,30 @@ final class PrintComposer
         $topInfo = (string) ($options['topInfo'] ?? '');
         $bottomInfo = (string) ($options['bottomInfo'] ?? '');
         $titleStyle = (string) ($options['titleStyle'] ?? 'classic');
+
+        // Everything a page or an export needs, resolved once.
+        return get_defined_vars();
+    }
+
+    /**
+     * The printed page: the context above, drawn by the layout's template and
+     * the shell.
+     *
+     * @param list<array<string,mixed>> $items
+     * @param array<string,mixed> $options see context()
+     */
+    public function render(
+        array $items,
+        DateTimeImmutable $start,
+        DateTimeImmutable $end,
+        array $options = [],
+    ): string {
+        extract($this->context($items, $start, $end, $options));
+
+        // Each template writes $body and $styles from $model and $colors.
+        $body = '';
+        $styles = '';
+        require $this->viewPath . '/print/' . $template['file'];
 
         // The theme's own stylesheet and its decoration, layered *behind* the
         // document rather than baked into it: the grid stays real HTML text so
