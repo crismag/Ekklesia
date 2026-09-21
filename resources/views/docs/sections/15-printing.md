@@ -117,6 +117,19 @@ Member types keep their colours and symbols in every theme, the monthly ones inc
 
 Under the cards: **Accent** colour, **Decoration** (only for themes that carry artwork), and **Ink friendly**, which drops page fills and decoration from whichever theme you chose.
 
+## Background picture
+
+Under the themes, **Background picture** puts a photo or artwork behind the calendar. It works with any theme: the theme still draws the grid and the writing.
+
+- **Add a picture** takes a JPEG, PNG or WebP up to 12 MB. It must be at least 1100 pixels on its long side; for a sharp Letter page use 2550 × 3300 or larger. Pictures are checked and re-saved when they arrive, so camera details and location are removed and phone photos are turned the right way up.
+- **Size** fills the page or fits the whole picture; **Across** and **Up and down** choose which part stays in view.
+- **Picture strength** sets how strongly it shows. **Readability wash** lays white over it so names and dates stay readable; keep it at 40% or more for a busy picture.
+- **Remove background** takes it off the sheet. **Delete this picture** removes it for good, but not while a saved publication still uses it; the studio names the publication.
+
+If a picture will print soft at the chosen paper size, or has been deleted, a note appears above the preview (it is not printed). The calendar always prints, with or without the picture. The picture repeats on every page of a longer calendar.
+
+Your pictures are yours: other people see one only in a publication you have shared with everyone. Each account can keep 20 pictures, up to 100 MB in all.
+
 ## Printing, and saving a PDF
 
 **Print** is on the Print tab and above the page. **Print** and **Save as PDF** open the same dialog, because a web page cannot choose the destination for you; to get a PDF, pick **Save as PDF** as the destination.

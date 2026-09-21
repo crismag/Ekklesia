@@ -155,6 +155,23 @@ $sheetH = round($paperH - 0.945, 3);
   .art--minimal [data-art="extra"] { display: none; }
   @media print { .art { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 
+  /* A background picture: its own layer behind everything, with a white wash
+     over it (the "readability" setting) so text keeps its contrast. On paper
+     it is fixed to the page, which in print means it repeats on every sheet
+     rather than stretching across all of them. Cells that are normally tinted
+     become translucent so the picture shows through evenly. */
+  .bg-layer { position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-repeat: no-repeat; background-size: var(--bg-fit, cover);
+    background-position: var(--bg-pos, center); opacity: var(--bg-o, .35);
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .bg-wash { position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: rgba(255,255,255,var(--bg-wash, .55)); }
+  .has-bg > *:not(.bg-layer):not(.bg-wash) { position: relative; z-index: 1; }
+  .has-bg .cal td.wknd, .has-bg .cal td.out, .has-bg .wk-day.wknd, .has-bg .wk-day.out { background: rgba(255,255,255,.4); }
+  @media print { .bg-layer, .bg-wash { position: fixed; } }
+  .print-note { margin: 0 0 8pt; padding: 6pt 8pt; border: 1pt solid #c98a2b; background: #fff7e8;
+    color: #5a3d00; font: 9pt/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; border-radius: 3pt; }
+
   /* The theme's own sheet, last so it can override the base without either
      side resorting to !important. Classic contributes nothing here: it *is*
      the base, which is what makes it impossible for a new theme to regress it. */
@@ -183,7 +200,16 @@ $sheetH = round($paperH - 0.945, 3);
   // sheet (PrintComposer::docTitle).
   $periodNote = $customTitle !== '' ? $customTitle : (string) ($docTitle ?? ($branding['period_note'] ?? ''));
 ?>
-<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
+<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?><?= !empty($background) ? ' has-bg' : '' ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
+  <?php foreach (($printNotes ?? []) as $note): ?>
+    <p class="print-note no-print" role="status"><?= $e($note) ?></p>
+  <?php endforeach; ?>
+  <?php if (!empty($background)):
+    $bgPos = ['left' => '0%', 'center' => '50%', 'right' => '100%'][$background['x']] ?? '50%';
+    $bgPos .= ' ' . (['top' => '0%', 'center' => '50%', 'bottom' => '100%'][$background['y']] ?? '50%'); ?>
+    <div class="bg-layer" aria-hidden="true" style="background-image:url('<?= $e($background['url']) ?>');--bg-fit:<?= $background['fit'] === 'contain' ? 'contain' : 'cover' ?>;--bg-pos:<?= $e($bgPos) ?>;--bg-o:<?= $e(number_format((float) $background['opacity'], 2)) ?>"></div>
+    <div class="bg-wash" aria-hidden="true" style="--bg-wash:<?= $e(number_format((float) $background['overlay'], 2)) ?>"></div>
+  <?php endif; ?>
   <header class="masthead">
     <div class="masthead-row">
       <div class="mh-main">

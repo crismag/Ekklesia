@@ -2739,6 +2739,36 @@ $webRoutes = [
             $campusName = 'All campuses';
         }
 
+        // The background picture, if the design has one and this viewer may see
+        // it. A picture that has gone, or belongs to someone else's private
+        // design, is left out and the preview says so; the calendar prints.
+        $background = null;
+        $backgroundMissing = false;
+        if ($config->get('background.mode') === 'image') {
+            try {
+                $opened = \App\Providers\PortalServiceProvider::makePrintBackgroundService()->open(
+                    \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                    (int) $config->get('background.id'),
+                );
+            } catch (\Throwable) {
+                $opened = null;
+            }
+            if ($opened === null) {
+                $backgroundMissing = true;
+            } else {
+                $background = [
+                    'url' => $basePath . '/print/backgrounds/' . (int) $opened['record']['id'],
+                    'width' => (int) $opened['record']['width'],
+                    'height' => (int) $opened['record']['height'],
+                    'fit' => (string) $config->get('background.fit'),
+                    'x' => (string) $config->get('background.x'),
+                    'y' => (string) $config->get('background.y'),
+                    'opacity' => (float) $config->get('background.opacity'),
+                    'overlay' => (float) $config->get('background.overlay'),
+                ];
+            }
+        }
+
         $composer = new \App\Services\Calendar\PrintComposer(dirname(__DIR__) . '/resources/views');
 
         return $composer->render($items, $start, $end, [
@@ -2748,6 +2778,8 @@ $webRoutes = [
             'sources' => $sources,
             'colors' => $colors,
             'sourceLabels' => $labels,
+            'background' => $background,
+            'backgroundMissing' => $backgroundMissing,
             'pageHeight' => $config->get('page.height'),
             'legend' => $config->get('appearance.legend'),
             'church' => (string) ($church['name'] ?? 'Church Portal'),

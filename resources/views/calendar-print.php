@@ -396,6 +396,38 @@ ob_start();
             </select></div>
         </div>
         <label class="pc-check"><input type="checkbox" id="pcInk"><span>Ink friendly: drop fills and decoration</span></label>
+        <!-- A picture behind the calendar. Combined with whichever theme is
+             chosen above; the theme still draws the grid and the writing. -->
+        <section class="pc-bg" aria-labelledby="pcBgLab">
+          <h3 class="pc-lab pc-season" id="pcBgLab">Background picture</h3>
+          <div class="pc-bgs" id="pcBgList" role="radiogroup" aria-labelledby="pcBgLab">
+            <label class="pc-bgopt"><input type="radio" name="bgpick" value="" checked><span class="pc-bgnone">None</span></label>
+          </div>
+          <div class="pc-field">
+            <label for="pcBgFile">Add a picture (JPEG, PNG or WebP, up to 12 MB)</label>
+            <input id="pcBgFile" type="file" accept="image/jpeg,image/png,image/webp">
+          </div>
+          <p class="pc-hint" id="pcBgStatus" role="status"></p>
+          <div id="pcBgControls" hidden>
+            <div class="pc-grid2">
+              <div class="pc-field"><label for="pcBgFit">Size</label>
+                <select id="pcBgFit"><option value="cover">Fill the page</option><option value="contain">Fit whole picture</option></select></div>
+              <div class="pc-field"><label for="pcBgX">Across</label>
+                <select id="pcBgX"><option value="left">Left</option><option value="center" selected>Centre</option><option value="right">Right</option></select></div>
+              <div class="pc-field"><label for="pcBgY">Up and down</label>
+                <select id="pcBgY"><option value="top">Top</option><option value="center" selected>Centre</option><option value="bottom">Bottom</option></select></div>
+            </div>
+            <div class="pc-field"><label for="pcBgOpacity">Picture strength <output id="pcBgOpacityOut">35%</output></label>
+              <input id="pcBgOpacity" type="range" min="10" max="100" step="5" value="35"></div>
+            <div class="pc-field"><label for="pcBgOverlay">Readability wash <output id="pcBgOverlayOut">55%</output></label>
+              <input id="pcBgOverlay" type="range" min="0" max="90" step="5" value="55">
+              <span class="pc-hint">A white wash over the picture keeps names and dates readable. Keep it at 40% or more for busy pictures.</span></div>
+            <div class="pc-viewacts">
+              <button type="button" class="pc-mini" id="pcBgNone">Remove background</button>
+              <button type="button" class="pc-mini pc-mini--danger" id="pcBgDelete" hidden>Delete this picture</button>
+            </div>
+          </div>
+        </section>
         <p class="pc-hint">Member types keep their colours in every theme: G&amp;A sky blue, Trailblazer green, Radical orange, each with its own symbol.</p>
       </div>
     </aside>
@@ -544,6 +576,18 @@ ob_start();
   .pc-theme-meta{grid-column:2;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--deep,#0c5a45)}
   .pc-season{margin:10px 0 0}
   .pc-thumb--auto .pc-thumb-t{background:linear-gradient(90deg,#4a7fb0 0 25%,#5f8f63 25% 50%,#b88322 50% 75%,#b44a1c 75%)}
+  .pc-bgs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:4px 0 8px}
+  .pc-bgopt{position:relative;display:block;cursor:pointer}
+  .pc-bgopt input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;width:100%;height:100%}
+  .pc-bgopt img,.pc-bgnone{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;border:1px solid var(--line,#c7d4cd);border-radius:6px;background:#fff}
+  .pc-bgnone{display:grid;place-items:center;font-size:11.5px;font-weight:700;color:var(--muted,#5c6b63)}
+  .pc-bgopt:has(input:checked) img,.pc-bgopt:has(input:checked) .pc-bgnone{outline:3px solid var(--deep,#0c5a45);outline-offset:1px}
+  .pc-bgopt:has(input:checked)::after{content:"✓";position:absolute;top:3px;right:5px;font-weight:800;color:#fff;
+    background:var(--deep,#0c5a45);border-radius:999px;width:18px;height:18px;display:grid;place-items:center;font-size:11px}
+  .pc-bgopt:has(input:focus-visible){outline:2px solid var(--focus-ring,var(--teal,#117b6d));outline-offset:3px;border-radius:6px}
+  .pc-bgopt .pc-bgname{display:block;font-size:10.5px;line-height:1.2;margin-top:2px;color:var(--muted,#5c6b63);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pc-field input[type=range]{padding:0;min-height:24px;border:0}
+  .pc-field output{font-weight:700;text-transform:none;letter-spacing:0}
   .pc-mode{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
   .pc-mode .pc-hint{margin:0}
   .pc-theme-blurb{grid-column:2;font-size:11px;line-height:1.35;color:var(--muted,#5c6b63)}
@@ -705,7 +749,13 @@ ob_start();
         top: { enabled: $('pcTop').value.trim() !== '', html: $('pcTop').value.trim() },
         bottom: { enabled: $('pcBottom').value.trim() !== '', html: $('pcBottom').value.trim() },
       },
-      background: { mode: 'none' },
+      background: (function(){
+        var id = parseInt(pick('bgpick') || '0', 10) || 0;
+        return { mode: id > 0 ? 'image' : 'none', id: id, fit: $('pcBgFit').value,
+          x: $('pcBgX').value, y: $('pcBgY').value,
+          opacity: (parseInt($('pcBgOpacity').value, 10) || 35) / 100,
+          overlay: (parseInt($('pcBgOverlay').value, 10) || 0) / 100 };
+      })(),
     };
   }
 
@@ -725,6 +775,14 @@ ob_start();
     $('pcPaper').value = pg.paper || 'letter';
     $('pcOrientation').value = pg.orientation || '';
     $('pcHeight').value = pg.height || 'grow';
+    var bg = c.background || {};
+    $('pcBgFit').value = bg.fit || 'cover';
+    $('pcBgX').value = bg.x || 'center';
+    $('pcBgY').value = bg.y || 'center';
+    $('pcBgOpacity').value = String(Math.round((bg.opacity || 0.35) * 100));
+    $('pcBgOverlay').value = String(Math.round((bg.overlay !== undefined ? bg.overlay : 0.55) * 100));
+    pendingBg = bg.mode === 'image' ? (bg.id || 0) : 0;
+    if (typeof selectBackground === 'function') selectBackground(pendingBg);
     $('pcLegend').checked = a.legend !== false;
     $('pcScale').value = String(a.typeScale || 1);
     $('pcFont').value = a.font || 'serif';
@@ -770,6 +828,13 @@ ob_start();
     ].forEach(function(row){ if (String(row[1]) !== String(row[2])) p.set(row[0], String(row[1])); });
     if (c.appearance.inkFriendly) p.set('ink', '1');
     if (!c.appearance.legend) p.set('legend', '0');
+    if (c.background.mode === 'image') {
+      p.set('bg', String(c.background.id));
+      [['bgFit', c.background.fit, D.background.fit], ['bgX', c.background.x, D.background.x],
+       ['bgY', c.background.y, D.background.y], ['bgOpacity', c.background.opacity, D.background.opacity],
+       ['bgOverlay', c.background.overlay, D.background.overlay]
+      ].forEach(function(row){ if (String(row[1]) !== String(row[2])) p.set(row[0], String(row[1])); });
+    }
     [['hChurch', c.header.show.church, true], ['hLocation', c.header.show.location, true],
      ['hPeriod', c.header.show.period, true], ['hDocType', c.header.show.docType, true],
      ['fPrinted', c.footer.show.printed, true], ['fWebsite', c.footer.show.website, true],
@@ -1099,6 +1164,84 @@ ob_start();
 
   // Nothing here submits: every control acts at once.
   form.addEventListener('submit', function(e){ e.preventDefault(); });
+
+  /* Background pictures. The list is this account's own pictures (all of
+   * them, for an administrator); a design opened from someone else may use a
+   * picture not in it, which is kept and shown as "From this design". */
+  var pendingBg = pendingBg || 0;
+  var BG_API = base + '/api/print/backgrounds';
+  var bgList = $('pcBgList'), bgStatus = $('pcBgStatus'), bgMine = {};
+  function bgOption(id, label, canDelete){
+    var l = document.createElement('label');
+    l.className = 'pc-bgopt';
+    var i = document.createElement('input');
+    i.type = 'radio'; i.name = 'bgpick'; i.value = String(id);
+    var img = document.createElement('img');
+    img.src = base + '/print/backgrounds/' + id; img.alt = label; img.loading = 'lazy';
+    var n = document.createElement('span'); n.className = 'pc-bgname'; n.textContent = label;
+    l.appendChild(i); l.appendChild(img); l.appendChild(n);
+    bgMine[id] = !!canDelete;
+    return l;
+  }
+  function selectBackground(id){
+    var want = String(id || '');
+    var el = bgList.querySelector('input[name=bgpick][value="' + want + '"]');
+    if (!el && id) {
+      bgList.appendChild(bgOption(id, 'From this design', false));
+      el = bgList.querySelector('input[name=bgpick][value="' + want + '"]');
+    }
+    if (el) el.checked = true;
+    syncBgControls();
+  }
+  function syncBgControls(){
+    var id = parseInt(pick('bgpick') || '0', 10) || 0;
+    $('pcBgControls').hidden = id === 0;
+    $('pcBgDelete').hidden = !(id && bgMine[id]);
+    $('pcBgOpacityOut').textContent = $('pcBgOpacity').value + '%';
+    $('pcBgOverlayOut').textContent = $('pcBgOverlay').value + '%';
+  }
+  function loadBackgrounds(){
+    return fetch(BG_API, { credentials: 'same-origin' })
+      .then(function(r){ return r.ok ? r.json() : { backgrounds: [] }; })
+      .then(function(j){
+        Array.prototype.slice.call(bgList.querySelectorAll('.pc-bgopt')).forEach(function(n){
+          if (n.querySelector('input').value !== '') n.remove(); });
+        (j.backgrounds || []).forEach(function(b){ bgList.appendChild(bgOption(b.id, b.label, b.canDelete)); });
+        selectBackground(pendingBg);
+      })
+      .catch(function(){ selectBackground(pendingBg); });
+  }
+  $('pcBgFile').addEventListener('change', function(){
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var data = new FormData(); data.append('picture', f);
+    bgStatus.textContent = 'Uploading and checking “' + f.name + '”…';
+    fetch(BG_API, { method: 'POST', credentials: 'same-origin', body: data })
+      .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || 'That picture could not be used.'); return j; }); })
+      .then(function(j){
+        bgStatus.textContent = 'Added “' + j.background.label + '” (' + j.background.width + ' × ' + j.background.height + ' pixels).';
+        pendingBg = j.background.id;
+        return loadBackgrounds();
+      })
+      .then(function(){ onChange(); })
+      .catch(function(e){ bgStatus.textContent = e.message; })
+      .finally(function(){ $('pcBgFile').value = ''; });
+  });
+  $('pcBgNone').addEventListener('click', function(){ selectBackground(0); onChange(); });
+  $('pcBgDelete').addEventListener('click', function(){
+    var id = parseInt(pick('bgpick') || '0', 10) || 0;
+    if (!id || !window.confirm('Delete this picture? Designs that use it must choose another first.')) return;
+    fetch(BG_API + '/' + id, { method: 'DELETE', credentials: 'same-origin' })
+      .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || 'That did not work.'); return j; }); })
+      .then(function(){ bgStatus.textContent = 'Picture deleted.'; pendingBg = 0; return loadBackgrounds(); })
+      .then(function(){ onChange(); })
+      .catch(function(e){ bgStatus.textContent = e.message; });
+  });
+  form.addEventListener('input', function(e){
+    if (e.target.id === 'pcBgOpacity' || e.target.id === 'pcBgOverlay') { syncBgControls(); onChange(); }
+  });
+  form.addEventListener('change', function(e){ if (e.target.name === 'bgpick') syncBgControls(); });
+  loadBackgrounds();
 
   var timer;
   function refresh(){

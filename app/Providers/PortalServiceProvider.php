@@ -114,6 +114,16 @@ final class PortalServiceProvider
      * Wires:  MembersConnection → SqlEventAdapter → DefaultEventRepository → EventService
      */
     /** Saved calendar views: the print studio's reusable configurations. */
+    public static function makePrintBackgroundService(): \App\Services\Calendar\PrintBackgroundService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+
+        return new \App\Services\Calendar\PrintBackgroundService(
+            new \App\Adapters\Sql\SqlPrintBackgroundAdapter(),
+            (new \App\Services\PrivateArchiveStore())->root() . '/print-assets/backgrounds',
+        );
+    }
+
     public static function makeSavedViewService(): \App\Services\Calendar\SavedViewService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');

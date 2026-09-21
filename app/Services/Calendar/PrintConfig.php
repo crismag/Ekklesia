@@ -156,8 +156,18 @@ final class PrintConfig
             $extra[$where] = $region;
         }
 
+        // A picture behind the calendar. The picture is referred to by id; who
+        // may see it is PrintBackgroundService's decision at render time.
         $background = self::section($input, 'background', $d['background']);
-        $background['mode'] = $background['mode'] === 'none' ? 'none' : 'none';
+        $background['id'] = max(0, (int) ($background['id'] ?? 0));
+        $background['mode'] = $background['mode'] === 'image' && $background['id'] > 0 ? 'image' : 'none';
+        $background['fit'] = in_array($background['fit'] ?? '', ['cover', 'contain'], true) ? $background['fit'] : 'cover';
+        $background['x'] = in_array($background['x'] ?? '', ['left', 'center', 'right'], true) ? $background['x'] : 'center';
+        $background['y'] = in_array($background['y'] ?? '', ['top', 'center', 'bottom'], true) ? $background['y'] : 'center';
+        // How strongly the picture shows, and how much white is laid over it so
+        // the writing stays readable. Bounded so no setting hides the calendar.
+        $background['opacity'] = round(max(0.1, min(1.0, (float) ($background['opacity'] ?? 0.35))), 2);
+        $background['overlay'] = round(max(0.0, min(0.9, (float) ($background['overlay'] ?? 0.55))), 2);
 
         // Optional screen calendar state. Empty means "this is a print-only
         // view" — opening it on the calendar still applies layers, but does
@@ -236,7 +246,8 @@ final class PrintConfig
                 'top' => ['enabled' => false, 'html' => ''],
                 'bottom' => ['enabled' => false, 'html' => ''],
             ],
-            'background' => ['mode' => 'none'],
+            'background' => ['mode' => 'none', 'id' => 0, 'fit' => 'cover', 'x' => 'center', 'y' => 'center',
+                'opacity' => 0.35, 'overlay' => 0.55],
             'screen' => ['view' => '', 'left' => ''],
         ];
     }
@@ -379,7 +390,15 @@ final class PrintConfig
                 'top' => ['enabled' => true, 'html' => (string) ($q['topInfo'] ?? '')],
                 'bottom' => ['enabled' => true, 'html' => (string) ($q['bottomInfo'] ?? '')],
             ],
-            'background' => ['mode' => 'none'],
+            'background' => [
+                'mode' => (int) ($q['bg'] ?? 0) > 0 ? 'image' : 'none',
+                'id' => (int) ($q['bg'] ?? 0),
+                'fit' => $q['bgFit'] ?? 'cover',
+                'x' => $q['bgX'] ?? 'center',
+                'y' => $q['bgY'] ?? 'center',
+                'opacity' => $q['bgOpacity'] ?? 0.35,
+                'overlay' => $q['bgOverlay'] ?? 0.55,
+            ],
             // Not `view`: print-setup already uses that query key for a saved
             // row id. Screen calendar state rides on names that cannot collide.
             'screen' => [
@@ -450,6 +469,14 @@ final class PrintConfig
         foreach (['top' => 'topInfo', 'bottom' => 'bottomInfo'] as $where => $param) {
             if ($this->get('additional.' . $where . '.enabled')) {
                 $q[$param] = (string) $this->get('additional.' . $where . '.html');
+            }
+        }
+        if ($this->get('background.mode') === 'image') {
+            $q['bg'] = (string) $this->get('background.id');
+            foreach (['fit' => 'bgFit', 'x' => 'bgX', 'y' => 'bgY', 'opacity' => 'bgOpacity', 'overlay' => 'bgOverlay'] as $k => $param) {
+                if ((string) $this->get('background.' . $k) !== (string) $d['background'][$k]) {
+                    $q[$param] = (string) $this->get('background.' . $k);
+                }
             }
         }
         if ((string) $this->get('screen.view', '') !== '') {
