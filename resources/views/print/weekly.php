@@ -192,7 +192,7 @@ if ($weeks === []): ?>
           $items = [];
           foreach ($day['entries'] as $entry) {
               $items[] = EntryPresentation::of($entry, $shortNames, !$legacy, !$legacy)
-                  + ['source' => $entry['source']];
+                  + ['source' => $entry['source'], 'href' => (string) ($entry['href'] ?? '')];
           }
           $plan = CellPlan::plan(
               $items, $entryMode, $grow ? $usableIn * 1.25 : $usableIn, $cellTextWidthIn, $ts, 0.134,
@@ -216,7 +216,7 @@ if ($weeks === []): ?>
           <?php if ($plan['shown'] > 0): ?>
           <div class="wk-ents">
             <?php foreach (array_slice($items, 0, $plan['shown']) as $item): ?>
-              <div class="wk-ent k-<?= $e($item['category']) ?><?= ($item['group'] ?? null) !== null ? ' mt-' . $e($item['group']) : '' ?>" style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
+              <div class="wk-ent k-<?= $e($item['category']) ?><?= ($item['group'] ?? null) !== null ? ' mt-' . $e($item['group']) : '' ?>"<?= !empty($editable) && str_starts_with($item['href'], '/events/') ? ' data-href="' . $e($item['href']) . '"' : '' ?> style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
                 <span class="t"><?= $item['category'] === 'birth' && isset($memberTypes) ? $memberTypes->symbol((string) $item['memberType']) : '' ?><?= $e($item['primary']) ?></span>
                 <?php if ($item['secondary'] !== ''): ?><span class="w"><?php
                     // Inline, a person's age reads as "(29)" and an event's time

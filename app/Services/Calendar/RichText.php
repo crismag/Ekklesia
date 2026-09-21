@@ -48,11 +48,21 @@ final class RichText
         $allowed = '<' . implode('><', self::ALLOWED) . '>';
         $html = strip_tags($html, $allowed);
 
-        // Every attribute goes, including the ones that look harmless: there is
-        // no attribute an editorial note needs, so none has to be judged.
+        // Every attribute goes, with one exception judged here and nowhere
+        // else: a paragraph or heading may be centred or right-aligned (the
+        // print studio's alignment buttons), which is kept as one of two fixed
+        // class names — never the attribute that arrived.
         $html = (string) preg_replace_callback(
-            '#<\s*([a-z0-9]+)\b[^>]*?(/?)>#i',
-            static fn (array $m): string => '<' . strtolower($m[1]) . ($m[2] === '/' ? ' /' : '') . '>',
+            '#<\s*([a-z0-9]+)\b([^>]*?)(/?)>#i',
+            static function (array $m): string {
+                $tag = strtolower($m[1]);
+                $align = '';
+                if (in_array($tag, ['p', 'h3', 'h4'], true)
+                    && preg_match('/(?:text-align\s*:\s*|\bal-)(center|right)\b/i', $m[2], $a) === 1) {
+                    $align = ' class="al-' . strtolower($a[1]) . '"';
+                }
+                return '<' . $tag . $align . ($m[3] === '/' ? ' /' : '') . '>';
+            },
             $html,
         );
         $html = (string) preg_replace_callback(

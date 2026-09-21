@@ -169,6 +169,17 @@ $sheetH = round($paperH - 0.945, 3);
   .has-bg > *:not(.bg-layer):not(.bg-wash) { position: relative; z-index: 1; }
   .has-bg .cal td.wknd, .has-bg .cal td.out, .has-bg .wk-day.wknd, .has-bg .wk-day.out { background: rgba(255,255,255,.4); }
   @media print { .bg-layer, .bg-wash { position: fixed; } }
+  /* Editing on the sheet (the studio's "Edit text on the sheet"). Outlines and
+     placeholders are for the screen; an empty editable region never prints. */
+  [data-edit] { outline: 1px dashed rgba(12,90,69,.45); outline-offset: 2px; min-height: 1em; cursor: text; }
+  [data-edit]:focus { outline: 2px solid #0c5a45; background: rgba(255,255,255,.9); }
+  [data-edit]:empty::before { content: attr(data-placeholder); color: #8a948f; font-style: italic; font-weight: 400; }
+  .doc-info .al-center { text-align: center; } .doc-info .al-right { text-align: right; }
+  [data-href] { cursor: pointer; }
+  @media print {
+    [data-edit] { outline: 0 !important; background: transparent !important; }
+    [data-edit]:empty, .doc-info:empty { display: none !important; }
+  }
   .print-note { margin: 0 0 8pt; padding: 6pt 8pt; border: 1pt solid #c98a2b; background: #fff7e8;
     color: #5a3d00; font: 9pt/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; border-radius: 3pt; }
 
@@ -222,10 +233,10 @@ $sheetH = round($paperH - 0.945, 3);
           <div class="church"><?= implode('<span class="sep" aria-hidden="true">·</span>', array_map($e, $kicker)) ?></div>
         <?php endif; ?>
         <?php if ($show['docType'] && $periodNote !== ''): ?>
-          <h1 class="doc-title"><?= $e($periodNote) ?></h1>
+          <h1 class="doc-title"<?= !empty($editable) ? ' data-edit="title" data-placeholder="Calendar title"' : '' ?>><?= $e($periodNote) ?></h1>
         <?php endif; ?>
-        <?php if ($customSubtitle !== ''): ?>
-          <div class="subtitle subtitle-custom"><?= $e($customSubtitle) ?></div>
+        <?php if ($customSubtitle !== '' || !empty($editable)): ?>
+          <div class="subtitle subtitle-custom"<?= !empty($editable) ? ' data-edit="subtitle" data-placeholder="Line under the title (optional)"' : '' ?>><?= $e($customSubtitle) ?></div>
         <?php endif; ?>
       </div>
       <?php if ($show['period']): ?>
@@ -235,8 +246,8 @@ $sheetH = round($paperH - 0.945, 3);
   </header>
 
   <?php // Rendered only when it has something to say. ?>
-  <?php if ($topHtml !== ''): ?>
-    <section class="doc-info doc-info--top"><?= $topHtml ?></section>
+  <?php if ($topHtml !== '' || !empty($editable)): ?>
+    <section class="doc-info doc-info--top"<?= !empty($editable) ? ' data-edit="top" data-rich="1" data-placeholder="Note above the calendar (optional)"' : '' ?>><?= $topHtml ?></section>
   <?php endif; ?>
 
   <?= $body ?>
@@ -253,8 +264,8 @@ $sheetH = round($paperH - 0.945, 3);
     </div>
   <?php endif; ?>
 
-  <?php if ($bottomHtml !== ''): ?>
-    <section class="doc-info doc-info--bottom"><?= $bottomHtml ?></section>
+  <?php if ($bottomHtml !== '' || !empty($editable)): ?>
+    <section class="doc-info doc-info--bottom"<?= !empty($editable) ? ' data-edit="bottom" data-rich="1" data-placeholder="Note below the calendar (optional)"' : '' ?>><?= $bottomHtml ?></section>
   <?php endif; ?>
 
   <?php // Decoration, after the information and before the colophon. ?>
@@ -264,13 +275,13 @@ $sheetH = round($paperH - 0.945, 3);
     $left = [];
     if ($fShow['printed'] && ($branding['footer'] ?? '') !== '') { $left[] = (string) $branding['footer']; }
     if ($fShow['church']) { $left[] = (string) ($branding['church'] ?? ''); }
-    if (trim((string) ($footerNote ?? '')) !== '') { $left[] = trim((string) $footerNote); }
+    $noteText = trim((string) ($footerNote ?? ''));
     $right = [];
     if ($fShow['website'] && ($branding['website'] ?? '') !== '') { $right[] = (string) $branding['website']; }
   ?>
-  <?php if ($left !== [] || $right !== [] || $fShow['page']): ?>
+  <?php if ($left !== [] || $right !== [] || $fShow['page'] || $noteText !== '' || !empty($editable)): ?>
   <footer class="colophon">
-    <span><?= $e(implode(' · ', array_filter($left))) ?></span>
+    <span><?= $e(implode(' · ', array_filter($left))) ?><?php if ($noteText !== '' || !empty($editable)): ?><?= $left !== [] ? ' · ' : '' ?><span class="foot-note"<?= !empty($editable) ? ' data-edit="footer" data-placeholder="Footer note (optional)"' : '' ?>><?= $e($noteText) ?></span><?php endif; ?></span>
     <?php if ($fShow['page']): ?><span class="folio"></span><?php endif; ?>
     <span><?= $e(implode(' · ', $right)) ?></span>
   </footer>

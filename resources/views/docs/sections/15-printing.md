@@ -20,6 +20,14 @@ Above the page, **Fit** shows one whole page, **100%** shows it at actual size, 
 
 > **Tip:** Pressing **Ctrl+P** (or **⌘P**) in the studio prints the sheet, not the studio.
 
+## Typing on the sheet
+
+**Edit text on the sheet**, above the page, lets you type the title, the line under it, the notes and the footer note straight onto the preview. Each editable place is outlined, and an empty one shows what it is for; outlines and hints never print, and an empty place takes no room.
+
+In the notes, a small toolbar offers **bold**, *italic*, alignment and three sizes. Pasted text arrives as plain text, so a document's own styling is not carried in.
+
+What you type is print-only: it changes this printed copy (and the publication, once saved), never the calendar. Events on the sheet are calendar data and cannot be typed over. Clicking one offers to open the event itself, where anyone allowed to edit it can change it for everyone. **Done editing** returns to the plain preview.
+
 ## Saving a publication
 
 A publication is a set of choices you can reopen next month. Use it for the sheets your church prints regularly — the birthday calendar, the ministry roster, the year planner.
@@ -27,6 +35,8 @@ A publication is a set of choices you can reopen next month. Use it for the shee
 - **Save as…** names a new publication.
 - **Save** updates the one you have open.
 - **Reset** puts back what was saved, discarding your edits.
+- **Rename** changes its name (the saved settings stay as they were).
+- **Duplicate** makes a private copy of what is on screen, for a variation of a sheet you already have.
 - **Delete** removes it. This cannot be undone.
 
 A publication stores the *period*, not the dates. A sheet saved as "This month" prints September in September and October in October — you do not need a new one each time.

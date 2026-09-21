@@ -119,6 +119,8 @@ ob_start();
           <button type="button" class="pc-mini" id="pcSave" disabled>Save</button>
           <button type="button" class="pc-mini" id="pcSaveAs">Save as…</button>
           <button type="button" class="pc-mini" id="pcReset" disabled>Reset</button>
+          <button type="button" class="pc-mini" id="pcRename" hidden>Rename</button>
+          <button type="button" class="pc-mini" id="pcDuplicate" hidden>Duplicate</button>
           <button type="button" class="pc-mini pc-mini--danger" id="pcDelete" hidden>Delete</button>
         </div>
       </section>
@@ -304,6 +306,8 @@ ob_start();
           <button type="button" class="pc-zbtn" id="pcZoomIn" aria-label="Larger">+</button>
         </div>
         <span class="pc-zoom" id="pcZoom"></span>
+        <button class="pc-mini" type="button" id="pcEditToggle" aria-pressed="false"
+                title="Type the title, notes and footer straight onto the sheet. Print-only: the calendar itself is not changed.">Edit text on the sheet</button>
         <button class="pc-btn pc-btn--primary pc-btn--sm" type="button" id="pcPrintBar">Print</button>
       </div>
       <!-- The sheet is rendered at its true paper size and scaled for the
@@ -845,6 +849,7 @@ ob_start();
     if (c.footer.note) p.set('fNote', c.footer.note);
     if (c.additional.top.enabled) p.set('topInfo', c.additional.top.html);
     if (c.additional.bottom.enabled) p.set('bottomInfo', c.additional.bottom.html);
+    if (editing) p.set('edit', '1');
     return base + '/calendar/print?' + p.toString();
   }
 
@@ -942,6 +947,8 @@ ob_start();
     $('pcSave').disabled = !saved || !saved.canEdit || !dirty;
     $('pcReset').disabled = !dirty;
     $('pcDelete').hidden = !saved || !saved.canEdit;
+    $('pcRename').hidden = !saved || !saved.canEdit;
+    $('pcDuplicate').hidden = !saved;
   }
 
   function api(method, path, body){
@@ -1242,6 +1249,139 @@ ob_start();
   });
   form.addEventListener('change', function(e){ if (e.target.name === 'bgpick') syncBgControls(); });
   loadBackgrounds();
+
+  /* Saved designs: rename and duplicate. Rename keeps the saved settings (not
+   * unsaved edits); Duplicate copies what is on screen now into a new private
+   * design of your own. */
+  $('pcRename').addEventListener('click', function(){
+    if (!saved || !saved.canEdit) return;
+    var name = window.prompt('Rename this publication', saved.name);
+    if (!name || name === saved.name) return;
+    api('PUT', '/' + saved.id, { name: name, visibility: saved.visibility, config: JSON.parse(savedConfig) })
+      .then(function(){
+        saved.name = name;
+        var opt = $('pcView').querySelector('option[value="' + saved.id + '"]');
+        if (opt) opt.textContent = name;
+        refreshViewState();
+      }).catch(fail);
+  });
+  $('pcDuplicate').addEventListener('click', function(){
+    if (!saved) return;
+    var name = window.prompt('Name the copy', saved.name + ' copy');
+    if (!name) return;
+    api('POST', '', { name: name, visibility: 'private', config: read() })
+      .then(function(j){ window.location.search = '?view=' + encodeURIComponent(j.id); })
+      .catch(fail);
+  });
+
+  /* Editing on the sheet. The print document marks its print-only text
+   * (title, line under it, notes, footer note) with data-edit; typing there
+   * writes straight into the matching setting here, so saving, the URL and
+   * printing all see it. The sheet is redrawn only when you leave a region,
+   * so the caret is not lost mid-word. Calendar entries are not editable:
+   * an event offers "Edit calendar event", which opens the real editor. */
+  var editing = false;
+  var FIELD = { title: 'hTitle', subtitle: 'hSubtitle', footer: 'fNote', top: 'pcTop', bottom: 'pcBottom' };
+  $('pcEditToggle').addEventListener('click', function(){
+    editing = !editing;
+    this.setAttribute('aria-pressed', editing ? 'true' : 'false');
+    this.textContent = editing ? 'Done editing' : 'Edit text on the sheet';
+    status.textContent = editing ? 'Editing: click the title, notes or footer on the sheet' : 'Preview';
+    refresh();
+  });
+  function wireEditing(){
+    if (!editing) return;
+    var doc;
+    try { doc = frame.contentDocument; } catch (e) { return; }
+    if (!doc) return;
+    try { doc.execCommand('defaultParagraphSeparator', false, 'p'); } catch (e) {}
+    var bar = doc.createElement('div');
+    bar.className = 'no-print';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', 'Formatting');
+    bar.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9;display:none;gap:4px;'
+      + 'padding:5px;background:#fff;border:1px solid #c7d4cd;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.15);'
+      + 'font:600 12px system-ui,sans-serif';
+    [['bold', 'B', 'Bold'], ['italic', 'I', 'Italic'], ['justifyLeft', '⇤', 'Align left'],
+     ['justifyCenter', '↔', 'Centre'], ['justifyRight', '⇥', 'Align right'],
+     ['p', 'Normal', 'Normal text'], ['h4', 'Medium', 'Medium heading'], ['h3', 'Large', 'Large heading']
+    ].forEach(function(b){
+      var btn = doc.createElement('button');
+      btn.type = 'button'; btn.textContent = b[1]; btn.title = b[2]; btn.setAttribute('aria-label', b[2]);
+      btn.style.cssText = 'min-width:30px;min-height:28px;border:1px solid #c7d4cd;border-radius:6px;background:#fff;cursor:pointer';
+      // mousedown, not click: focus must stay in the note being formatted.
+      btn.addEventListener('mousedown', function(e){
+        e.preventDefault();
+        if (b[0] === 'p' || b[0] === 'h3' || b[0] === 'h4') doc.execCommand('formatBlock', false, b[0]);
+        else doc.execCommand(b[0], false, null);
+        var el = doc.activeElement;
+        if (el && el.dataset && el.dataset.edit) push(el);
+      });
+      bar.appendChild(btn);
+    });
+    doc.body.appendChild(bar);
+
+    function push(el){
+      var id = FIELD[el.dataset.edit];
+      if (!id) return;
+      if (el.dataset.rich) {
+        // Cleaned on a copy, never on the note being typed in: changing the
+        // live text would lose the selection a formatting button acts on.
+        var copy = el.cloneNode(true);
+        // Browser alignment arrives as a style; the server keeps only its two
+        // classes, so translate here and let RichText do the real judging.
+        Array.prototype.forEach.call(copy.querySelectorAll('[style*="text-align"]'), function(n){
+          var m = /text-align:\s*(center|right)/.exec(n.getAttribute('style') || '');
+          n.removeAttribute('style');
+          if (m) n.className = 'al-' + m[1];
+        });
+        // Browsers wrap formatted text in spans with inline sizes; the sheet's
+        // own sizes are the headings, so the wrappers go (their text stays).
+        Array.prototype.forEach.call(copy.querySelectorAll('span, font'), function(n){
+          while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n);
+          n.parentNode.removeChild(n);
+        });
+        $(id).value = copy.textContent.trim() === '' ? '' : copy.innerHTML.trim();
+      } else {
+        $(id).value = el.textContent.replace(/\s+/g, ' ').trim();
+      }
+      summarise(read()); refreshViewState();
+    }
+    Array.prototype.forEach.call(doc.querySelectorAll('[data-edit]'), function(el){
+      el.setAttribute('contenteditable', el.dataset.rich ? 'true' : 'plaintext-only');
+      if (el.contentEditable !== 'plaintext-only' && !el.dataset.rich) el.setAttribute('contenteditable', 'true');
+      el.setAttribute('role', 'textbox');
+      el.setAttribute('aria-label', (el.dataset.placeholder || 'Text') + ' (print only)');
+      el.title = 'Print only: this changes the printed copy, not the calendar';
+      el.addEventListener('input', function(){ push(el); });
+      el.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' && !el.dataset.rich) { e.preventDefault(); el.blur(); }
+      });
+      // Pasted text arrives as plain text: styling from elsewhere is not kept.
+      el.addEventListener('paste', function(e){
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData('text/plain');
+        doc.execCommand('insertText', false, text);
+      });
+      el.addEventListener('focus', function(){ bar.style.display = el.dataset.rich ? 'flex' : 'none'; });
+      el.addEventListener('blur', function(){
+        bar.style.display = 'none';
+        push(el);
+        onChange();
+      });
+    });
+    // Calendar entries: data, not print text.
+    Array.prototype.forEach.call(doc.querySelectorAll('[data-href]'), function(el){
+      el.title = 'Calendar data. Click to edit the event itself.';
+      el.addEventListener('click', function(){
+        if (window.confirm('This is an event on the calendar, not text on the sheet.\n\n'
+            + 'Open the event? If you may edit it, changes there apply to the real calendar for everyone.')) {
+          window.open(base + el.dataset.href, '_blank', 'noopener');
+        }
+      });
+    });
+  }
+  frame.addEventListener('load', wireEditing);
 
   var timer;
   function refresh(){
