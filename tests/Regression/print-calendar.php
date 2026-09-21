@@ -146,5 +146,17 @@ foreach (['weekly', 'agenda', 'planner'] as $layout) {
         && !str_contains($text($html), 'Jessie James Quill'));
 }
 
+echo "\nThe printed calendar follows the chosen campus\n";
+$routes = (string) file_get_contents($root . '/routes/web.php');
+$printRoute = substr($routes, (int) strpos($routes, "'GET /calendar/print' =>"), 4000);
+check('the print route resolves one campus, from the link or the top-bar selection',
+    str_contains($printRoute, '$printCampus = (int) (_campusContext($req) ?? 0);'));
+check('and every read is filtered by it, not only the header',
+    str_contains($printRoute, "\$req['current_campus_id'] = \$printCampus > 0 ? \$printCampus : 0;")
+    && strpos($printRoute, "\$req['current_campus_id'] =") < strpos($printRoute, 'printSources('));
+check('the header names the same campus', str_contains($printRoute, '$chosen = $printCampus;'));
+check('the studio passes the selected campus to the sheet',
+    str_contains((string) file_get_contents($root . '/resources/views/calendar-print.php'), "p.set('current_campus_id', campusSel.value)"));
+
 printf("\nPassed: %d; failed: %d\n", $passed, $failed);
 exit($failed === 0 ? 0 : 1);

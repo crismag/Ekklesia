@@ -857,6 +857,10 @@ ob_start();
     if (c.footer.note) p.set('fNote', c.footer.note);
     if (c.additional.top.enabled) p.set('topInfo', c.additional.top.html);
     if (c.additional.bottom.enabled) p.set('bottomInfo', c.additional.bottom.html);
+    // The campus chosen in the top bar, so a link or a PDF says which campus
+    // it shows. (Changing the campus reloads this page.)
+    var campusSel = document.getElementById('campusSelect') || document.getElementById('campusSelectMobile');
+    if (campusSel && parseInt(campusSel.value || '0', 10) > 0) p.set('current_campus_id', campusSel.value);
     if (editing) p.set('edit', '1');
     return base + '/calendar/print?' + p.toString();
   }
