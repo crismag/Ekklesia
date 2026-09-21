@@ -182,4 +182,18 @@ test.describe('print studio', () => {
     await page.emulateMedia({ media: 'print' });
     await expect(page.locator('.cal')).toBeVisible();
   });
+  test('exports the calendar as an editable PowerPoint file', async ({ page }) => {
+    await page.goto('/calendar/print-setup?' + MONTH);
+    await page.click('#pcTab-print');
+    const link = page.locator('#pcPptx');
+    await expect(link).toHaveAttribute('href', /calendar\/export\.pptx\?.*template=monthly/);
+    const [download] = await Promise.all([page.waitForEvent('download'), link.click()]);
+    expect(download.suggestedFilename()).toBe('calendar-2026-09.pptx');
+    const path = await download.path();
+    const fs = await import('fs');
+    const bytes = fs.readFileSync(path);
+    // A zip package, with a slide in it.
+    expect(bytes.subarray(0, 2).toString('latin1')).toBe('PK');
+    expect(bytes.includes(Buffer.from('ppt/slides/slide1.xml'))).toBe(true);
+  });
 });

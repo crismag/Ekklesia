@@ -156,8 +156,9 @@ check('the screen sheet has the printed page\'s width, so it can be measured',
 
 echo "\nThe printed calendar follows the chosen campus\n";
 $routes = (string) file_get_contents($root . '/routes/web.php');
-$printRoute = substr($routes, (int) strpos($routes, "'GET /calendar/print' =>"), 4000);
-check('the print route resolves one campus, from the link or the top-bar selection',
+// Gathered once in _calendarPrintJob(), shared by the page and the export.
+$printRoute = substr($routes, (int) strpos($routes, 'function _calendarPrintJob('), 6000);
+check('the print job resolves one campus, from the link or the top-bar selection',
     str_contains($printRoute, '$printCampus = (int) (_campusContext($req) ?? 0);'));
 check('and every read is filtered by it, not only the header',
     str_contains($printRoute, "\$req['current_campus_id'] = \$printCampus > 0 ? \$printCampus : 0;")

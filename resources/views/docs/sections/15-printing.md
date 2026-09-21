@@ -167,6 +167,18 @@ Turn on **background graphics** in the print dialog for tinted cells and header 
 
 **Open in a new tab** gives you the document on its own, which is useful for checking a long sheet before committing it to paper. **Restore the default settings** resets how the sheet looks and keeps the calendars, dates, title and notes you chose.
 
+## Editing the calendar in PowerPoint
+
+**Export editable PowerPoint** (Print tab) downloads the same calendar as a PowerPoint file, one slide per month, for the church that wants to finish it by hand: add a photo, reword a line, move the key.
+
+- The title, church line, month, weekday names, dates, and each day's events and birthdays are **text boxes** you can type into. Each day's entries are one text box, a line per entry, named after the day ("Entries 13 Sep") in the Selection Pane.
+- The grid is a **rectangle per day**, and the member-type key is **one group**, so it moves as a whole.
+- Birthdays keep their member-type colour: highlighted behind the name, or set in colour, as chosen under **People & events**. Names are the ones on the printed sheet, and no ages.
+- A **PowerPoint theme's** artwork comes back as its own shapes, pictures and text; a **background picture** comes as a picture with its transparency, under a white wash you can adjust or delete.
+- **One page** keeps each month on one slide, with "+n more" where a day is full. **Grow to fit** puts every entry in, continuing a month on further slides between weeks.
+
+It always exports the month grid, whichever layout is chosen. The built-in themes' small line drawings, and the Planner and Celebration artwork, are not in the file; their colours are. Each day's text box is set to shrink its text rather than spill out of the day, so check any day where you added text before printing or sending the file on.
+
 ## Common mistakes to avoid
 
 - **Printing the wrong campus.** The campus selector in the top bar decides whose events appear, and a saved publication does not override it.
