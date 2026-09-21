@@ -88,8 +88,8 @@ Each celebrant's name is marked with their member type, using colour on the name
 
 **Busy days** decides what happens when a day holds a lot:
 
-- **Grow to fit** (the default) — nothing is hidden. A busy week is simply taller and names wrap instead of being cut short. A month stays on one sheet whenever it can; when it genuinely cannot, it continues on the next sheet, breaking between weeks and repeating the day names.
-- **One page** — the month always fits one sheet, and a day that cannot hold everything says "+2 more". Publications saved before this setting existed keep printing this way.
+- **One page** (the default) — the month always fits one sheet, so print and PDF come out as a single calendar page. A day that cannot hold everything says "+2 more".
+- **Grow to fit** — nothing is hidden. A busy week is simply taller and names wrap instead of being cut short. A month stays on one sheet whenever it can; when it genuinely cannot, it continues on the next sheet, breaking between weeks and repeating the day names.
 
 The rest of the tab sets **Text size**, **Density** (how tightly the grid is set, a separate choice from text size), **Typeface**, **Title style**, what the header and footer show, and a **footer note**.
 
@@ -152,6 +152,6 @@ Turn on **background graphics** in the print dialog for tinted cells and header 
 
 - **Printing the wrong campus.** The campus selector in the top bar decides whose events appear, and a saved publication does not override it.
 - **Expecting a saved publication to change the calendar screen.** It is a printing recipe. Opening one does not change what Month or Week shows.
-- **A very long title on a busy month.** The title wraps rather than shrinking, and on the busiest months that can push the key and footer onto a second sheet. Shorten the title or choose **One page**.
+- **A very long title on a busy month.** The title wraps rather than shrinking, and on the busiest months that can push the key and footer onto a second sheet. Shorten the title, or keep **One page**.
 - **Choosing Compact for a birthday sheet.** Compact is for busy days; a celebrant list wants Showcase or Auto.
 - **Ticking nothing under People & events** and printing an empty page. The studio warns you, but the warning is easy to miss.

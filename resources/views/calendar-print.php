@@ -240,10 +240,10 @@ ob_start();
         </div>
         <div class="pc-field"><label for="pcHeight">Busy days</label>
           <select id="pcHeight">
-            <option value="grow">Grow to fit: nothing is hidden</option>
             <option value="fit">One page: extra entries become “+n more”</option>
+            <option value="grow">Grow to fit: nothing is hidden, may use more pages</option>
           </select>
-          <span class="pc-hint">Growing, a month stays on one sheet when it can and continues on the next, between weeks, only when it must.</span></div>
+          <span class="pc-hint">One page keeps each month to a single sheet. Growing shows every entry; a month continues on the next sheet, between weeks, only when it must.</span></div>
         <div class="pc-grid2">
           <div class="pc-field"><label for="pcScale">Text size</label>
             <select id="pcScale">
@@ -735,7 +735,7 @@ ob_start();
       date: { mode: $('pcRange').value || 'this-month',
               from: $('pcStart').value || null, to: $('pcEnd').value || null },
       content: { sources: sources },
-      page: { paper: $('pcPaper').value, orientation: $('pcOrientation').value, height: $('pcHeight').value || 'grow' },
+      page: { paper: $('pcPaper').value, orientation: $('pcOrientation').value, height: $('pcHeight').value || 'fit' },
       appearance: {
         typeScale: parseFloat($('pcScale').value) || 1,
         font: $('pcFont').value, names: $('pcNames').value,
@@ -784,7 +784,7 @@ ob_start();
     boxes.forEach(function(b){ b.checked = want.indexOf(b.value) !== -1; });
     $('pcPaper').value = pg.paper || 'letter';
     $('pcOrientation').value = pg.orientation || '';
-    $('pcHeight').value = pg.height || 'grow';
+    $('pcHeight').value = pg.height || 'fit';
     var bg = c.background || {};
     $('pcBgFit').value = bg.fit || 'cover';
     $('pcBgX').value = bg.x || 'center';

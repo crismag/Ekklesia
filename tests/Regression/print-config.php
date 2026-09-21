@@ -47,11 +47,13 @@ check('old "in full" views load as first names',
     App\Services\Calendar\PrintConfig::fromArray(['appearance' => ['names' => 'full']])->get('appearance.names') === 'first');
 check('old "shortened" views load as first name and initial',
     App\Services\Calendar\PrintConfig::fromArray(['appearance' => ['names' => 'short']])->get('appearance.names') === 'initial');
-check('a new calendar grows to fit its busy days', $d->get('page.height') === 'grow');
+check('a new calendar prints on one page', $d->get('page.height') === 'fit');
+check('growing to fit is kept when chosen',
+    App\Services\Calendar\PrintConfig::fromArray(['page' => ['height' => 'grow']])->get('page.height') === 'grow');
 check('a view saved before page height existed keeps its one fitted sheet',
     App\Services\Calendar\PrintConfig::fromArray(['page' => ['paper' => 'a4', 'orientation' => '']])->get('page.height') === 'fit');
 check('page height round-trips through the query',
-    App\Services\Calendar\PrintConfig::fromQuery(App\Services\Calendar\PrintConfig::fromArray(['page' => ['height' => 'fit']])->toQuery())->get('page.height') === 'fit');
+    App\Services\Calendar\PrintConfig::fromQuery(App\Services\Calendar\PrintConfig::fromArray(['page' => ['height' => 'grow']])->toQuery())->get('page.height') === 'grow');
 check('tabloid paper is accepted',
     App\Services\Calendar\PrintConfig::fromArray(['page' => ['paper' => 'tabloid']])->get('page.paper') === 'tabloid');
 check('the member-type legend is on by default and can be turned off',
