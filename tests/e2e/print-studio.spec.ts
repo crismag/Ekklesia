@@ -95,6 +95,18 @@ test.describe('print studio', () => {
     await expect(page.locator('.pc-theme', { hasText: 'November · Fall' })).toHaveCount(1);
   });
 
+  test('a background picture can be uploaded, applied and removed', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/calendar/print-setup?' + MONTH);
+    await page.setInputFiles('#pcBgFile', __dirname + '/../fixtures/print-background.jpg');
+    await expect(page.locator('#pcBgStatus')).toContainText('Added');
+    await expect(page.locator('#pcFrame')).toHaveAttribute('src', /[?&]bg=\d+/);
+    await expect(page.locator('#pcBgControls')).toBeVisible();
+    await page.click('#pcBgNone');
+    await expect(page.locator('#pcFrame')).not.toHaveAttribute('src', /[?&]bg=/);
+    await expect(page.locator('#pcBgControls')).toBeHidden();
+  });
+
   test('printing the studio page prints no controls', async ({ page }) => {
     await page.goto('/calendar/print-setup?' + MONTH);
     await page.emulateMedia({ media: 'print' });

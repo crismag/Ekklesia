@@ -158,6 +158,28 @@ return [
         PortalServiceProvider::makeRequestContext(),
     ))->destroy($req),
 
+    // Background pictures for printed calendars (PrintBackgroundService holds
+    // the rules). The picture itself is served by GET /print/backgrounds/{id}.
+    'GET /api/print/backgrounds' => fn (array $req) => (new \App\Http\Controllers\Api\PrintBackgroundController(
+        PortalServiceProvider::makePrintBackgroundService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->index($req),
+
+    'POST /api/print/backgrounds' => fn (array $req) => (new \App\Http\Controllers\Api\PrintBackgroundController(
+        PortalServiceProvider::makePrintBackgroundService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->store($req),
+
+    'DELETE /api/print/backgrounds/{id}' => fn (array $req) => (new \App\Http\Controllers\Api\PrintBackgroundController(
+        PortalServiceProvider::makePrintBackgroundService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->destroy($req),
+
+    'GET /print/backgrounds/{id}' => fn (array $req) => (new \App\Http\Controllers\Api\PrintBackgroundController(
+        PortalServiceProvider::makePrintBackgroundService(),
+        PortalServiceProvider::makeRequestContext(),
+    ))->serve($req),
+
     'GET /api/calendar/sources' => fn (array $req) => (new CalendarController(
         PortalServiceProvider::makeCalendarService(),
         PortalServiceProvider::makeRequestContext(),

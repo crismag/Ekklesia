@@ -178,6 +178,22 @@ final class PrintComposer
             $mastheadIn += 0.43 * (max(1, (int) ceil(mb_strlen($docTitle) / $perLine)) - 1);
         }
 
+        // A background picture: validated values only, and a screen-only note
+        // when it is missing or will print soft at this paper size.
+        $background = is_array($options['background'] ?? null) ? $options['background'] : null;
+        $printNotes = [];
+        if (!empty($options['backgroundMissing'])) {
+            $printNotes[] = 'The background picture could not be found or is not shared with you, so this calendar prints without it.';
+        }
+        if ($background !== null) {
+            require_once __DIR__ . '/ImageIntake.php';
+            $dpi = ImageIntake::printDpi((int) $background['width'], (int) $background['height'], $paperWidthIn, $paperHeightIn);
+            if ($dpi > 0 && $dpi < 150) {
+                $printNotes[] = 'The background picture gives about ' . $dpi . ' dpi at this paper size, so it may print soft. '
+                    . 'A larger picture (' . (int) ceil($paperWidthIn * 150) . ' × ' . (int) ceil($paperHeightIn * 150) . ' pixels or more) will print sharp.';
+            }
+        }
+
         // The member-type key, for layouts that print birthdays at all.
         $legendRows = [];
         $legendNeutral = false;
