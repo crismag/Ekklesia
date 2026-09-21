@@ -50,7 +50,7 @@ Administrators can share a publication with everyone. Anyone may open a shared o
 - **Ministry & leadership** — who is serving, and the leadership diary.
 - **Clear** unticks everything so you can build a sheet from scratch.
 
-Below the presets, tick the calendars you want. Ticking nothing prints an empty sheet, and the studio says so rather than quietly printing everything.
+Below the presets, tick the calendars you want. A new calendar starts with nothing ticked, so what goes on the sheet is always your choice; a saved publication, or **Print this view** from the calendar, brings its own selection. With nothing ticked the sheet is empty, and the studio says so.
 
 **Birthdays.** A celebrant is printed by the name they go by: their preferred name, or their first name when there is none. Choose **with a last initial** when two people with the same name share a day. **Ages are never printed**, on any layout.
 

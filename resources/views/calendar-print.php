@@ -1025,7 +1025,7 @@ ob_start();
       var n = boxes.filter(function(b){ return b.checked; }).length;
       // An empty selection prints an empty calendar, which looks like a fault
       // rather than a choice. Say which it is.
-      note.textContent = n === 0 ? 'Nothing selected — the sheet will be empty.'
+      note.textContent = n === 0 ? 'Nothing selected yet: tick the calendars to print, or choose a preset.'
         : n + (n === 1 ? ' calendar selected.' : ' calendars selected.');
     }
   }
@@ -1174,9 +1174,9 @@ ob_start();
     printSheet();
   });
 
-  // Start from the saved view if one was opened; otherwise from the first
-  // normal choice, and remember whatever the reader last used.
-  var SOURCES_KEY = 'church_portal_print_sources_v1';
+  // Start from the saved view if one was opened, or from the calendar's
+  // "Print this view". Otherwise every calendar starts unticked: what goes on
+  // the sheet is always the reader's choice, never a leftover from last time.
   write(INITIAL);
   var qs = new URLSearchParams(location.search);
   var fromCalendar = !saved && (qs.get('sources') || qs.get('dateMode') || qs.get('start'));
@@ -1190,18 +1190,9 @@ ob_start();
     merged.content.sources = (qs.get('sources') || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
     write(merged);
     savedConfig = JSON.stringify(read());
-  } else if (!saved && INITIAL.content.sources.length === 0) {
-    var restored = null;
-    try { restored = localStorage.getItem(SOURCES_KEY); } catch (e) {}
-    var want = (restored !== null ? restored
-      : (presetButtons.length ? presetButtons[0].dataset.sources || '' : '')).split(',').filter(Boolean);
-    boxes.forEach(function(b){ b.checked = want.indexOf(b.value) !== -1; });
-    savedConfig = JSON.stringify(read());
   }
-  form.addEventListener('change', function(e){
-    if (e.target.name !== 'source') return;
-    try { localStorage.setItem(SOURCES_KEY, currentSources()); } catch (err) {}
-  });
+  // The selection used to be remembered per browser; drop what is stored.
+  try { localStorage.removeItem('church_portal_print_sources_v1'); } catch (e) {}
 
   markPresets();
   syncTheme(INITIAL.appearance.artwork);
