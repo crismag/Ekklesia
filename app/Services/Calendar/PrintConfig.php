@@ -103,6 +103,9 @@ final class PrintConfig
         $names = self::LEGACY_NAME_STYLES[$names] ?? $names;
         $appearance['names'] = in_array($names, self::NAME_STYLES, true) ? $names : 'first';
         $appearance['legend'] = (bool) ($appearance['legend'] ?? true);
+        // How a member type is marked on a name: highlighted, or coloured text.
+        $appearance['memberMark'] = in_array($appearance['memberMark'] ?? '', MemberTypeStyle::MARKS, true)
+            ? (string) $appearance['memberMark'] : 'highlight';
         $appearance['density'] = in_array($appearance['density'], self::DENSITIES, true) ? $appearance['density'] : 'standard';
         $appearance['titleStyle'] = in_array($appearance['titleStyle'], self::TITLE_STYLES, true)
             ? $appearance['titleStyle'] : 'classic';
@@ -221,6 +224,7 @@ final class PrintConfig
                 'names' => 'first',
                 // The member-type key under a sheet that has birthdays on it.
                 'legend' => true,
+                'memberMark' => 'highlight',
                 'density' => 'standard',
                 'titleStyle' => 'classic',
                 'accent' => '',
@@ -358,6 +362,7 @@ final class PrintConfig
                 'font' => $q['font'] ?? 'serif',
                 'names' => $q['names'] ?? $d['appearance']['names'],
                 'legend' => $bool('legend', true),
+                'memberMark' => $q['mark'] ?? 'highlight',
                 'density' => $q['density'] ?? 'standard',
                 'titleStyle' => $q['titleStyle'] ?? 'classic',
                 'accent' => $q['accent'] ?? '',
@@ -435,7 +440,7 @@ final class PrintConfig
             'names' => 'appearance.names', 'density' => 'appearance.density',
             'titleStyle' => 'appearance.titleStyle', 'accent' => 'appearance.accent',
             'theme' => 'appearance.theme', 'entry' => 'appearance.entryDisplay',
-            'artwork' => 'appearance.artwork', 'decor' => 'appearance.decoration',
+            'artwork' => 'appearance.artwork', 'decor' => 'appearance.decoration', 'mark' => 'appearance.memberMark',
         ] as $param => $path) {
             $value = $this->get($path);
             [$section, $key] = explode('.', $path, 2);

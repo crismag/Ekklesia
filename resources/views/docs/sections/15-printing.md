@@ -64,14 +64,14 @@ Below the presets, tick the calendars you want. A new calendar starts with nothi
 
 **Birthdays.** A celebrant is printed by the name they go by: their preferred name, or their first name when there is none. Choose **with a last initial** when two people with the same name share a day. **Ages are never printed**, on any layout.
 
-Each celebrant is marked with their member type — a colour and a symbol beside the name:
+Each celebrant's name is marked with their member type, using colour on the name itself so a busy day loses no room:
 
-- **G&A** — sky blue, an arrow
-- **Trailblazer** — green, a pennant
-- **Radical** — orange, a seedling
-- No member type recorded — a grey mark and no symbol
+- **G&A**: sky blue
+- **Trailblazer**: green
+- **Radical**: orange
+- No member type recorded: printed plainly, with a grey rule beside it
 
-The symbols are what tell the types apart on a black-and-white printer. **Print the member-type key** adds a one-line key under the calendar; it lists only the types that appear on the sheet.
+**Show member types by** chooses how: **Highlighting the name** (the default) puts the name on a light tint of its colour, with the writing kept dark; **Colouring the name** prints the name itself in a deeper shade of its colour. Colour is the only marker, so on a black-and-white printer the three types look the same. **Print the member-type key** adds a one-line key under the calendar; it lists only the types that appear on the sheet.
 
 **How much room entries get** decides the writing inside each day:
 
@@ -123,7 +123,7 @@ Choosing any other card sets the theme by hand for the whole sheet. The line und
 - **Hearth** — warm and welcoming for a noticeboard: a light header band, fine rules and a small sprig in the corner.
 - **Economy** — the least ink: black hairlines, no fills, no decoration. *Low ink.*
 
-Member types keep their colours and symbols in every theme, the monthly ones included.
+Member types keep their colours in every theme, the monthly ones included.
 
 Under the cards: **Accent** colour, **Decoration** (only for themes that carry artwork), and **Ink friendly**, which drops page fills and decoration from whichever theme you chose.
 

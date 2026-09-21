@@ -21,6 +21,7 @@ declare(strict_types=1);
 $root = dirname(__DIR__, 2);
 require_once $root . '/app/Services/Calendar/RichText.php';
 require_once $root . '/app/Services/Calendar/CalendarTheme.php';
+require_once $root . '/app/Services/Calendar/MemberTypeStyle.php';
 require_once $root . '/app/Services/Calendar/PrintConfig.php';
 
 use App\Services\Calendar\PrintConfig;

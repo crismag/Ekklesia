@@ -191,6 +191,12 @@ ob_start();
             <option value="initial">The name they go by, with a last initial</option>
           </select>
           <span class="pc-hint">Their preferred name, or first name when there is none. Ages are never printed.</span></div>
+        <div class="pc-field"><label for="pcMark">Show member types by</label>
+          <select id="pcMark">
+            <option value="highlight">Highlighting the name</option>
+            <option value="text">Colouring the name</option>
+          </select>
+          <span class="pc-hint">G&amp;A sky blue, Trailblazer green, Radical orange. No extra marks take room in a busy day.</span></div>
         <label class="pc-check"><input type="checkbox" id="pcLegend" checked><span>Print the member-type key</span></label>
 
         <h3 class="pc-lab" id="pcEntryLab">How much room entries get</h3>
@@ -432,7 +438,7 @@ ob_start();
             </div>
           </div>
         </section>
-        <p class="pc-hint">Member types keep their colours in every theme: G&amp;A sky blue, Trailblazer green, Radical orange, each with its own symbol.</p>
+        <p class="pc-hint">Member types keep their colours in every theme: G&amp;A sky blue, Trailblazer green, Radical orange.</p>
       </div>
     </aside>
 
@@ -737,7 +743,7 @@ ob_start();
         accent: $('pcAccent').value, theme: pick('theme') || 'classic',
         entryDisplay: pick('entry') || 'auto',
         artwork: $('pcArtwork').value || 'none', decoration: $('pcDecor').value,
-        inkFriendly: $('pcInk').checked, legend: $('pcLegend').checked,
+        inkFriendly: $('pcInk').checked, legend: $('pcLegend').checked, memberMark: $('pcMark').value,
       },
       header: {
         show: { church: $('hChurch').checked, location: $('hLocation').checked,
@@ -788,6 +794,7 @@ ob_start();
     pendingBg = bg.mode === 'image' ? (bg.id || 0) : 0;
     if (typeof selectBackground === 'function') selectBackground(pendingBg);
     $('pcLegend').checked = a.legend !== false;
+    $('pcMark').value = a.memberMark === 'text' ? 'text' : 'highlight';
     $('pcScale').value = String(a.typeScale || 1);
     $('pcFont').value = a.font || 'serif';
     $('pcNames').value = a.names === 'initial' || a.names === 'short' ? 'initial' : 'first';
@@ -828,7 +835,8 @@ ob_start();
      ['names', c.appearance.names, D.appearance.names], ['density', c.appearance.density, D.appearance.density],
      ['titleStyle', c.appearance.titleStyle, D.appearance.titleStyle], ['accent', c.appearance.accent, D.appearance.accent],
      ['theme', c.appearance.theme, D.appearance.theme], ['entry', c.appearance.entryDisplay, D.appearance.entryDisplay],
-     ['artwork', c.appearance.artwork, D.appearance.artwork], ['decor', c.appearance.decoration, D.appearance.decoration]
+     ['artwork', c.appearance.artwork, D.appearance.artwork], ['decor', c.appearance.decoration, D.appearance.decoration],
+     ['mark', c.appearance.memberMark, D.appearance.memberMark]
     ].forEach(function(row){ if (String(row[1]) !== String(row[2])) p.set(row[0], String(row[1])); });
     if (c.appearance.inkFriendly) p.set('ink', '1');
     if (!c.appearance.legend) p.set('legend', '0');

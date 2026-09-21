@@ -4,47 +4,43 @@ declare(strict_types=1);
 
 namespace App\Services\Calendar;
 
-use App\Services\MemberTypeIcons;
-
 /**
  * How a celebrant's member type is marked on a printed calendar.
  *
- * One colour per type, fixed across every theme so it keeps its meaning:
- * G&A sky blue, Trailblazer green, Radical orange. Colour is never the only
- * mark. Each type also prints the symbol the people directory already uses
- * (MemberTypeIcons), so the types stay apart on a greyscale printer and for a
- * reader who does not see the colours. A type that is not one of the three,
- * or no type at all, gets a neutral rule and no symbol rather than a guess.
+ * By colour on the name itself, never by an extra mark beside it: a busy day
+ * has no room to spare. Each type has one hue, fixed across every theme so it
+ * keeps its meaning — G&A sky blue, Trailblazer green, Radical orange — used
+ * in one of two ways the reader chooses:
  *
- * The colours are only ever used on the rule beside a name and on the symbol,
- * never on the name itself, which stays in the sheet's ink for contrast.
+ *   highlight  the name on a light tint of its hue, in the sheet's ink
+ *              (the default: the hue is shown true and the text stays dark)
+ *   text       the name itself in a deeper shade of its hue, dark enough to
+ *              read as small text
+ *
+ * The coloured rule beside each entry uses the hue at full strength. A type
+ * that is not one of the three, or none, is printed plainly with a grey rule.
+ * Colour is the only marker, by the church's choice: on a black-and-white
+ * printer the three types are not distinguishable.
  */
 final class MemberTypeStyle
 {
     /**
      * The three groups, in the order the legend lists them.
      *
-     * `label` is used only when the database gives no name; the legend prints
-     * the member type as Ekklesia stores it. The colours are checked in
-     * tests/Regression against white for a 3:1 non-text contrast.
+     * `color` is the hue (rule, swatch border), `tint` the highlight behind a
+     * name, `ink` the name's colour in text mode. `label` is used only when the
+     * database gives no name. Contrast is checked in tests/Regression.
      */
     public const GROUPS = [
-        'gna' => ['label' => 'G&A', 'color' => '#2b87d1'],
-        'trailblazer' => ['label' => 'Trailblazer', 'color' => '#2f8a4a'],
-        'radical' => ['label' => 'Radical', 'color' => '#cf6a12'],
+        'gna' => ['label' => 'G&A', 'color' => '#2b87d1', 'tint' => '#d3e9fa', 'ink' => '#1b64a0'],
+        'trailblazer' => ['label' => 'Trailblazer', 'color' => '#2f8a4a', 'tint' => '#d5eedb', 'ink' => '#236b38'],
+        'radical' => ['label' => 'Radical', 'color' => '#cf6a12', 'tint' => '#fde0c4', 'ink' => '#a14d06'],
     ];
 
+    /** How a member type is marked on a name. */
+    public const MARKS = ['highlight', 'text'];
+
     public const NEUTRAL = '#8b9590';
-
-    public function __construct(private readonly ?MemberTypeIcons $icons = null)
-    {
-    }
-
-    /** Built from the directory's own symbol configuration. */
-    public static function fromConfig(string $configPath): self
-    {
-        return new self(MemberTypeIcons::fromFile($configPath));
-    }
 
     /**
      * Which group a stored member type belongs to, or null.
@@ -67,26 +63,17 @@ final class MemberTypeStyle
         };
     }
 
-    /** The symbol for a stored member type, as inline SVG, or '' for none. */
-    public function symbol(string $memberType): string
-    {
-        if ($this->icons === null || self::group($memberType) === null) {
-            return '';
-        }
-        $symbol = $this->icons->symbolFor($memberType);
-
-        return $symbol === null ? '' : $this->icons->svg($symbol);
-    }
-
     /**
      * The one place the colours become CSS: custom properties on the sheet.
-     * A theme may paint behind a name, never redefine these.
+     * A theme may paint around a name, never redefine these.
      */
     public static function cssVars(): string
     {
         $vars = [];
         foreach (self::GROUPS as $id => $g) {
             $vars[] = '--mt-' . $id . ':' . $g['color'];
+            $vars[] = '--mt-' . $id . '-tint:' . $g['tint'];
+            $vars[] = '--mt-' . $id . '-ink:' . $g['ink'];
         }
         $vars[] = '--mt-none:' . self::NEUTRAL;
 
@@ -98,7 +85,7 @@ final class MemberTypeStyle
      * as the database names it.
      *
      * @param list<string> $memberTypes every member type printed on the sheet
-     * @return list<array{group:string,label:string,symbol:string}>
+     * @return list<array{group:string,label:string}>
      */
     public function legend(array $memberTypes): array
     {
@@ -114,7 +101,7 @@ final class MemberTypeStyle
             if (!isset($seen[$id])) {
                 continue;
             }
-            $rows[] = ['group' => $id, 'label' => trim($seen[$id]) ?: $g['label'], 'symbol' => $this->symbol($seen[$id])];
+            $rows[] = ['group' => $id, 'label' => trim($seen[$id]) ?: $g['label']];
         }
 
         return $rows;

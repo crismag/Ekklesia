@@ -2783,6 +2783,7 @@ $webRoutes = [
             'editable' => (string) ($req['edit'] ?? '') === '1',
             'pageHeight' => $config->get('page.height'),
             'legend' => $config->get('appearance.legend'),
+            'memberMark' => $config->get('appearance.memberMark'),
             'church' => (string) ($church['name'] ?? 'Church Portal'),
             'subtitle' => $campusName,
             'website' => (string) ($church['website'] ?? ''),

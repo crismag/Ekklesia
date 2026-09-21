@@ -33,13 +33,11 @@ ob_start(); ?>
 <?php
   // Birthdays print the name the celebrant goes by, with no age
   // (EntryPresentation::celebrant); everything else prints its title.
-  $label = static function (array $entry) use ($e, $nameStyle, $memberTypes): string {
+  $label = static function (array $entry) use ($e, $nameStyle): string {
       if (($entry['kind'] ?? '') !== 'birth') {
           return $e($entry['title']);
       }
-      $type = (string) ($entry['person']['memberType'] ?? '');
-      return (isset($memberTypes) ? $memberTypes->symbol($type) : '')
-          . $e(\App\Services\Calendar\EntryPresentation::celebrant($entry, ($nameStyle ?? 'full') === 'short'));
+      return $e(\App\Services\Calendar\EntryPresentation::celebrant($entry, ($nameStyle ?? 'full') === 'short'));
   };
   $mtClass = static function (array $entry): string {
       if (($entry['kind'] ?? '') !== 'birth') {
@@ -59,7 +57,7 @@ ob_start(); ?>
       <?php foreach ($day['entries'] as $entry): ?>
         <tr class="<?= $first ? 'newday' : '' ?>">
           <td class="c-date"><?php if ($first): ?><?= $e($day['month_short']) ?> <?= (int) $day['day'] ?><span class="dow"><?= $e($day['weekday_short']) ?></span><?php endif; ?></td>
-          <td class="<?= trim($mtClass($entry)) ?>"><span class="tag" style="background:<?= $e($colors[$entry['source']] ?? '#9aa7a0') ?>"></span><?= $label($entry) ?></td>
+          <td class="<?= trim($mtClass($entry)) ?>"><span class="tag" style="background:<?= $e($colors[$entry['source']] ?? '#9aa7a0') ?>"></span><span class="t"><?= $label($entry) ?></span></td>
           <td class="c-when"><?= $entry['all_day'] ? '—' : $e($entry['time']) . ($entry['end_time'] ? '–' . $e($entry['end_time']) : '') ?></td>
           <td class="c-where"><?= $e($entry['location'] !== '' ? $entry['location'] : $entry['meta']) ?></td>
           <td class="c-note"></td>

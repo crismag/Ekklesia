@@ -55,14 +55,24 @@ $lum = static function (string $hex): float {
     $c = array_map(static fn (float $v): float => $v <= 0.03928 ? $v / 12.92 : (($v + 0.055) / 1.055) ** 2.4, $c);
     return 0.2126 * $c[0] + 0.7152 * $c[1] + 0.0722 * $c[2];
 };
+$contrast = static function (string $x, string $y) use ($lum): float {
+    [$a, $b] = [$lum($x), $lum($y)];
+    return (max($a, $b) + 0.05) / (min($a, $b) + 0.05);
+};
 foreach (MemberTypeStyle::GROUPS as $id => $g) {
-    check("the $id colour has at least 3:1 contrast on white", (1.05) / ($lum($g['color']) + 0.05) >= 3.0);
+    check("the $id rule colour has at least 3:1 contrast on white", (1.05) / ($lum($g['color']) + 0.05) >= 3.0);
 }
-$styles = MemberTypeStyle::fromConfig($root . '/config/member-type-icons.json');
-check('each of the three types has its own symbol, so greyscale still tells them apart',
-    count(array_unique([$styles->symbol('G&A'), $styles->symbol('Trailblazer'), $styles->symbol('Radical')])) === 3
-    && $styles->symbol('G&A') !== '');
-check('an unknown type gets no symbol', $styles->symbol('Seniors') === '');
+foreach (MemberTypeStyle::GROUPS as $id => $g) {
+    // Highlight: the name stays in the sheet's ink on a light tint of the hue.
+    check("the $id highlight keeps the name readable (ink on tint, 7:1)", $contrast('#16211c', $g['tint']) >= 7.0);
+    // Text mode: the name itself in a deeper shade, readable as small text.
+    check("the $id coloured name reads as small text (4.5:1 on white)", $contrast($g['ink'], '#ffffff') >= 4.5);
+}
+check('member types are marked on the name, with no symbol or icon anywhere',
+    !method_exists(MemberTypeStyle::class, 'symbol')
+    && !str_contains((string) file_get_contents($root . '/resources/views/print/monthly.php'), 'symbol(')
+    && !str_contains((string) file_get_contents($root . '/resources/views/print/weekly.php'), 'symbol('));
+$styles = new MemberTypeStyle();
 $legend = $styles->legend(['Radical', 'G&A', 'Radical', 'Seniors']);
 check('the legend lists only the types on the sheet, in a fixed order, named as stored',
     array_column($legend, 'group') === ['gna', 'radical'] && $legend[0]['label'] === 'G&A');
@@ -119,6 +129,8 @@ foreach (['grow' => $grow, 'fit' => $fit] as $mode => $html) {
         && !preg_match('/class="w">[\s(]*\d{1,3}[\s)]*</', $html));
 }
 check('member types are marked by class', str_contains($grow, 'mt-radical') && str_contains($grow, 'mt-gna') && str_contains($grow, 'mt-trailblazer'));
+check('names are highlighted by default', str_contains($grow, ' mark-highlight"') || str_contains($grow, 'mark-highlight '));
+check('or coloured, when chosen', str_contains($composer->render($items, $start, $end, $base + ['memberMark' => 'text']), 'mark-text'));
 check('a birthday with no type gets the neutral mark only', preg_match('/k-birth"[^>]*>\s*<span class="t">Vangie/', $grow) === 1);
 check('the key is printed under a sheet with birthdays', str_contains($grow, 'class="legend"') && str_contains($grow, 'Not recorded'));
 check('and can be left off',
