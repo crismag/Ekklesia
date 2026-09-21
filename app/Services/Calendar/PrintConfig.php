@@ -114,11 +114,16 @@ final class PrintConfig
         // Classic rather than rendering a design nobody drew.
         // "auto" follows the printed month (CalendarTheme::resolve). A theme id
         // that no longer exists falls back to Classic rather than failing.
+        // "pptx:ID" is an uploaded PowerPoint theme, pinned to a version so a
+        // saved design keeps looking as it did when the theme is replaced.
+        $isPptx = preg_match('/^pptx:\d+$/', (string) ($appearance['theme'] ?? '')) === 1;
         $appearance['theme'] = CalendarTheme::exists((string) ($appearance['theme'] ?? ''))
-            || ($appearance['theme'] ?? '') === CalendarTheme::AUTO
+            || ($appearance['theme'] ?? '') === CalendarTheme::AUTO || $isPptx
             ? (string) $appearance['theme'] : CalendarTheme::DEFAULT;
+        $appearance['themeVersion'] = $isPptx ? max(0, (int) ($appearance['themeVersion'] ?? 0)) : 0;
         $layoutId = self::text($input['layout'] ?? $d['layout'], 40) ?: $d['layout'];
-        if (!CalendarTheme::supports($appearance['theme'], $layoutId)) {
+        if (!$isPptx && !CalendarTheme::supports($appearance['theme'], $layoutId)
+            || $isPptx && !in_array($layoutId, ['monthly', 'weekly'], true)) {
             $appearance['theme'] = CalendarTheme::DEFAULT;
         }
         $appearance['entryDisplay'] = in_array($appearance['entryDisplay'], self::ENTRY_DISPLAYS, true)
@@ -228,6 +233,7 @@ final class PrintConfig
                 // The member-type key under a sheet that has birthdays on it.
                 'legend' => true,
                 'memberMark' => 'highlight',
+                'themeVersion' => 0,
                 'density' => 'standard',
                 'titleStyle' => 'classic',
                 'accent' => '',
@@ -366,6 +372,7 @@ final class PrintConfig
                 'names' => $q['names'] ?? $d['appearance']['names'],
                 'legend' => $bool('legend', true),
                 'memberMark' => $q['mark'] ?? 'highlight',
+                'themeVersion' => (int) ($q['themeV'] ?? 0),
                 'density' => $q['density'] ?? 'standard',
                 'titleStyle' => $q['titleStyle'] ?? 'classic',
                 'accent' => $q['accent'] ?? '',
@@ -444,6 +451,7 @@ final class PrintConfig
             'titleStyle' => 'appearance.titleStyle', 'accent' => 'appearance.accent',
             'theme' => 'appearance.theme', 'entry' => 'appearance.entryDisplay',
             'artwork' => 'appearance.artwork', 'decor' => 'appearance.decoration', 'mark' => 'appearance.memberMark',
+            'themeV' => 'appearance.themeVersion',
         ] as $param => $path) {
             $value = $this->get($path);
             [$section, $key] = explode('.', $path, 2);

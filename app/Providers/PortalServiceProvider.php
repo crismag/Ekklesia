@@ -124,6 +124,25 @@ final class PortalServiceProvider
         );
     }
 
+    public static function makePrintThemeService(): \App\Services\Calendar\PrintThemeService
+    {
+        EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');
+
+        return new \App\Services\Calendar\PrintThemeService(
+            new \App\Adapters\Sql\SqlPrintThemeAdapter(),
+            (new \App\Services\PrivateArchiveStore())->root() . '/print-assets/themes',
+        );
+    }
+
+    public static function makePrintThemeController(): \App\Http\Controllers\Api\PrintThemeController
+    {
+        return new \App\Http\Controllers\Api\PrintThemeController(
+            self::makePrintThemeService(),
+            self::makeRequestContext(),
+            dirname(__DIR__, 2) . '/resources/print/starters',
+        );
+    }
+
     public static function makeSavedViewService(): \App\Services\Calendar\SavedViewService
     {
         EnvLoader::loadOnce(dirname(__DIR__, 2) . '/.env');

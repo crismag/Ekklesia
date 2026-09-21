@@ -573,6 +573,43 @@ CREATE TABLE print_backgrounds (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
+-- Print studio: PowerPoint themes (migration 004)
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE print_themes (
+  id               INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  account_id       INT UNSIGNED NOT NULL,
+  name             VARCHAR(120) NOT NULL,
+  scope            ENUM('private','church') NOT NULL DEFAULT 'private',
+  status           ENUM('active','archived') NOT NULL DEFAULT 'active',
+  current_version  SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY ix_print_themes_account (account_id),
+  CONSTRAINT fk_print_themes_account FOREIGN KEY (account_id) REFERENCES user_accounts (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE print_theme_versions (
+  id             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  theme_id       INT UNSIGNED NOT NULL,
+  version        SMALLINT UNSIGNED NOT NULL,
+  original_name  VARCHAR(190) NULL,
+  bytes          INT UNSIGNED NOT NULL,
+  sha256         CHAR(64) NOT NULL,
+  paper          VARCHAR(20) NOT NULL,
+  orientation    ENUM('portrait','landscape') NOT NULL,
+  model          MEDIUMTEXT NOT NULL,
+  warnings       TEXT NULL,
+  created_by     INT UNSIGNED NULL,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_print_theme_versions (theme_id, version),
+  CONSTRAINT fk_print_theme_versions_theme FOREIGN KEY (theme_id) REFERENCES print_themes (id) ON DELETE CASCADE,
+  CONSTRAINT fk_print_theme_versions_account FOREIGN KEY (created_by) REFERENCES user_accounts (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
 -- Member spreadsheet import (the church's Excel format), and history
 -- -----------------------------------------------------------------------------
 

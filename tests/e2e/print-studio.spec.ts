@@ -154,6 +154,18 @@ test.describe('print studio', () => {
     }
   });
 
+  test('a PowerPoint theme can be uploaded and chosen; a macro file is refused', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/calendar/print-setup?' + MONTH);
+    await expect(page.locator('#pcStarters a')).toHaveCount(4);
+    await page.fill('#pcPptxName', 'E2E harvest ' + Date.now());
+    await page.setInputFiles('#pcPptxFile', __dirname + '/../fixtures/print-theme-example.pptx');
+    await expect(page.locator('#pcPptxStatus')).toContainText('Added');
+    await expect(page.locator('#pcFrame')).toHaveAttribute('src', /theme=pptx%3A\d+&themeV=\d+/);
+    await page.setInputFiles('#pcPptxFile', { name: 'theme.pptm', mimeType: 'application/octet-stream', buffer: Buffer.from('PK') });
+    await expect(page.locator('#pcPptxStatus')).toContainText('Macro-enabled');
+  });
+
   test('printing the studio page prints no controls', async ({ page }) => {
     await page.goto('/calendar/print-setup?' + MONTH);
     await page.emulateMedia({ media: 'print' });

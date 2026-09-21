@@ -127,6 +127,25 @@ Member types keep their colours in every theme, the monthly ones included.
 
 Under the cards: **Accent** colour, **Decoration** (only for themes that carry artwork), and **Ink friendly**, which drops page fills and decoration from whichever theme you chose.
 
+## PowerPoint themes
+
+A church can design its own calendar in PowerPoint, and Ekklesia fills it with the real calendar every month.
+
+1. In the Theme panel, open **Download a theme starter** and pick the paper: Letter portrait, A4 portrait, Letter landscape or Tabloid.
+2. In PowerPoint, decorate **slide 1**: colours, a background picture, shapes, borders, seasonal artwork, a verse. The **dashed blue boxes** are where Ekklesia writes (the title, the month, the calendar grid, and optionally a line under the title, the member-type key and the footer). Move and resize them to suit the design, but keep their names; *Home ▸ Arrange ▸ Selection Pane* shows them. Keep the calendar area plain or very light.
+3. Save it as **.pptx** and upload it under **PowerPoint themes**, with a name. Ekklesia checks it straight away and says if anything was left out (see below).
+4. Choose its card. The preview shows your design with this month's calendar on it; print or save a PDF as usual.
+
+Who can do what: anyone signed in can choose a theme they can see. People who manage events (and administrators) can upload, replace and retire themes. A new theme is private to whoever uploaded it; an administrator can **Share with the church**.
+
+**What PowerPoint content is used.** Background colours and pictures, pictures, rectangles, rounded rectangles, ovals, outlines, rotation, and text boxes. Left out, with a note: charts, tables, SmartArt, video and sound, freeform drawings, gradients (printed as one colour), picture effects and 3D. Fonts that are not available everywhere print in a similar standard font, and the note names them.
+
+**What is refused.** Macro-enabled files (.pptm), password-protected files, files with embedded objects, linked (not inserted) pictures, a slide size other than the starters', and designs whose calendar area is too small or overlapped by the title. Files are checked, never opened by another program, and their pictures are re-saved.
+
+**Versions.** **Upload a new version** replaces the design for new calendars. A publication saved with the old version keeps it, and its preview mentions that a newer one exists; choose the theme again to use it. **Retire theme** removes it from the gallery; calendars saved with it then print in Classic, with a note.
+
+A PowerPoint theme sets the page: its paper and direction replace the Paper setting. The design prints edge to edge on the first sheet, so keep important artwork inside the starter's red dotted margin. If a month runs onto a second sheet, that sheet carries the calendar without the artwork.
+
 ## Background picture
 
 Under the themes, **Background picture** puts a photo or artwork behind the calendar. It works with any theme: the theme still draws the grid and the writing.

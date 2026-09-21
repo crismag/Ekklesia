@@ -31,7 +31,12 @@ $size = $paperW . 'in ' . $paperH . 'in';
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= $e($title) ?></title>
 <style>
+<?php if (!empty($pptx)): ?>
+  @page { size: <?= $size ?>; margin: 0.45in 0; }
+  @page :first { margin: 0; }
+<?php else: ?>
   @page { size: <?= $size ?>; margin: 12mm; }
+<?php endif; ?>
 
   /* Point sizes, not pixels: this is going on paper, where a point is a real
      unit and a pixel is a guess about somebody's screen. */
@@ -202,6 +207,29 @@ $size = $paperW . 'in ' . $paperH . 'in';
   .print-note { margin: 0 0 8pt; padding: 6pt 8pt; border: 1pt solid #c98a2b; background: #fff7e8;
     color: #5a3d00; font: 9pt/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; border-radius: 3pt; }
 
+  /* A PowerPoint theme. The design fills the page edge to edge on the first
+     sheet (it has its own margins); the writing sits in its regions; the grid
+     cells carry a light wash so names read over artwork. A month that runs on
+     continues on plain sheets with the weekday row repeated. */
+  .theme-pptx { padding: 0 !important; position: relative; }
+  .theme-pptx .pptx-art, .theme-pptx .pptx-art .pa-bg { position: absolute; inset: 0; overflow: hidden; }
+  .theme-pptx .pptx-art .pa-bg { z-index: 0; }
+  .theme-pptx .pa-el { position: absolute; z-index: 1; background-repeat: no-repeat; }
+  .theme-pptx .pa-el p { margin: 0; line-height: 1.15; }
+  .theme-pptx .rg { position: absolute; z-index: 2; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+  .theme-pptx .rg-flow { position: relative; z-index: 2; }
+  .theme-pptx .rg-title .doc-title { margin: 0; font-size: var(--title-pt, 30pt); color: var(--th-heading); line-height: 1.05; }
+  .theme-pptx .rg-title .church { color: var(--th-accent); }
+  .theme-pptx .rg-month .period { font-size: var(--month-pt, 20pt); color: var(--th-heading); text-align: left; white-space: normal; }
+  .theme-pptx .rg-legend .legend, .theme-pptx .rg-footer .colophon { margin: 0; border-top: 0; padding: 0; }
+  .theme-pptx .cal td { background: rgba(255,255,255,.9); border-color: var(--th-grid); }
+  .theme-pptx .cal td.wknd, .theme-pptx .cal td.out { background: rgba(250,250,248,.9); }
+  .theme-pptx .cal th { color: var(--th-heading); border-bottom-color: var(--th-accent); background: rgba(255,255,255,.85); }
+  .theme-pptx .wk-day { background: rgba(255,255,255,.9); }
+  .theme-pptx .num { color: var(--th-heading); }
+  .theme-pptx .print-note { position: relative; z-index: 3; }
+  @media print { .theme-pptx { width: auto !important; } }
+
   /* The theme's own sheet, last so it can override the base without either
      side resorting to !important. Classic contributes nothing here: it *is*
      the base, which is what makes it impossible for a new theme to regress it. */
@@ -229,50 +257,35 @@ $size = $paperW . 'in ' . $paperH . 'in';
   // The title: the reader's own, else the one worked out from what is on the
   // sheet (PrintComposer::docTitle).
   $periodNote = $customTitle !== '' ? $customTitle : (string) ($docTitle ?? ($branding['period_note'] ?? ''));
+  // A PowerPoint theme's palette, as the same --th-* tokens a built-in theme sets.
+  $pptxTokens = '';
+  if (!empty($pptx)) {
+      foreach ((array) ($pptx['model']['palette'] ?? []) as $name => $hex) {
+          if (preg_match('/^#[0-9a-f]{6}$/i', (string) $hex) === 1 && preg_match('/^[a-z]+$/', (string) $name) === 1) {
+              $pptxTokens .= '--th-' . $name . ':' . $hex . ';';
+          }
+      }
+      // The first sheet is the whole page, so the artwork reaches its foot even
+      // when the calendar ends higher up. A hair short of the page, so rounding
+      // never adds a blank second sheet.
+      $pptxTokens .= sprintf('width:%.3fin;min-height:%.3fin', $pptx['model']['page']['w'], $pptx['model']['page']['h'] - 0.04);
+  }
 ?>
-<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?><?= !empty($background) ? ' has-bg' : '' ?> mark-<?= $e($memberMark ?? 'highlight') ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
-  <?php foreach (($printNotes ?? []) as $note): ?>
+<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?><?= !empty($background) ? ' has-bg' : '' ?> mark-<?= $e($memberMark ?? 'highlight') ?><?= !empty($pptx) ? ' theme-pptx' : '' ?>" style="<?= $e(!empty($pptx) ? $pptxTokens : \App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
+  <?php if (empty($pptx)): foreach (($printNotes ?? []) as $note): ?>
     <p class="print-note no-print" role="status"><?= $e($note) ?></p>
-  <?php endforeach; ?>
+  <?php endforeach; endif; ?>
   <?php if (!empty($background)):
     $bgPos = ['left' => '0%', 'center' => '50%', 'right' => '100%'][$background['x']] ?? '50%';
     $bgPos .= ' ' . (['top' => '0%', 'center' => '50%', 'bottom' => '100%'][$background['y']] ?? '50%'); ?>
     <div class="bg-layer" aria-hidden="true" style="background-image:url('<?= $e($background['url']) ?>');--bg-fit:<?= $background['fit'] === 'contain' ? 'contain' : 'cover' ?>;--bg-pos:<?= $e($bgPos) ?>;--bg-o:<?= $e(number_format((float) $background['opacity'], 2)) ?>"></div>
     <div class="bg-wash" aria-hidden="true" style="--bg-wash:<?= $e(number_format((float) $background['overlay'], 2)) ?>"></div>
   <?php endif; ?>
-  <div class="sheet-body">
-  <header class="masthead">
-    <div class="masthead-row">
-      <div class="mh-main">
-        <?php
-          $kicker = [];
-          if ($show['church']) { $kicker[] = (string) $branding['church']; }
-          if ($show['location'] && ($branding['subtitle'] ?? '') !== '') { $kicker[] = (string) $branding['subtitle']; }
-        ?>
-        <?php if ($kicker !== []): ?>
-          <div class="church"><?= implode('<span class="sep" aria-hidden="true">·</span>', array_map($e, $kicker)) ?></div>
-        <?php endif; ?>
-        <?php if ($show['docType'] && $periodNote !== ''): ?>
-          <h1 class="doc-title"<?= !empty($editable) ? ' data-edit="title" data-placeholder="Calendar title"' : '' ?>><?= $e($periodNote) ?></h1>
-        <?php endif; ?>
-        <?php if ($customSubtitle !== '' || !empty($editable)): ?>
-          <div class="subtitle subtitle-custom"<?= !empty($editable) ? ' data-edit="subtitle" data-placeholder="Line under the title (optional)"' : '' ?>><?= $e($customSubtitle) ?></div>
-        <?php endif; ?>
-      </div>
-      <?php if ($show['period']): ?>
-      <div class="period"><?= $e($branding['period']) ?></div>
-      <?php endif; ?>
-    </div>
-  </header>
-
-  <?php // Rendered only when it has something to say. ?>
-  <?php if ($topHtml !== '' || !empty($editable)): ?>
-    <section class="doc-info doc-info--top"<?= !empty($editable) ? ' data-edit="top" data-rich="1" data-placeholder="Note above the calendar (optional)"' : '' ?>><?= $topHtml ?></section>
-  <?php endif; ?>
-
-  <?= $body ?>
-
-  <?php if (($legendRows ?? []) !== []): ?>
+<?php
+    // The key and the footer are rendered once and placed below: in the page's
+    // flow, or in a PowerPoint theme's LEGEND and FOOTER regions.
+    ob_start();
+    if (($legendRows ?? []) !== []): ?>
     <div class="legend" aria-label="Member types">
       <span class="legend-title">Member type</span>
       <?php foreach ($legendRows as $row): ?>
@@ -282,31 +295,98 @@ $size = $paperW . 'in ' . $paperH . 'in';
         <span class="legend-item"><span class="legend-rule" aria-hidden="true"></span>Not recorded</span>
       <?php endif; ?>
     </div>
-  <?php endif; ?>
+  <?php endif;
+    $legendHtml = (string) ob_get_clean();
 
-  <?php if ($bottomHtml !== '' || !empty($editable)): ?>
-    <section class="doc-info doc-info--bottom"<?= !empty($editable) ? ' data-edit="bottom" data-rich="1" data-placeholder="Note below the calendar (optional)"' : '' ?>><?= $bottomHtml ?></section>
-  <?php endif; ?>
-
-  <?php // Decoration, after the information and before the colophon. ?>
-  <?= $artworkSvg ?? '' ?>
-
-  <?php
     $left = [];
     if ($fShow['printed'] && ($branding['footer'] ?? '') !== '') { $left[] = (string) $branding['footer']; }
     if ($fShow['church']) { $left[] = (string) ($branding['church'] ?? ''); }
     $noteText = trim((string) ($footerNote ?? ''));
     $right = [];
     if ($fShow['website'] && ($branding['website'] ?? '') !== '') { $right[] = (string) $branding['website']; }
-  ?>
-  <?php if ($left !== [] || $right !== [] || $fShow['page'] || $noteText !== '' || !empty($editable)): ?>
+    ob_start();
+    if ($left !== [] || $right !== [] || $fShow['page'] || $noteText !== '' || !empty($editable)): ?>
   <footer class="colophon">
     <span><?= $e(implode(' · ', array_filter($left))) ?><?php if ($noteText !== '' || !empty($editable)): ?><?= $left !== [] ? ' · ' : '' ?><span class="foot-note"<?= !empty($editable) ? ' data-edit="footer" data-placeholder="Footer note (optional)"' : '' ?>><?= $e($noteText) ?></span><?php endif; ?></span>
     <?php if ($fShow['page']): ?><span class="folio"></span><?php endif; ?>
     <span><?= $e(implode(' · ', $right)) ?></span>
   </footer>
-  <?php endif; ?>
+  <?php endif;
+    $footerHtml = (string) ob_get_clean();
+
+    $kicker = [];
+    if ($show['church']) { $kicker[] = (string) $branding['church']; }
+    if ($show['location'] && ($branding['subtitle'] ?? '') !== '') { $kicker[] = (string) $branding['subtitle']; }
+    $kickerHtml = $kicker !== [] ? '<div class="church">' . implode('<span class="sep" aria-hidden="true">·</span>', array_map($e, $kicker)) . '</div>' : '';
+    $titleHtml = $show['docType'] && $periodNote !== ''
+        ? '<h1 class="doc-title"' . (!empty($editable) ? ' data-edit="title" data-placeholder="Calendar title"' : '') . '>' . $e($periodNote) . '</h1>' : '';
+    $subtitleHtml = $customSubtitle !== '' || !empty($editable)
+        ? '<div class="subtitle subtitle-custom"' . (!empty($editable) ? ' data-edit="subtitle" data-placeholder="Line under the title (optional)"' : '') . '>' . $e($customSubtitle) . '</div>' : '';
+    $periodHtml = $show['period'] ? '<div class="period">' . $e($branding['period']) . '</div>' : '';
+    $topNoteHtml = $topHtml !== '' || !empty($editable)
+        ? '<section class="doc-info doc-info--top"' . (!empty($editable) ? ' data-edit="top" data-rich="1" data-placeholder="Note above the calendar (optional)"' : '') . '>' . $topHtml . '</section>' : '';
+    $bottomNoteHtml = $bottomHtml !== '' || !empty($editable)
+        ? '<section class="doc-info doc-info--bottom"' . (!empty($editable) ? ' data-edit="bottom" data-rich="1" data-placeholder="Note below the calendar (optional)"' : '') . '>' . $bottomHtml . '</section>' : '';
+  ?>
+<?php if (!empty($pptx)):
+    // A PowerPoint theme: its artwork behind, Ekklesia's writing in its
+    // regions. Type is sized to fit each region rather than overflowing it.
+    $rg = $pptx['model']['regions'];
+    $fitPt = static function (string $text, array $box, float $max, float $share) : float {
+        $byHeight = $box['h'] * 72 * $share;
+        $byWidth = $box['w'] * 72 * 2 / max(1, mb_strlen($text) * 0.55);
+        return round(max(11.0, min($max, $byHeight, $byWidth)), 1);
+    };
+    $titlePt = $fitPt($periodNote, $rg['CALENDAR_TITLE'], 30, $kickerHtml !== '' ? 0.5 : 0.62);
+    $monthPt = $fitPt((string) $branding['period'], $rg['MONTH_HEADING'], 22, 0.7);
+  ?>
+  <?= \App\Services\Calendar\PptxThemeRenderer::artwork($pptx['model'], (string) $pptx['assetBase']) ?>
+  <div class="rg rg-title" style="<?= $e(\App\Services\Calendar\PptxThemeRenderer::box($rg['CALENDAR_TITLE'])) ?>;--title-pt:<?= $e($titlePt) ?>pt">
+    <?= $kickerHtml ?><?= $titleHtml ?><?= isset($rg['SUBTITLE']) ? '' : $subtitleHtml ?>
   </div>
+  <div class="rg rg-month" style="<?= $e(\App\Services\Calendar\PptxThemeRenderer::box($rg['MONTH_HEADING'])) ?>;--month-pt:<?= $e($monthPt) ?>pt"><?= $periodHtml ?></div>
+  <?php if (isset($rg['SUBTITLE'])): ?>
+    <div class="rg rg-subtitle" style="<?= $e(\App\Services\Calendar\PptxThemeRenderer::box($rg['SUBTITLE'])) ?>"><?= $subtitleHtml ?></div>
+  <?php endif; ?>
+  <div class="rg-flow" style="padding-top:<?= $e(number_format($rg['CALENDAR_GRID']['y'], 3)) ?>in;margin-left:<?= $e(number_format($rg['CALENDAR_GRID']['x'], 3)) ?>in;width:<?= $e(number_format($rg['CALENDAR_GRID']['w'], 3)) ?>in">
+    <?php foreach (($printNotes ?? []) as $note): ?>
+      <p class="print-note no-print" role="status"><?= $e($note) ?></p>
+    <?php endforeach; ?>
+    <?= $topNoteHtml ?>
+    <?= $body ?>
+    <?= isset($rg['LEGEND']) ? '' : $legendHtml ?>
+    <?= $bottomNoteHtml ?>
+    <?= isset($rg['FOOTER']) ? '' : $footerHtml ?>
+  </div>
+  <?php if (isset($rg['LEGEND'])): ?>
+    <div class="rg rg-legend" style="<?= $e(\App\Services\Calendar\PptxThemeRenderer::box($rg['LEGEND'])) ?>"><?= $legendHtml ?></div>
+  <?php endif; ?>
+  <?php if (isset($rg['FOOTER'])): ?>
+    <div class="rg rg-footer" style="<?= $e(\App\Services\Calendar\PptxThemeRenderer::box($rg['FOOTER'])) ?>"><?= $footerHtml ?></div>
+  <?php endif; ?>
+<?php else: ?>
+  <div class="sheet-body">
+  <header class="masthead">
+    <div class="masthead-row">
+      <div class="mh-main"><?= $kickerHtml ?><?= $titleHtml ?><?= $subtitleHtml ?></div>
+      <?= $periodHtml ?>
+    </div>
+  </header>
+
+  <?= $topNoteHtml ?>
+
+  <?= $body ?>
+
+  <?= $legendHtml ?>
+
+  <?= $bottomNoteHtml ?>
+
+  <?php // Decoration, after the information and before the colophon. ?>
+  <?= $artworkSvg ?? '' ?>
+
+  <?= $footerHtml ?>
+  </div>
+<?php endif; ?>
 </div>
 <?php if (!empty($fitOnePage)): ?>
 <script>
@@ -321,14 +401,23 @@ $size = $paperW . 'in ' . $paperH . 'in';
  * sheet. Measured on screen, where the sheet has the printed page's width. */
 (function () {
   var avail = <?= json_encode(round(($paperH - 0.945) * 96 - 6, 1)) ?>;
+  // Under a PowerPoint theme the limit is the design's calendar region, not
+  // the paper: the writing must not run over the artwork below it.
+  var flow = document.querySelector('.rg-flow');
+  <?php if (!empty($pptx)): $g = $pptx['model']['regions']['CALENDAR_GRID']; ?>
+  if (flow) {
+    avail = <?= json_encode(round(((float) $g['h'] + (isset($pptx['model']['regions']['LEGEND']) ? 0 : 0.3)) * 96 - 4, 1)) ?>;
+  }
+  <?php endif; ?>
   function fit() {
-    var body = document.querySelector('.sheet-body');
+    var body = document.querySelector('.sheet-body') || flow;
     if (!body) return;
     var kids = Array.prototype.slice.call(body.children);
     kids.forEach(function (k) { k.style.zoom = ''; });
     var groups = [[]];
     var months = 0;
     kids.forEach(function (k) {
+      if (k.classList.contains('print-note')) return;
       if (k.matches('section.month') && months++ > 0) groups.push([]);
       groups[groups.length - 1].push(k);
     });

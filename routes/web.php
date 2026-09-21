@@ -2776,6 +2776,32 @@ $webRoutes = [
             }
         }
 
+        // A PowerPoint theme: its artwork model, if this viewer may use it. A
+        // retired or unshared theme prints in Classic and the preview says so.
+        $pptx = null;
+        $pptxNote = '';
+        if (preg_match('/^pptx:(\d+)$/', (string) $config->get('appearance.theme'), $pm) === 1) {
+            try {
+                $opened = \App\Providers\PortalServiceProvider::makePrintThemeService()->openVersion(
+                    \App\Providers\PortalServiceProvider::makeRequestContext()->fromArray($req),
+                    (int) $pm[1], (int) $config->get('appearance.themeVersion'),
+                );
+            } catch (\Throwable) {
+                $opened = null;
+            }
+            if ($opened === null) {
+                $pptxNote = 'The PowerPoint theme chosen for this calendar is not available to you (it may have been retired), so it prints in Classic.';
+            } else {
+                $pptx = [
+                    'model' => $opened['model'],
+                    'assetBase' => $basePath . '/print/themes/' . (int) $pm[1] . '/' . (int) $opened['version'] . '/',
+                    'name' => (string) $opened['name'],
+                    'version' => (int) $opened['version'],
+                    'current' => (int) $opened['current'],
+                ];
+            }
+        }
+
         $composer = new \App\Services\Calendar\PrintComposer(dirname(__DIR__) . '/resources/views');
 
         return $composer->render($items, $start, $end, [
@@ -2788,6 +2814,8 @@ $webRoutes = [
             'background' => $background,
             'backgroundMissing' => $backgroundMissing,
             'editable' => (string) ($req['edit'] ?? '') === '1',
+            'pptx' => $pptx,
+            'pptxNote' => $pptxNote,
             'pageHeight' => $config->get('page.height'),
             'legend' => $config->get('appearance.legend'),
             'memberMark' => $config->get('appearance.memberMark'),

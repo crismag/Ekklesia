@@ -181,6 +181,18 @@ $rowHeightIn = $gridHeightIn / $rowCount;
 // Seven columns across whatever is left of the page, less the cell's own
 // padding (4pt each side) and the entry's rule and indent (7pt).
 $gridWidthIn = max(3.0, $paperWidthIn - 0.945 - 1.102 - (float) $safe['left'] - (float) $safe['right']);
+// A PowerPoint theme gives the grid its region instead: that area is where
+// the design left room. The key goes inside it unless the design has its own.
+if (is_array($gridBox ?? null)) {
+    $inRegionKey = ($legendRows ?? []) !== [] && !isset($pptx['model']['regions']['LEGEND']) ? 0.24 : 0.0;
+    $gridHeightIn = max(2.0, (float) $gridBox['h'] - 0.222 - $inRegionKey);
+    $gridWidthIn = max(3.0, (float) $gridBox['w']);
+    $rowCount = 0;
+    foreach ($model['months'] as $m) {
+        $rowCount = max($rowCount, count($m['weeks']));
+    }
+    $rowHeightIn = $gridHeightIn / max(1, $rowCount);
+}
 $cellTextWidthIn = max(0.5, ($gridWidthIn / 7) - (11.0 / 72.0));
 
 // How tightly the grid is set — a separate axis from type size, and from the
