@@ -15,3 +15,9 @@
 .is-ink.title-banner .subtitle, .is-ink.title-banner .doc-title { color: #16211c !important; }
 .is-ink .art { display: none !important; }
 .is-ink * { box-shadow: none !important; }
+
+/* The monthly themes: the title band and its motif go; the rules stay. */
+.is-ink.theme-seasonal .masthead, .is-ink .theme-seasonal .month-name,
+.is-ink.theme-seasonal .month-name { background: transparent !important; }
+.is-ink.theme-seasonal .masthead::after, .is-ink .month-name::after { display: none !important; }
+.is-ink .wk-day, .is-ink .wk-day.wknd, .is-ink .wk-day.out { background: #fff !important; }

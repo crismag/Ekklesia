@@ -206,7 +206,12 @@ $hiddenCount = 0;
 
 ob_start();
 foreach ($model['months'] as $mi => $month): ?>
-  <section class="month">
+  <?php
+    // Printed in "auto", each month wears its own monthly theme: its tokens
+    // on the section restyle everything inside it.
+    $monthTheme = ($monthThemes ?? [])[$month['year'] . '-' . $month['month']] ?? null;
+  ?>
+  <section class="month<?= $monthTheme !== null && $mi > 0 ? ' ' . $e($themeClasses($monthTheme)) : '' ?>"<?= $monthTheme !== null && $mi > 0 ? ' style="' . $e(\App\Services\Calendar\CalendarTheme::tokenCss($monthTheme)) . '"' : '' ?>>
     <?php if (count($model['months']) > 1): ?>
       <h2 class="month-name"><?= $e($month['title']) ?></h2>
     <?php endif; ?>

@@ -61,6 +61,31 @@ test.describe('print studio', () => {
     expect(await frame.getAttribute('src')).toBe(themed);
   });
 
+  test('automatic follows the printed month, and a manual choice can go back to it', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/calendar/print-setup?dateMode=custom&start=2026-10-01&end=2026-10-31&sources=birthdays');
+    await page.click('label.pc-theme[data-theme="auto"]');
+    await expect(page.locator('#pcThemeModeText')).toContainText('October prints in Maple Colour');
+    await expect(page.locator('#pcFrame')).toHaveAttribute('src', /theme=auto/);
+
+    await page.click('label.pc-theme[data-theme="open-skies"]');
+    await expect(page.locator('#pcThemeModeText')).toContainText('overrides the monthly theme');
+    await expect(page.locator('#pcUseAuto')).toBeVisible();
+
+    await page.click('#pcUseAuto');
+    await expect(page.locator('label.pc-theme[data-theme="auto"] input')).toBeChecked();
+    await expect(page.locator('#pcUseAuto')).toBeHidden();
+    await expect(page.locator('#pcFrame')).toHaveAttribute('src', /theme=auto/);
+  });
+
+  test('the gallery groups the monthly themes by Canadian season', async ({ page }) => {
+    await page.goto('/calendar/print-setup?' + MONTH);
+    const winter = page.locator('#pcSeason-winter ~ label.pc-theme').first();
+    await expect(winter).toContainText('December · Winter');
+    await expect(page.locator('.pc-theme', { hasText: 'January · Winter' })).toHaveCount(1);
+    await expect(page.locator('.pc-theme', { hasText: 'November · Fall' })).toHaveCount(1);
+  });
+
   test('printing the studio page prints no controls', async ({ page }) => {
     await page.goto('/calendar/print-setup?' + MONTH);
     await page.emulateMedia({ media: 'print' });

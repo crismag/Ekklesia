@@ -112,9 +112,22 @@ final class PrintComposer
         // reachable from the ministry-schedule preview, which builds options
         // by hand rather than from a PrintConfig.
         $theme = (string) ($options['theme'] ?? CalendarTheme::DEFAULT);
-        if (!CalendarTheme::exists($theme) || !CalendarTheme::supports($theme, $templateId)) {
+        // "Auto" follows the month being printed, never today's date: each
+        // month of the model gets its own monthly theme, and the page itself
+        // (masthead, weekly strips) takes the first month's.
+        $monthThemes = [];
+        if ($theme === CalendarTheme::AUTO && CalendarTheme::supports($theme, $templateId)) {
+            foreach ($model['months'] as $m) {
+                $monthThemes[$m['year'] . '-' . $m['month']] = CalendarTheme::forMonth((int) $m['month']);
+            }
+            $theme = $monthThemes !== [] ? reset($monthThemes) : CalendarTheme::forMonth((int) $start->format('n'));
+        } elseif (!CalendarTheme::exists($theme) || !CalendarTheme::supports($theme, $templateId)) {
             $theme = CalendarTheme::DEFAULT;
         }
+        // Classes the sheet carries for its theme: the id, and for a monthly
+        // theme its family and season.
+        $themeClasses = static fn (string $id): string => 'theme-' . $id
+            . (CalendarTheme::isSeasonal($id) ? ' theme-seasonal season-' . CalendarTheme::get($id)['season'] : '');
         $entryDisplay = (string) ($options['entryDisplay'] ?? 'auto');
         $entryDisplay = in_array($entryDisplay, ['compact', 'readable', 'showcase', 'auto'], true)
             ? $entryDisplay : 'auto';
@@ -256,7 +269,9 @@ final class PrintComposer
     private function themeCss(string $theme, bool $inkFriendly): string
     {
         $css = '';
-        $file = $this->viewPath . '/print/themes/' . $theme . '.css';
+        // The twelve monthly themes share one stylesheet; the rest have their own.
+        $file = $this->viewPath . '/print/themes/'
+            . (CalendarTheme::isSeasonal($theme) ? 'seasonal' : $theme) . '.css';
         if ($theme !== CalendarTheme::DEFAULT && is_file($file)) {
             $css = (string) file_get_contents($file);
         }
