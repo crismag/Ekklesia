@@ -70,6 +70,9 @@ final class PrintComposer
         $nameStyle = in_array($options['nameStyle'] ?? 'first', ['initial', 'short'], true) ? 'short' : 'full';
         // Whether a month may run past one sheet (see PrintConfig::PAGE_HEIGHTS).
         $pageHeight = ($options['pageHeight'] ?? 'fit') === 'grow' ? 'grow' : 'fit';
+        // One page per month is a promise, not only a plan: the print shell
+        // measures each month's page and scales it to fit if needed.
+        $fitOnePage = $pageHeight === 'fit' && $templateId === 'monthly';
         // How tightly the grid is set. A separate axis from type size: a reader
         // may want the same large type with less air around it.
         // Read once, then validate. Reading it again inside the ternary meant
