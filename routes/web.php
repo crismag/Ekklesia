@@ -2665,6 +2665,13 @@ $webRoutes = [
     // screen.
     'GET /calendar/print' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
+        // The campus the sheet is for: an explicit ?current_campus_id= or
+        // ?campus=, else the top-bar selection (the portal_campus_id cookie),
+        // exactly as the calendar screen uses it. Every read below is filtered
+        // by it, and the header names it — they used to disagree, with the
+        // data unfiltered while the header showed the chosen campus.
+        $printCampus = (int) (_campusContext($req) ?? 0);
+        $req['current_campus_id'] = $printCampus > 0 ? $printCampus : 0;
         $actor = $resolvePortalActor($req);
 
         // One configuration object, built once. These settings used to be a
@@ -2728,7 +2735,7 @@ $webRoutes = [
         // Name the campus on the page. A calendar pinned to one campus and a
         // calendar showing all of them look identical once printed.
         $campusName = '';
-        $chosen = (int) (_campusContext($req) ?? 0);
+        $chosen = $printCampus;
         if ($chosen > 0) {
             foreach (($resolveCampusSelector($req)['campuses'] ?? []) as $campus) {
                 if ((int) $campus['id'] === $chosen) {
