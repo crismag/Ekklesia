@@ -183,7 +183,7 @@ $sheetH = round($paperH - 0.945, 3);
   // sheet (PrintComposer::docTitle).
   $periodNote = $customTitle !== '' ? $customTitle : (string) ($docTitle ?? ($branding['period_note'] ?? ''));
 ?>
-<div class="sheet title-<?= $e($titleStyle) ?> theme-<?= $e($theme ?? 'classic') ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
+<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
   <header class="masthead">
     <div class="masthead-row">
       <div class="mh-main">

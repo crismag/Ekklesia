@@ -109,7 +109,10 @@ final class PrintConfig
         // Theme, and then the settings the theme is allowed to have an opinion
         // about. A theme that cannot dress the chosen layout falls back to
         // Classic rather than rendering a design nobody drew.
+        // "auto" follows the printed month (CalendarTheme::resolve). A theme id
+        // that no longer exists falls back to Classic rather than failing.
         $appearance['theme'] = CalendarTheme::exists((string) ($appearance['theme'] ?? ''))
+            || ($appearance['theme'] ?? '') === CalendarTheme::AUTO
             ? (string) $appearance['theme'] : CalendarTheme::DEFAULT;
         $layoutId = self::text($input['layout'] ?? $d['layout'], 40) ?: $d['layout'];
         if (!CalendarTheme::supports($appearance['theme'], $layoutId)) {

@@ -327,8 +327,11 @@ ob_start();
         <!-- Cards rather than a list of words: a theme is a look. Each preview
              shows a title band, a birthday row and an event row in the
              theme's own colours, drawn in CSS with nothing to download. -->
-        <div class="pc-themes" role="radiogroup" aria-label="Theme">
-          <?php foreach ($themes as $tid => $theme): ?>
+        <?php
+          $monthNames = [1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July',
+                         'August', 'September', 'October', 'November', 'December'];
+          $card = static function (string $tid, array $theme, string $meta = '') use ($h, $monthNames): string {
+              ob_start(); ?>
             <label class="pc-theme" data-theme="<?= $h($tid) ?>"
                    data-layouts="<?= $h(implode(',', $theme['layouts'])) ?>"
                    data-artwork="<?= $h(implode(',', $theme['artwork'])) ?>"
@@ -336,7 +339,8 @@ ob_start();
               <input type="radio" name="theme" value="<?= $h($tid) ?>"
                      <?= $tid === 'classic' ? 'checked' : '' ?>
                      aria-describedby="pcThemeB-<?= $h($tid) ?>">
-              <span class="pc-thumb" aria-hidden="true" style="<?= $h(\App\Services\Calendar\CalendarTheme::swatchCss($tid)) ?>">
+              <span class="pc-thumb<?= $tid === 'auto' ? ' pc-thumb--auto' : '' ?>" aria-hidden="true"
+                    style="<?= $h(\App\Services\Calendar\CalendarTheme::swatchCss($tid === 'auto' ? 'harvest-beginning' : $tid)) ?>">
                 <span class="pc-thumb-t"></span>
                 <span class="pc-thumb-row pc-thumb-row--b"></span>
                 <span class="pc-thumb-row pc-thumb-row--e"></span>
@@ -344,9 +348,35 @@ ob_start();
               </span>
               <span class="pc-theme-name"><?= $h($theme['label']) ?>
                 <?php if (($theme['ink'] ?? '') === 'low'): ?><span class="pc-ink">Low ink</span><?php endif; ?></span>
+              <?php if ($meta !== ''): ?><span class="pc-theme-meta"><?= $h($meta) ?></span><?php endif; ?>
               <span class="pc-theme-blurb" id="pcThemeB-<?= $h($tid) ?>"><?= $h($theme['blurb']) ?></span>
             </label>
+          <?php return (string) ob_get_clean(); };
+        ?>
+        <!-- Grouped the way a church thinks of the year: follow the month, the
+             four Canadian seasons (winter runs December to February), then the
+             general designs. One radio group across all of them. -->
+        <div class="pc-themes" role="radiogroup" aria-label="Theme">
+          <?= $card('auto', [
+              'label' => 'Automatic', 'layouts' => ['monthly', 'weekly'], 'artwork' => ['none'], 'defaults' => [],
+              'blurb' => 'Each month prints in its own monthly theme, taken from the month on the sheet.',
+          ], 'Follows the month') ?>
+          <?php foreach (\App\Services\Calendar\CalendarTheme::SEASONS as $sid => $season): ?>
+            <h3 class="pc-lab pc-season" id="pcSeason-<?= $h($sid) ?>"><?= $h($season['label']) ?></h3>
+            <?php foreach ($season['months'] as $m): $tid = \App\Services\Calendar\CalendarTheme::forMonth($m); ?>
+              <?= $card($tid, $themes[$tid], $monthNames[$m] . ' · ' . $season['label']) ?>
+            <?php endforeach; ?>
           <?php endforeach; ?>
+          <h3 class="pc-lab pc-season">Any month</h3>
+          <?php foreach ($themes as $tid => $theme): if (\App\Services\Calendar\CalendarTheme::isSeasonal($tid)) { continue; } ?>
+            <?= $card($tid, $theme) ?>
+          <?php endforeach; ?>
+        </div>
+        <!-- Which theme the sheet is actually in, and the way back to "follow
+             the month" after choosing one by hand. -->
+        <div class="pc-mode" id="pcThemeMode">
+          <p class="pc-hint" id="pcThemeModeText" role="status"></p>
+          <button type="button" class="pc-mini" id="pcUseAuto" hidden>Use monthly default</button>
         </div>
         <p class="pc-hint" id="pcThemeNote"></p>
         <div class="pc-field"><label for="pcAccent">Accent</label>
@@ -511,6 +541,11 @@ ob_start();
   .pc-theme:has(input:checked) .pc-theme-name::after{content:" ✓";color:var(--deep,#0c5a45)}
   .pc-theme:has(input:focus-visible){outline:2px solid var(--focus-ring,var(--teal,#117b6d));outline-offset:2px}
   .pc-theme-name{grid-column:2;font-size:12.5px;font-weight:800;color:var(--ink,#17211b)}
+  .pc-theme-meta{grid-column:2;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--deep,#0c5a45)}
+  .pc-season{margin:10px 0 0}
+  .pc-thumb--auto .pc-thumb-t{background:linear-gradient(90deg,#4a7fb0 0 25%,#5f8f63 25% 50%,#b88322 50% 75%,#b44a1c 75%)}
+  .pc-mode{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
+  .pc-mode .pc-hint{margin:0}
   .pc-theme-blurb{grid-column:2;font-size:11px;line-height:1.35;color:var(--muted,#5c6b63)}
   .pc-ink{display:inline-block;margin-left:4px;padding:0 5px;border:1px solid var(--line,#c7d4cd);border-radius:999px;
     font-size:10px;font-weight:700;color:var(--muted,#5c6b63)}
@@ -581,7 +616,44 @@ ob_start();
   var base = <?= json_encode($basePath) ?>;
   var THEMES = <?= json_encode(array_map(static fn (array $t): array => [
       'layouts' => $t['layouts'], 'artwork' => $t['artwork'], 'defaults' => $t['defaults'],
-  ], $themes), JSON_THROW_ON_ERROR) ?>;
+      'label' => $t['label'], 'month' => $t['month'] ?? null,
+  ], $themes) + ['auto' => ['layouts' => ['monthly', 'weekly'], 'artwork' => ['none'], 'defaults' => new stdClass(),
+      'label' => 'Automatic', 'month' => null]], JSON_THROW_ON_ERROR) ?>;
+  var MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function monthlyThemeFor(m){
+    var id = Object.keys(THEMES).filter(function(t){ return THEMES[t].month === m; })[0];
+    return id ? THEMES[id].label : '';
+  }
+  /* The first month the sheet will print, worked out as the server will. */
+  function firstPrintedMonth(){
+    var mode = $('pcRange').value, now = new Date();
+    if (mode === 'custom' && $('pcStart').value) return parseInt($('pcStart').value.slice(5, 7), 10);
+    if (mode === 'next-month') return (now.getMonth() + 1) % 12 + 1;
+    if (mode === 'year') return 1;
+    return now.getMonth() + 1;
+  }
+  function spansMonths(){
+    var mode = $('pcRange').value;
+    if (mode === 'quarter' || mode === 'year') return true;
+    return mode === 'custom' && $('pcStart').value.slice(0, 7) !== $('pcEnd').value.slice(0, 7);
+  }
+  /* Say which theme the sheet is in. "Automatic" names the month's theme;
+   * a theme chosen by hand says so and offers the way back. */
+  function updateThemeMode(){
+    var theme = pick('theme') || 'classic', m = firstPrintedMonth();
+    var text = $('pcThemeModeText'), back = $('pcUseAuto');
+    var autoCard = document.querySelector('.pc-theme[data-theme="auto"]');
+    var autoOk = autoCard && !autoCard.hidden;
+    if (theme === 'auto') {
+      text.textContent = 'Automatic: ' + MONTH_NAMES[m - 1] + ' prints in ' + monthlyThemeFor(m)
+        + (spansMonths() ? ', and each later month in its own theme.' : '.');
+      back.hidden = true;
+    } else {
+      text.textContent = autoOk ? 'Chosen by hand: this overrides the monthly theme ('
+        + MONTH_NAMES[m - 1] + ' would be ' + monthlyThemeFor(m) + ').' : '';
+      back.hidden = !autoOk;
+    }
+  }
   var ARTWORK_LABELS = <?= json_encode($artworkLabels, JSON_THROW_ON_ERROR) ?>;
   var INITIAL = <?= json_encode($initialConfig, JSON_THROW_ON_ERROR) ?>;
   var ACTIVE = <?= json_encode($activeView, JSON_THROW_ON_ERROR) ?>;
@@ -764,7 +836,7 @@ ob_start();
       var only = Object.keys(THEMES).filter(function(t){
         return (THEMES[t].layouts || []).indexOf(layout) === -1; });
       note.textContent = only.length
-        ? only.length + ' theme' + (only.length === 1 ? ' is' : 's are') + ' designed for the monthly grid only.'
+        ? only.length + ' theme' + (only.length === 1 ? ' is' : 's are') + ' hidden: not designed for this layout.'
         : '';
     }
   }
@@ -1043,6 +1115,7 @@ ob_start();
   function onChange(){
     var c = read();
     summarise(c);
+    updateThemeMode();
     refreshViewState();
     refresh();
   }
@@ -1073,6 +1146,11 @@ ob_start();
   }
   $('pcPrint').addEventListener('click', printSheet);
   $('pcPrintBar').addEventListener('click', printSheet);
+  $('pcUseAuto').addEventListener('click', function(){
+    setPick('theme', 'auto'); applyThemeDefaults('auto'); syncTheme('none'); onChange();
+    var card = document.querySelector('.pc-theme[data-theme="auto"] input');
+    if (card) card.focus();
+  });
   // Ctrl+P on this page would print the editor. Send it to the sheet instead.
   window.addEventListener('keydown', function(e){
     if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'p' || e.key === 'P')) {

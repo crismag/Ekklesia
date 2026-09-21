@@ -87,6 +87,25 @@ The rest of the tab sets **Text size**, **Density** (how tightly the grid is set
 
 A theme is how the sheet is dressed; the dates and names are the same in every one. Each card shows the theme's colours and a small birthday and event row. The selected card has a border, a fill and a tick.
 
+### Monthly themes and Automatic
+
+Every month has a theme of its own, grouped by Canadian season:
+
+| Season | Months and themes |
+| --- | --- |
+| Winter | December *Evergreen Snow* · January *Northern Stillness* · February *Winter Warmth* |
+| Spring | March *First Thaw* · April *Gentle Rain* · May *New Blossom* |
+| Summer | June *Open Skies* · July *Summer Meadow* · August *Golden Days* |
+| Fall | September *Harvest Beginning* · October *Maple Colour* · November *First Frost* |
+
+They share one layout, so the sheet reads the same way every month; the colours, the small drawing in the title band, and the season's style of title change. December is snow and evergreen, not Christmas.
+
+Choose **Automatic** at the top of the gallery and each month prints in its own theme. It follows the month *on the sheet*, not today's date: an October calendar printed in June is still Maple Colour, and a three-month calendar gives each month its own theme. The line under the gallery says which theme the sheet will use.
+
+Choosing any other card sets the theme by hand for the whole sheet. The line under the gallery then says it overrides the monthly theme, and **Use monthly default** goes back to Automatic. A saved publication remembers whether it follows the month or uses a chosen theme. Automatic works with the monthly and weekly calendars; other layouts use Classic.
+
+### Themes for any month
+
 - **Classic** — the church's usual sheet. Restrained and dense; right for operational calendars.
 - **Editorial** — a publication rather than a notice. Large title, generous margins, a quiet grid. *Low ink.*
 - **Planner** — warm and open, with room left to write on. Monthly grid only.
@@ -94,7 +113,7 @@ A theme is how the sheet is dressed; the dates and names are the same in every o
 - **Hearth** — warm and welcoming for a noticeboard: a light header band, fine rules and a small sprig in the corner.
 - **Economy** — the least ink: black hairlines, no fills, no decoration. *Low ink.*
 
-Member types keep their colours and symbols in every theme.
+Member types keep their colours and symbols in every theme, the monthly ones included.
 
 Under the cards: **Accent** colour, **Decoration** (only for themes that carry artwork), and **Ink friendly**, which drops page fills and decoration from whichever theme you chose.
 
