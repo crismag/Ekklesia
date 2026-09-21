@@ -56,11 +56,11 @@ final class PrintConfig
     ];
 
     /**
-     * Whether a month may run past one sheet. "grow" lets a busy week take the
-     * height its entries need and hides nothing; "fit" is the original sheet,
-     * one page with "+n more" for what does not fit.
+     * Whether a month may run past one sheet. "fit" (the default) is one page,
+     * with "+n more" for what does not fit; "grow" lets a busy week take the
+     * height its entries need and hides nothing.
      */
-    public const PAGE_HEIGHTS = ['grow', 'fit'];
+    public const PAGE_HEIGHTS = ['fit', 'grow'];
 
     /** @param array<string,mixed> $raw */
     private function __construct(private readonly array $raw)
@@ -217,7 +217,10 @@ final class PrintConfig
             // first preset. Baking a source list in here would put the choice
             // in two places.
             'content' => ['sources' => []],
-            'page' => ['paper' => 'letter', 'orientation' => '', 'height' => 'grow'],
+            // One page by default: the calendar prints as a single fitted sheet,
+            // with "+n more" on a day that cannot hold everything. Growing to
+            // fit is the reader's choice.
+            'page' => ['paper' => 'letter', 'orientation' => '', 'height' => 'fit'],
             'appearance' => [
                 'typeScale' => 1.0,
                 'font' => 'serif',
