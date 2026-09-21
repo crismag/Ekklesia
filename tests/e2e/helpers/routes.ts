@@ -75,6 +75,8 @@ export const PROTECTED_MUTATIONS: ProtectedMutation[] = [
   { method: 'POST', path: '/admin/maintenance/import/ingest', body: { campus_id: 1 } },
   { method: 'POST', path: '/admin/maintenance/import/apply', body: { confirm: '1', batch_id: 1 } },
   { method: 'POST', path: '/api/print/backgrounds', body: {} },
+  { method: 'POST', path: '/api/print/themes', body: {} },
+  { method: 'PUT', path: '/api/print/themes/1', body: { scope: 'church' } },
   { method: 'DELETE', path: '/api/print/backgrounds/1' },
   { method: 'POST', path: '/admin/maintenance/import/duplicate', body: { batch_id: 1, group: 1, choice: 'separate' } },
   { method: 'POST', path: '/admin/maintenance/backup', body: { kind: 'mysql', target: 'people' } },

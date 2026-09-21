@@ -180,6 +180,14 @@ return [
         PortalServiceProvider::makeRequestContext(),
     ))->serve($req),
 
+    // PowerPoint calendar themes (PrintThemeService holds the rules).
+    'GET /api/print/themes' => fn (array $req) => PortalServiceProvider::makePrintThemeController()->index($req),
+    'POST /api/print/themes' => fn (array $req) => PortalServiceProvider::makePrintThemeController()->store($req),
+    'POST /api/print/themes/{id}/versions' => fn (array $req) => PortalServiceProvider::makePrintThemeController()->replace($req),
+    'PUT /api/print/themes/{id}' => fn (array $req) => PortalServiceProvider::makePrintThemeController()->update($req),
+    'GET /print/themes/{id}/{version}/{file}' => fn (array $req) => PortalServiceProvider::makePrintThemeController()->serve($req),
+    'GET /print/theme-starters/{variant}' => fn (array $req) => PortalServiceProvider::makePrintThemeController()->starter($req),
+
     'GET /api/calendar/sources' => fn (array $req) => (new CalendarController(
         PortalServiceProvider::makeCalendarService(),
         PortalServiceProvider::makeRequestContext(),

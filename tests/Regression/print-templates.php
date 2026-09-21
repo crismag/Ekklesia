@@ -182,7 +182,8 @@ check('and the plan always accounts for every entry it was given',
 // The composer has to resolve the page before the template runs, or a template
 // that lays out to fit the page has nothing to fit to.
 $composer = file_get_contents(__DIR__ . '/../../app/Services/Calendar/PrintComposer.php');
-$orientationAt = strpos($composer, "\$orientation = (string) (\$options['orientation']");
+// A PowerPoint theme's page comes first when there is one.
+$orientationAt = strpos($composer, "\$orientation = (string) (\$pptx['model']['page']['orientation'] ?? \$options['orientation']");
 $requireAt = strpos($composer, "require \$this->viewPath . '/print/' . \$template['file']");
 check('paper and orientation are resolved before the template is rendered',
     $orientationAt !== false && $requireAt !== false && $orientationAt < $requireAt);

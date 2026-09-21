@@ -51,6 +51,9 @@ $grow = ($pageHeight ?? 'fit') === 'grow';
 // A theme that spends more of the page on its masthead has that much less to
 // give the grid. Measured per theme, as a difference from Classic.
 $gridHeightIn = max(2.5, $gridHeightIn - (float) ($themeChromeIn ?? 0.0));
+if (is_array($gridBox ?? null)) {
+    $gridHeightIn = max(2.0, (float) $gridBox['h']);
+}
 
 // Past four weeks a row is no roomier than a month cell, so the sheet stops
 // trying to hold them all and lets them run on.
@@ -84,6 +87,10 @@ $usableIn = max(0.1, $cellContentIn - (0.208 * $ts));
 // seven columns across the page, less the cell's padding (5pt each side) and
 // the entry's rule and indent (7pt).
 $gridWidthIn = max(3.0, $paperWidthIn - 0.945 - 1.102);
+if (is_array($gridBox ?? null)) {
+    // A PowerPoint theme's grid region (see monthly.php).
+    $gridWidthIn = max(3.0, (float) $gridBox['w']);
+}
 $cellTextWidthIn = max(0.5, ($gridWidthIn / 7) - (17.0 / 72.0));
 
 $styles = <<<'CSS'

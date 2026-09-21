@@ -97,8 +97,11 @@ final class PrintComposer
         // lay content out to fit the page cannot do it without knowing what the
         // page is. The monthly grid was guessing, and printed a wall calendar
         // across two sheets.
-        $orientation = (string) ($options['orientation'] ?? $template['orientation']);
-        $paper = strtolower((string) ($options['paper'] ?? 'letter'));
+        // A PowerPoint theme decides the page: its artwork was drawn for one.
+        $pptx = is_array($options['pptx'] ?? null) && is_array($options['pptx']['model'] ?? null)
+            && in_array($templateId, ['monthly', 'weekly'], true) ? $options['pptx'] : null;
+        $orientation = (string) ($pptx['model']['page']['orientation'] ?? $options['orientation'] ?? $template['orientation']);
+        $paper = strtolower((string) ($pptx['model']['page']['paper'] ?? $options['paper'] ?? 'letter'));
         // Inches, portrait. The shell owns the CSS @page size; this is the same
         // fact in a form a template can compute with.
         require_once __DIR__ . '/PrintConfig.php';
@@ -127,6 +130,9 @@ final class PrintComposer
         } elseif (!CalendarTheme::exists($theme) || !CalendarTheme::supports($theme, $templateId)) {
             $theme = CalendarTheme::DEFAULT;
         }
+        // Under a PowerPoint theme the calendar is drawn in Classic's rules,
+        // coloured from the design's own palette, inside the design's regions.
+        $gridBox = $pptx !== null ? ($pptx['model']['regions']['CALENDAR_GRID'] ?? null) : null;
         // Classes the sheet carries for its theme: the id, and for a monthly
         // theme its family and season.
         $themeClasses = static fn (string $id): string => 'theme-' . $id
@@ -191,6 +197,18 @@ final class PrintComposer
         // when it is missing or will print soft at this paper size.
         $background = is_array($options['background'] ?? null) ? $options['background'] : null;
         $printNotes = [];
+        if (($options['pptxNote'] ?? '') !== '') {
+            $printNotes[] = (string) $options['pptxNote'];
+        }
+        if ($pptx !== null && (int) ($pptx['current'] ?? 0) > (int) $pptx['version']) {
+            $printNotes[] = 'This design uses version ' . (int) $pptx['version'] . ' of “' . $pptx['name'] . '”; version '
+                . (int) $pptx['current'] . ' is available. Choose the theme again to use it.';
+        }
+        if ($pptx !== null && isset($options['paper']) && ($options['paper'] !== $paper
+            || (($options['orientation'] ?? '') !== '' && $options['orientation'] !== $orientation))) {
+            $printNotes[] = '“' . $pptx['name'] . '” was designed for ' . ucfirst($paper) . ' ' . $orientation
+                . ', so the page follows the theme rather than the Paper setting.';
+        }
         if (!empty($options['backgroundMissing'])) {
             $printNotes[] = 'The background picture could not be found or is not shared with you, so this calendar prints without it.';
         }

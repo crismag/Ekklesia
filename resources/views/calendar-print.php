@@ -381,7 +381,30 @@ ob_start();
           <?php foreach ($themes as $tid => $theme): if (\App\Services\Calendar\CalendarTheme::isSeasonal($tid)) { continue; } ?>
             <?= $card($tid, $theme) ?>
           <?php endforeach; ?>
+          <!-- Designed in PowerPoint and uploaded here; filled in by script. -->
+          <h3 class="pc-lab pc-season" id="pcPptxLab">PowerPoint themes</h3>
+          <div id="pcPptxList" class="pc-pptx-list"></div>
         </div>
+        <section class="pc-pptx" aria-labelledby="pcPptxLab">
+          <p class="pc-hint" id="pcPptxEmpty">Design a calendar in PowerPoint: download a starter, decorate it around the dashed boxes, and upload it here.</p>
+          <details class="pc-pptx-start">
+            <summary>Download a theme starter</summary>
+            <ul class="pc-starters" id="pcStarters"></ul>
+          </details>
+          <div id="pcPptxUpload" hidden>
+            <div class="pc-field"><label for="pcPptxName">New theme name</label>
+              <input id="pcPptxName" type="text" maxlength="120" placeholder="e.g. Harvest welcome"></div>
+            <div class="pc-field"><label for="pcPptxFile">Upload a PowerPoint theme (.pptx)</label>
+              <input id="pcPptxFile" type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"></div>
+          </div>
+          <div id="pcPptxStatus" class="pc-pptx-status" role="status"></div>
+          <div id="pcPptxManage" class="pc-viewacts" hidden>
+            <button type="button" class="pc-mini" id="pcPptxReplace">Upload a new version</button>
+            <button type="button" class="pc-mini" id="pcPptxPublish">Share with the church</button>
+            <button type="button" class="pc-mini pc-mini--danger" id="pcPptxRetire">Retire theme</button>
+            <input id="pcPptxReplaceFile" type="file" accept=".pptx" hidden>
+          </div>
+        </section>
         <!-- Which theme the sheet is actually in, and the way back to "follow
              the month" after choosing one by hand. -->
         <div class="pc-mode" id="pcThemeMode">
@@ -586,6 +609,17 @@ ob_start();
   .pc-theme-meta{grid-column:2;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--deep,#0c5a45)}
   .pc-season{margin:10px 0 0}
   .pc-thumb--auto .pc-thumb-t{background:linear-gradient(90deg,#4a7fb0 0 25%,#5f8f63 25% 50%,#b88322 50% 75%,#b44a1c 75%)}
+  .pc-pptx-list{display:grid;gap:8px}
+  .pc-thumb--pptx{padding:0;overflow:hidden;background:#fff}
+  .pc-thumb--pptx img{display:block;width:100%;height:100%;object-fit:contain}
+  .pc-pptx{margin:6px 0 10px}
+  .pc-pptx-start summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--deep,#0c5a45);min-height:28px}
+  .pc-starters{margin:4px 0 8px;padding-left:18px;font-size:12.5px}
+  .pc-starters a{color:var(--deep,#0c5a45)}
+  .pc-pptx-status{font-size:11.5px;line-height:1.4}
+  .pc-pptx-status .is-error{color:#8c2f2f;font-weight:700}
+  .pc-pptx-status ul{margin:4px 0 0;padding-left:16px;color:#8a5a00}
+  .pc-scope{display:inline-block;margin-left:4px;padding:0 5px;border:1px solid var(--line,#c7d4cd);border-radius:999px;font-size:10px;font-weight:700;color:var(--muted,#5c6b63)}
   .pc-bgs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:4px 0 8px}
   .pc-bgopt{position:relative;display:block;cursor:pointer}
   .pc-bgopt input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;width:100%;height:100%}
@@ -740,7 +774,7 @@ ob_start();
         typeScale: parseFloat($('pcScale').value) || 1,
         font: $('pcFont').value, names: $('pcNames').value,
         density: $('pcDensity').value, titleStyle: $('pcTitleStyle').value,
-        accent: $('pcAccent').value, theme: pick('theme') || 'classic',
+        accent: $('pcAccent').value, theme: pick('theme') || 'classic', themeVersion: pptxVersionFor(pick('theme')),
         entryDisplay: pick('entry') || 'auto',
         artwork: $('pcArtwork').value || 'none', decoration: $('pcDecor').value,
         inkFriendly: $('pcInk').checked, legend: $('pcLegend').checked, memberMark: $('pcMark').value,
@@ -774,6 +808,8 @@ ob_start();
     var a = c.appearance || {}, d = c.date || {}, hh = c.header || {}, ff = c.footer || {},
         ad = c.additional || {}, pg = c.page || {};
     setPick('template', c.layout || 'monthly');
+    pinnedPptx = /^pptx:/.test(a.theme || '') ? { theme: a.theme, version: a.themeVersion || 0 } : null;
+    if (typeof ensurePptxCard === 'function') ensurePptxCard(a.theme);
     setPick('theme', a.theme || 'classic');
     setPick('entry', a.entryDisplay || 'auto');
     $('pcRange').value = d.mode || 'this-month';
@@ -836,7 +872,8 @@ ob_start();
      ['titleStyle', c.appearance.titleStyle, D.appearance.titleStyle], ['accent', c.appearance.accent, D.appearance.accent],
      ['theme', c.appearance.theme, D.appearance.theme], ['entry', c.appearance.entryDisplay, D.appearance.entryDisplay],
      ['artwork', c.appearance.artwork, D.appearance.artwork], ['decor', c.appearance.decoration, D.appearance.decoration],
-     ['mark', c.appearance.memberMark, D.appearance.memberMark]
+     ['mark', c.appearance.memberMark, D.appearance.memberMark],
+     ['themeV', c.appearance.themeVersion, D.appearance.themeVersion]
     ].forEach(function(row){ if (String(row[1]) !== String(row[2])) p.set(row[0], String(row[1])); });
     if (c.appearance.inkFriendly) p.set('ink', '1');
     if (!c.appearance.legend) p.set('legend', '0');
@@ -1183,6 +1220,156 @@ ob_start();
 
   // Nothing here submits: every control acts at once.
   form.addEventListener('submit', function(e){ e.preventDefault(); });
+
+  /* PowerPoint themes. A card's radio value is "pptx:ID"; choosing one pins
+   * its current version into the design, and a design opened later keeps the
+   * version it was saved with (the sheet says when a newer one exists). */
+  var PPTX_API = base + '/api/print/themes';
+  var pinnedPptx = pinnedPptx || null;
+  var pptxThemes = {};
+  function pptxVersionFor(theme){
+    if (!/^pptx:/.test(theme || '')) return 0;
+    if (pinnedPptx && pinnedPptx.theme === theme && pinnedPptx.version) return pinnedPptx.version;
+    var t = pptxThemes[theme.slice(5)];
+    return t ? t.version : 0;
+  }
+  function pptxCard(t){
+    var id = 'pptx:' + t.id;
+    var label = document.createElement('label');
+    label.className = 'pc-theme';
+    label.dataset.theme = id;
+    label.dataset.layouts = 'monthly,weekly';
+    label.dataset.artwork = 'none';
+    label.dataset.defaults = '{}';
+    var input = document.createElement('input');
+    input.type = 'radio'; input.name = 'theme'; input.value = id;
+    input.setAttribute('aria-describedby', 'pcThemeB-pptx-' + t.id);
+    var thumb = document.createElement('span');
+    thumb.className = 'pc-thumb pc-thumb--pptx'; thumb.setAttribute('aria-hidden', 'true');
+    var img = document.createElement('img');
+    img.alt = ''; img.loading = 'lazy';
+    img.src = base + '/print/themes/' + t.id + '/' + t.version + '/thumb.png';
+    thumb.appendChild(img);
+    var name = document.createElement('span'); name.className = 'pc-theme-name'; name.textContent = t.name;
+    var scope = document.createElement('span'); scope.className = 'pc-scope';
+    scope.textContent = t.scope === 'church' ? 'Shared' : 'Private';
+    name.appendChild(scope);
+    var meta = document.createElement('span'); meta.className = 'pc-theme-meta';
+    meta.textContent = (t.paper === 'a4' ? 'A4' : t.paper.charAt(0).toUpperCase() + t.paper.slice(1)) + ' ' + t.orientation + ' · v' + t.version;
+    var blurb = document.createElement('span'); blurb.className = 'pc-theme-blurb'; blurb.id = 'pcThemeB-pptx-' + t.id;
+    blurb.textContent = 'By ' + (t.creator || 'unknown') + ', ' + String(t.updatedAt || '').slice(0, 10)
+      + (t.warnings && t.warnings.length ? ' · ' + t.warnings.length + ' note' + (t.warnings.length === 1 ? '' : 's') : ' · checked');
+    label.appendChild(input); label.appendChild(thumb); label.appendChild(name); label.appendChild(meta); label.appendChild(blurb);
+    return label;
+  }
+  /* A design may name a theme this viewer cannot list (retired, or someone
+   * else's private one); it stays selected and the sheet says it prints in
+   * Classic, rather than silently changing the design. */
+  function ensurePptxCard(theme){
+    if (!/^pptx:/.test(theme || '') || document.querySelector('.pc-theme[data-theme="' + theme + '"]')) return;
+    var holder = $('pcPptxList');
+    holder.appendChild(pptxCard({ id: theme.slice(5), name: 'PowerPoint theme (not available)', scope: 'private',
+      version: 1, paper: 'letter', orientation: 'portrait', creator: '', updatedAt: '', warnings: [] }));
+  }
+  function showPptxStatus(kind, lines){
+    var box = $('pcPptxStatus');
+    box.textContent = '';
+    if (!lines || !lines.length) return;
+    var head = document.createElement('p');
+    head.className = kind === 'error' ? 'is-error' : '';
+    head.textContent = lines[0];
+    box.appendChild(head);
+    if (lines.length > 1) {
+      var ul = document.createElement('ul');
+      lines.slice(1).forEach(function(l){ var li = document.createElement('li'); li.textContent = l; ul.appendChild(li); });
+      box.appendChild(ul);
+    }
+  }
+  function syncPptxManage(){
+    var theme = pick('theme') || '';
+    var t = /^pptx:/.test(theme) ? pptxThemes[theme.slice(5)] : null;
+    $('pcPptxManage').hidden = !(t && t.canEdit);
+    if (t) {
+      $('pcPptxPublish').hidden = !t.canPublish;
+      $('pcPptxPublish').textContent = t.scope === 'church' ? 'Make private' : 'Share with the church';
+    }
+  }
+  function loadPptxThemes(select){
+    return fetch(PPTX_API, { credentials: 'same-origin' })
+      .then(function(r){ return r.ok ? r.json() : { themes: [], canUpload: false, starters: {} }; })
+      .then(function(j){
+        var holder = $('pcPptxList');
+        var chosen = pick('theme');
+        holder.textContent = '';
+        pptxThemes = {};
+        (j.themes || []).forEach(function(t){ pptxThemes[t.id] = t; holder.appendChild(pptxCard(t)); });
+        $('pcPptxEmpty').hidden = (j.themes || []).length > 0;
+        $('pcPptxUpload').hidden = !j.canUpload;
+        var list = $('pcStarters');
+        list.textContent = '';
+        Object.keys(j.starters || {}).forEach(function(k){
+          var li = document.createElement('li'), a = document.createElement('a');
+          a.href = base + '/print/theme-starters/' + k; a.textContent = j.starters[k]; a.setAttribute('download', '');
+          li.appendChild(a); list.appendChild(li);
+        });
+        var want = select || chosen;
+        if (want) { ensurePptxCard(want); setPick('theme', want); }
+        syncTheme();
+        syncPptxManage();
+      })
+      .catch(function(){});
+  }
+  function uploadPptx(url, file, extra){
+    var data = new FormData();
+    data.append('pptx', file);
+    Object.keys(extra || {}).forEach(function(k){ data.append(k, extra[k]); });
+    showPptxStatus('', ['Checking “' + file.name + '”…']);
+    return fetch(url, { method: 'POST', credentials: 'same-origin', body: data })
+      .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || 'That presentation could not be used.'); return j; }); })
+      .then(function(j){
+        var warns = j.warnings || [];
+        showPptxStatus('', [(url === PPTX_API ? 'Added' : 'Updated') + ' “' + j.theme.name + '” (' + j.theme.paper + ' '
+          + j.theme.orientation + '). ' + (warns.length ? 'Notes:' : 'No problems found.')].concat(warns));
+        pinnedPptx = null;
+        return loadPptxThemes('pptx:' + j.theme.id);
+      })
+      .then(function(){ onChange(); })
+      .catch(function(e){ showPptxStatus('error', [e.message]); });
+  }
+  $('pcPptxFile').addEventListener('change', function(){
+    var f = this.files && this.files[0];
+    if (!f) return;
+    uploadPptx(PPTX_API, f, { name: $('pcPptxName').value.trim() }).finally(function(){ $('pcPptxFile').value = ''; });
+  });
+  $('pcPptxReplace').addEventListener('click', function(){ $('pcPptxReplaceFile').click(); });
+  $('pcPptxReplaceFile').addEventListener('change', function(){
+    var f = this.files && this.files[0], theme = pick('theme') || '';
+    if (!f || !/^pptx:/.test(theme)) return;
+    uploadPptx(PPTX_API + '/' + theme.slice(5) + '/versions', f).finally(function(){ $('pcPptxReplaceFile').value = ''; });
+  });
+  function putTheme(id, body){
+    return fetch(PPTX_API + '/' + id, { method: 'PUT', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || 'That did not work.'); return j; }); });
+  }
+  $('pcPptxPublish').addEventListener('click', function(){
+    var theme = pick('theme') || '', t = pptxThemes[theme.slice(5)];
+    if (!t) return;
+    var scope = t.scope === 'church' ? 'private' : 'church';
+    putTheme(t.id, { scope: scope })
+      .then(function(){ showPptxStatus('', [scope === 'church' ? 'Shared with everyone in the church.' : 'Now private to you.']); return loadPptxThemes(theme); })
+      .catch(function(e){ showPptxStatus('error', [e.message]); });
+  });
+  $('pcPptxRetire').addEventListener('click', function(){
+    var theme = pick('theme') || '', t = pptxThemes[theme.slice(5)];
+    if (!t || !window.confirm('Retire “' + t.name + '”? It leaves the gallery, and calendars saved with it print in Classic.')) return;
+    putTheme(t.id, { status: 'archived' })
+      .then(function(){ showPptxStatus('', ['Retired “' + t.name + '”.']); setPick('theme', 'classic'); return loadPptxThemes(); })
+      .then(function(){ onChange(); })
+      .catch(function(e){ showPptxStatus('error', [e.message]); });
+  });
+  form.addEventListener('change', function(e){ if (e.target.name === 'theme') { pinnedPptx = null; syncPptxManage(); } });
+  loadPptxThemes();
 
   /* Background pictures. The list is this account's own pictures (all of
    * them, for an administrator); a design opened from someone else may use a

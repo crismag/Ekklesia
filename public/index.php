@@ -247,7 +247,11 @@ try {
 }
 
 if (is_string($result)) {
-    if (!headers_sent()) {
+    // A handler that writes a picture or a download sets its own type; the
+    // HTML default must not replace it. (Small responses stay in PHP's output
+    // buffer, so headers are not yet "sent" when this runs.)
+    $typed = array_filter(headers_list(), static fn (string $h): bool => stripos($h, 'content-type:') === 0) !== [];
+    if (!headers_sent() && !$typed) {
         header('Content-Type: text/html; charset=utf-8');
     }
     echo $result;
