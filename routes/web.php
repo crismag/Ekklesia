@@ -2780,6 +2780,7 @@ $webRoutes = [
             'sourceLabels' => $labels,
             'background' => $background,
             'backgroundMissing' => $backgroundMissing,
+            'editable' => (string) ($req['edit'] ?? '') === '1',
             'pageHeight' => $config->get('page.height'),
             'legend' => $config->get('appearance.legend'),
             'church' => (string) ($church['name'] ?? 'Church Portal'),

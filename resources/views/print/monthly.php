@@ -235,7 +235,7 @@ foreach ($model['months'] as $mi => $month): ?>
               $items = [];
               foreach ($day['entries'] as $entry) {
                   $items[] = EntryPresentation::of($entry, $shortNames, !$legacy, !$legacy)
-                      + ['source' => $entry['source']];
+                      + ['source' => $entry['source'], 'href' => (string) ($entry['href'] ?? '')];
               }
 
               // Growing, a day may take a quarter as much height again before the
@@ -263,7 +263,7 @@ foreach ($model['months'] as $mi => $month): ?>
               <?php if ($plan['shown'] > 0): ?>
               <div class="ents">
                 <?php foreach (array_slice($items, 0, $plan['shown']) as $item): ?>
-                  <div class="ent k-<?= $e($item['category']) ?><?= ($item['group'] ?? null) !== null ? ' mt-' . $e($item['group']) : '' ?>" style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
+                  <div class="ent k-<?= $e($item['category']) ?><?= ($item['group'] ?? null) !== null ? ' mt-' . $e($item['group']) : '' ?>"<?= !empty($editable) && str_starts_with($item['href'], '/events/') ? ' data-href="' . $e($item['href']) . '"' : '' ?> style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
                     <span class="t"><?= $item['category'] === 'birth' && isset($memberTypes) ? $memberTypes->symbol((string) $item['memberType']) : '' ?><?= $e($item['primary']) ?></span>
                     <?php if ($item['secondary'] !== ''): ?><span class="w"><?php
                       // Inline, a person's age reads as "(29)" and an event's

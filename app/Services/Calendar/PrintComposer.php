@@ -178,6 +178,10 @@ final class PrintComposer
             $mastheadIn += 0.43 * (max(1, (int) ceil(mb_strlen($docTitle) / $perLine)) - 1);
         }
 
+        // The studio's "Edit text on the sheet": editable regions and event
+        // links are marked up. Screen only; nothing about it prints.
+        $editable = !empty($options['editable']);
+
         // A background picture: validated values only, and a screen-only note
         // when it is missing or will print soft at this paper size.
         $background = is_array($options['background'] ?? null) ? $options['background'] : null;

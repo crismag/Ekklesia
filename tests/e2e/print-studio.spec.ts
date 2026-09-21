@@ -107,6 +107,53 @@ test.describe('print studio', () => {
     await expect(page.locator('#pcBgControls')).toBeHidden();
   });
 
+  test('the title and notes can be typed on the sheet, and reach the settings', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/calendar/print-setup?' + MONTH);
+    await page.click('#pcEditToggle');
+    await expect(page.locator('#pcFrame')).toHaveAttribute('src', /edit=1/);
+    const sheet = page.frameLocator('#pcFrame');
+    await sheet.locator('[data-edit="title"]').click();
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('Birthday Wall');
+    await sheet.locator('[data-edit="footer"]').click();
+    await expect(page.locator('#hTitle')).toHaveValue('Birthday Wall');
+    await page.click('#pcEditToggle');
+    await expect(page.locator('#pcFrame')).not.toHaveAttribute('src', /edit=1/);
+    await expect(page.locator('#pcFrame')).toHaveAttribute('src', /hTitle=Birthday\+Wall/);
+  });
+
+  test('a saved design can be duplicated and renamed', async ({ page }) => {
+    // Answers for the prompts and confirms, in the order they appear.
+    const answers: Array<string | false | true> = [];
+    page.on('dialog', d => {
+      const a = answers.shift();
+      if (a === false) return d.dismiss();
+      return typeof a === 'string' ? d.accept(a) : d.accept();
+    });
+    await page.goto('/calendar/print-setup?' + MONTH);
+    const name = 'E2E design ' + Date.now();
+    answers.push(name, false);                      // name it; keep it private
+    await page.click('#pcSaveAs');
+    await page.waitForURL(/saved=1/);
+    const id = await page.locator('#pcView option', { hasText: name }).first().getAttribute('value');
+    await page.goto('/calendar/print-setup?view=' + id);
+    answers.push(name + ' copy');
+    await page.click('#pcDuplicate');
+    await page.waitForURL(/view=\d+/);
+    await expect(page.locator('#pcView option:checked')).toHaveText(name + ' copy');
+    answers.push(name + ' renamed');
+    await page.click('#pcRename');
+    await expect(page.locator('#pcView option:checked')).toHaveText(name + ' renamed');
+    for (const title of [name + ' renamed', name]) {
+      const vid = await page.locator('#pcView option', { hasText: title }).first().getAttribute('value');
+      await page.goto('/calendar/print-setup?view=' + vid);
+      answers.push(true);
+      await page.click('#pcDelete');
+      await page.waitForURL(url => !/view=/.test(url.search));
+    }
+  });
+
   test('printing the studio page prints no controls', async ({ page }) => {
     await page.goto('/calendar/print-setup?' + MONTH);
     await page.emulateMedia({ media: 'print' });
