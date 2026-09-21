@@ -52,6 +52,14 @@ final class SqlMemberImportAdapter implements MemberImportAdapter
                 );
             }
         }
+        $col = $this->db->query('SHOW COLUMNS FROM ' . self::ROW_TABLE . " LIKE 'duplicate_group'");
+        if ($col === false || $col->fetchColumn() === false) {
+            throw new RuntimeException(
+                "The member import staging tables predate duplicate decisions.\n\n"
+                . "Apply database/members/migrations/002-import-duplicate-decisions.sql:\n"
+                . "    php tools/migrate.php --apply"
+            );
+        }
     }
 
     public function createBatch(array $batch, array $rows): int
@@ -61,8 +69,8 @@ final class SqlMemberImportAdapter implements MemberImportAdapter
         try {
             $ins = $this->db->prepare(
                 'INSERT INTO ' . self::BATCH_TABLE . '
-                    (campus_id, status, source_label, hub_sheet, ny_sheet, hub_updated, ny_updated, warnings, duplicate_report, created_by_account_id)
-                 VALUES (:c, "staging", :label, :hub, :ny, :hu, :nu, :w, :dup, :by)'
+                    (campus_id, status, source_label, hub_sheet, ny_sheet, hub_updated, ny_updated, warnings, duplicate_report, match_rules, created_by_account_id)
+                 VALUES (:c, "staging", :label, :hub, :ny, :hu, :nu, :w, :dup, :rules, :by)'
             );
             $ins->execute([
                 ':c' => $batch['campus_id'],
@@ -74,6 +82,7 @@ final class SqlMemberImportAdapter implements MemberImportAdapter
                 // A JSON list in storage; a batch with nothing to say stores NULL.
                 ':w' => ($batch['warnings'] ?? []) !== [] ? json_encode(array_values((array) $batch['warnings']), JSON_UNESCAPED_UNICODE) : null,
                 ':dup' => $batch['duplicate_report'],
+                ':rules' => ($batch['match_rules'] ?? []) !== [] ? json_encode(array_values((array) $batch['match_rules'])) : null,
                 // An account id; a CLI run has none, and 0 is not an account.
                 ':by' => (int) ($batch['created_by_account_id'] ?? 0) > 0 ? (int) $batch['created_by_account_id'] : null,
             ]);
@@ -84,12 +93,12 @@ final class SqlMemberImportAdapter implements MemberImportAdapter
                     (batch_id, last_name, first_name, middle_name, preferred_name, email, phone,
                      address_raw, address_line1, city, region, postal_code, country,
                      birth_year, birth_month, birth_day, member_since, member_type, ministry, confirmed,
-                     source, filled_from, status, matched_person_id, notes)
+                     source, filled_from, status, matched_person_id, notes, duplicate_group)
                  VALUES
                     (:batch, :last_name, :first_name, :middle_name, :preferred_name, :email, :phone,
                      :address_raw, :address_line1, :city, :region, :postal_code, :country,
                      :birth_year, :birth_month, :birth_day, :member_since, :member_type, :ministry, :confirmed,
-                     :source, :filled_from, :status, :matched, :notes)'
+                     :source, :filled_from, :status, :matched, :notes, :dup_group)'
             );
             foreach ($rows as $row) {
                 $rowIns->execute([
@@ -120,6 +129,7 @@ final class SqlMemberImportAdapter implements MemberImportAdapter
                     ':status' => $row['status'],
                     ':matched' => $row['matched_person_id'],
                     ':notes' => $row['notes'],
+                    ':dup_group' => $row['duplicate_group'] ?? null,
                 ]);
             }
             $this->db->commit();
@@ -131,6 +141,15 @@ final class SqlMemberImportAdapter implements MemberImportAdapter
             }
             throw $e;
         }
+    }
+
+    public function saveDuplicateReport(int $batchId, array $report): void
+    {
+        $st = $this->db->prepare('UPDATE ' . self::BATCH_TABLE . ' SET duplicate_report = :r WHERE id = :id');
+        $st->execute([
+            ':r' => $report === [] ? null : json_encode($report, JSON_UNESCAPED_UNICODE),
+            ':id' => $batchId,
+        ]);
     }
 
     public function listBatches(int $limit): array

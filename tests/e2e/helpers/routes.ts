@@ -74,6 +74,7 @@ export const PROTECTED_MUTATIONS: ProtectedMutation[] = [
   { method: 'POST', path: '/admin/people/import/discard', body: { batch_id: 1 } },
   { method: 'POST', path: '/admin/maintenance/import/ingest', body: { campus_id: 1 } },
   { method: 'POST', path: '/admin/maintenance/import/apply', body: { confirm: '1', batch_id: 1 } },
+  { method: 'POST', path: '/admin/maintenance/import/duplicate', body: { batch_id: 1, group: 1, choice: 'separate' } },
   { method: 'POST', path: '/admin/maintenance/backup', body: { kind: 'mysql', target: 'people' } },
   { method: 'POST', path: '/admin/maintenance/export-xlsx', body: { campus_id: 1 } },
   { method: 'POST', path: '/admin/users', body: { action: 'delete', user_id: 1 } },

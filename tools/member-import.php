@@ -21,6 +21,10 @@ declare(strict_types=1);
  *   php tools/member-import.php --source=file.xlsx --preset=ny --campus-id=3 --dry-run
  *   php tools/member-import.php --source=file.xlsx --preset=ny --campus-id=3 --ingest
  *   php tools/member-import.php --apply-batch=12 --confirm=APPLY
+ *
+ * --match=birthday,full_first_name (also email, phone, member_type) requires
+ * those to agree, beyond the surname and first word of the first name, before
+ * two rows are the same person — as the ticks on the import page do.
  */
 
 spl_autoload_register(static function (string $class): void {
@@ -42,7 +46,7 @@ use App\Services\MemberWorkbookParser;
 $opts = getopt('', [
     'source:', 'google:', 'preset:', 'primary:', 'secondary:',
     'campus-id:', 'instructions:', 'dump-json', 'dry-run', 'ingest',
-    'apply-batch:', 'confirm:', 'allow-csv', 'help',
+    'apply-batch:', 'confirm:', 'allow-csv', 'match:', 'help',
 ]);
 
 if ($opts === false || isset($opts['help'])) {
@@ -82,6 +86,14 @@ $applyBatch = isset($opts['apply-batch']) ? (int) $opts['apply-batch'] : 0;
 $allowCsv = isset($opts['allow-csv']);
 $campusId = isset($opts['campus-id']) ? (int) $opts['campus-id'] : 0;
 $confirm = (string) ($opts['confirm'] ?? '');
+$matchNames = array_values(array_filter(array_map('trim', explode(',', (string) ($opts['match'] ?? '')))));
+$unknownRules = array_diff($matchNames, array_keys(\App\Services\MemberMatchRules::LABELS));
+if ($unknownRules !== []) {
+    fwrite(STDERR, 'Unknown --match rule(s): ' . implode(', ', $unknownRules) . '. Choose from: '
+        . implode(', ', array_keys(\App\Services\MemberMatchRules::LABELS)) . ".\n");
+    exit(2);
+}
+$rules = new \App\Services\MemberMatchRules($matchNames);
 
 try {
     if ($applyBatch > 0) {
@@ -108,7 +120,7 @@ try {
         $parsed = $parser->parseWorkbook($source, $primary, $secondary);
         $merged = $merger->merge($parsed['hub']['rows'] ?? [], $parsed['ny']['rows'] ?? []);
         $deduper = new \App\Services\MemberImportDeduper($parser);
-        $deduped = $deduper->dedupe($merged);
+        $deduped = $deduper->dedupe($merged, $rules);
         $merged = $deduped['rows'];
         $out = [
             'sheets' => $parsed['sheets'],
@@ -140,7 +152,7 @@ try {
     }
     $imp = PortalServiceProvider::makeMemberCampusImportService();
     if ($doIngest) {
-        $result = $imp->ingest($source, $campusId, 0, $primary, $secondary, basename($source), $allowCsv);
+        $result = $imp->ingest($source, $campusId, 0, $primary, $secondary, basename($source), $allowCsv, $rules);
         echo json_encode([
             'ingested' => true,
             'batch_id' => $result['batch']['id'] ?? null,
@@ -151,7 +163,7 @@ try {
         exit(0);
     }
 
-    $preview = $imp->preview($source, $campusId, $primary, $secondary);
+    $preview = $imp->preview($source, $campusId, $primary, $secondary, $rules);
     echo json_encode($preview, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
     fwrite(STDERR, sprintf(
         "Dry run only. Would create %d, update %d, unlink %d campus members. No writes to people.\n",

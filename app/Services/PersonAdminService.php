@@ -741,14 +741,18 @@ final readonly class PersonAdminService
     /**
      * Compact directory used to match an import against existing people.
      *
-     * @return list<array{id:int,first_name:string,last_name:string,email:string,campus_id:?int}>
+     * @return list<array{id:int,first_name:string,last_name:string,email:string,campus_id:?int,phone:string,birth_year:int,birth_month:int,birth_day:int,member_type:string}>
      */
     public function matchIndex(): array
     {
+        // Phone, birthday and member type are here for the importer's match
+        // rules (MemberMatchRules), which may require them to agree.
         $sql = 'SELECT p.id, p.first_name, p.last_name,
                        LOWER(TRIM(COALESCE(p.email, ""))) AS email,
-                       p.campus_id
+                       p.campus_id, p.mobile_phone, p.birth_year, p.birth_month, p.birth_day,
+                       mt.name AS member_type
                   FROM people p
+             LEFT JOIN member_types mt ON mt.id = p.member_type_id
               ORDER BY p.last_name, p.first_name';
         $rows = $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map(static fn (array $r): array => [
@@ -757,6 +761,11 @@ final readonly class PersonAdminService
             'last_name' => (string) $r['last_name'],
             'email' => (string) $r['email'],
             'campus_id' => $r['campus_id'] !== null && $r['campus_id'] !== '' ? (int) $r['campus_id'] : null,
+            'phone' => (string) ($r['mobile_phone'] ?? ''),
+            'birth_year' => (int) ($r['birth_year'] ?? 0),
+            'birth_month' => (int) ($r['birth_month'] ?? 0),
+            'birth_day' => (int) ($r['birth_day'] ?? 0),
+            'member_type' => (string) ($r['member_type'] ?? ''),
         ], $rows);
     }
 

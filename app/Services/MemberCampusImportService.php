@@ -89,6 +89,7 @@ final readonly class MemberCampusImportService
         ?string $nySheet = '',
         string $sourceLabel = '',
         bool $allowCsv = false,
+        MemberMatchRules $rules = new MemberMatchRules(),
     ): array {
         $this->ensureSchema();
         if ($this->parser->isCsvPath($path) && !$allowCsv) {
@@ -102,32 +103,40 @@ final readonly class MemberCampusImportService
             throw new InvalidArgumentException('That workbook has too many member rows (max ' . self::MAX_ROWS . ').');
         }
         $merged = $this->merger->merge($hubRows, $nyRows);
-        $deduped = $this->deduper->dedupe($merged);
-        $merged = $deduped['rows'];
         if ($merged === []) {
             throw new InvalidArgumentException('No member rows were found on those worksheets.');
         }
 
-        $people = $this->people->matchIndex();
-        $plan = $this->planner->plan(array_map($this->toPlannerRow(...), $merged), $people, $campusId);
-        $matchedByKey = [];
-        foreach ($plan['update'] as $item) {
-            $r = $item['row'];
-            $matchedByKey[$this->parser->nameKey((string) $r['last_name'], (string) $r['first_name'])] = (int) $item['person_id'];
-            $email = (string) ($r['email'] ?? '');
-            if ($email !== '') {
-                $matchedByKey['e:' . $email] = (int) $item['person_id'];
+        // Every row is staged, duplicates included. Rows that look like the
+        // same person share a group, and the suggested decision for each group
+        // is applied below as an ordinary, reversible decision — the importer
+        // can change it on the staging page. Dropping rows here is what lost a
+        // parent "Jessie" to a child "Jessie James" with nothing left to undo.
+        $groupOf = [];
+        foreach ($this->deduper->groups($merged, $rules) as $n => $indexes) {
+            foreach ($indexes as $i) {
+                $groupOf[$i] = $n + 1;
             }
+        }
+
+        // Matched by row position. Matching back by email or name key gave
+        // every row sharing a household inbox the same person.
+        $plan = $this->planner->plan(array_map($this->toPlannerRow(...), $merged), $this->people->matchIndex(), $campusId, $rules);
+        $matchByIndex = [];
+        foreach ($plan['update'] as $item) {
+            $matchByIndex[(int) $item['index']] = (int) $item['person_id'];
         }
 
         $warnings = array_merge(
             $parsed['warnings'],
-            $deduped['warnings'],
             $this->ministryKeywordWarnings($merged),
             $this->addressWarnings($merged),
             $this->memberTypeWarnings($merged),
         );
-        $dupReport = $deduped['removed'] === [] ? null : json_encode($deduped['removed'], JSON_UNESCAPED_UNICODE);
+        $stagingRows = [];
+        foreach ($merged as $i => $row) {
+            $stagingRows[] = $this->toStagingRow($row, $matchByIndex[$i] ?? null) + ['duplicate_group' => $groupOf[$i] ?? null];
+        }
         $batchId = $this->staging->createBatch(
             [
                 'campus_id' => $campusId,
@@ -137,11 +146,16 @@ final readonly class MemberCampusImportService
                 'hub_updated' => $parsed['hub']['updated'] ?? null,
                 'ny_updated' => $parsed['ny']['updated'] ?? null,
                 'warnings' => $warnings,
-                'duplicate_report' => $dupReport,
+                'duplicate_report' => null,
+                'match_rules' => $rules->toArray(),
                 'created_by_account_id' => $actorId,
             ],
-            array_map(fn (array $row): array => $this->toStagingRow($row, $matchedByKey), $merged)
+            $stagingRows
         );
+
+        if ($groupOf !== []) {
+            $this->suggestDuplicateDecisions($batchId);
+        }
 
         $batch = $this->batch($batchId);
         return ['batch' => $batch ?? [], 'counts' => $this->rowCounts($batchId), 'warnings' => $warnings];
@@ -155,16 +169,11 @@ final readonly class MemberCampusImportService
      * the INSERT itself belongs behind the repository.
      *
      * @param array<string,mixed>  $row
-     * @param array<string,int>    $matchedByKey
      * @return array<string,mixed>
      */
-    private function toStagingRow(array $row, array $matchedByKey): array
+    private function toStagingRow(array $row, ?int $match): array
     {
         $email = (string) ($row['email'] ?? '');
-        $key = $this->parser->nameKey((string) $row['last_name'], (string) $row['first_name']);
-        $match = $email !== '' && isset($matchedByKey['e:' . $email])
-            ? $matchedByKey['e:' . $email]
-            : ($matchedByKey[$key] ?? null);
         $since = (string) ($row['member_since'] ?? '');
 
         $blankToNull = static fn (string $k): ?string => ($row[$k] ?? '') !== '' ? (string) $row[$k] : null;
@@ -278,9 +287,210 @@ final readonly class MemberCampusImportService
             throw new InvalidArgumentException('Mark at least one cleaned row as Ready before applying.');
         }
         $fileRows = array_map($this->toPlannerRow(...), $data['rows']);
-        $result = $this->apply($fileRows, (int) $batch['campus_id'], $actorId);
+        $result = $this->apply($fileRows, (int) $batch['campus_id'], $actorId, $this->batchRules($batch));
         $this->staging->markBatchApplied($batchId);
         return $result;
+    }
+
+    /** The match rules a batch was staged with. @param array<string,mixed> $batch */
+    public function batchRules(array $batch): MemberMatchRules
+    {
+        return MemberMatchRules::fromJson(isset($batch['match_rules']) ? (string) $batch['match_rules'] : null);
+    }
+
+    /**
+     * The duplicate groups of a batch, each with its rows and decision, for the
+     * staging page. Empty for a batch staged before decisions existed (its
+     * report is the old list of removed names; see legacyDuplicates()).
+     *
+     * @return list<array{group:int,decision:string,keep:?int,suggested:int,rows:list<array<string,mixed>>,filled:array<string,mixed>}>
+     */
+    public function duplicateGroups(int $batchId): array
+    {
+        $batch = $this->batch($batchId);
+        $report = is_array($batch['duplicate_report'] ?? null) ? $batch['duplicate_report'] : [];
+        if (($report['version'] ?? 0) !== 2) {
+            return [];
+        }
+        $byGroup = [];
+        foreach ($this->staging->listRows($batchId) as $row) {
+            $g = (int) ($row['duplicate_group'] ?? 0);
+            if ($g > 0) {
+                $byGroup[$g][] = $row;
+            }
+        }
+        $out = [];
+        foreach ($report['groups'] ?? [] as $entry) {
+            $g = (int) $entry['group'];
+            $rows = $byGroup[$g] ?? [];
+            usort($rows, static fn (array $a, array $b): int => (int) $a['id'] <=> (int) $b['id']);
+            // Show each row as the workbook had it: the kept row's own values,
+            // with what the merge filled in listed beside them. Otherwise a
+            // parent "Jessie" whose name was expanded from a child "Jessie
+            // James" shows as a second "Jessie James".
+            $filled = [];
+            $keep = isset($entry['keep']) ? (int) $entry['keep'] : null;
+            foreach ((array) ($entry['filled'] ?? []) as $field => [$before, $after]) {
+                $filled[(string) $field] = $after;
+                foreach ($rows as $k => $r) {
+                    if ((int) $r['id'] === $keep && (string) ($r[$field] ?? '') === (string) ($after ?? '')) {
+                        $rows[$k][$field] = $before;
+                    }
+                }
+            }
+            $out[] = [
+                'group' => $g,
+                'decision' => (string) ($entry['decision'] ?? 'keep'),
+                'keep' => $keep,
+                'suggested' => (int) ($entry['suggested'] ?? 0),
+                'rows' => $rows,
+                'filled' => $filled,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * A batch staged before duplicate decisions: the names that were removed.
+     *
+     * @return list<array{name:string,kept:string}>
+     */
+    public function legacyDuplicates(array $batch): array
+    {
+        $report = is_array($batch['duplicate_report'] ?? null) ? $batch['duplicate_report'] : [];
+
+        return ($report['version'] ?? 0) === 2 ? [] : array_values(array_filter($report, 'is_array'));
+    }
+
+    /**
+     * Record the suggested decision for every group of a freshly staged batch:
+     * keep the row with more filled fields, as the import always has.
+     */
+    private function suggestDuplicateDecisions(int $batchId): void
+    {
+        $byGroup = [];
+        foreach ($this->staging->listRows($batchId) as $row) {
+            $g = (int) ($row['duplicate_group'] ?? 0);
+            if ($g > 0) {
+                $byGroup[$g][] = $row;
+            }
+        }
+        ksort($byGroup);
+        $report = ['version' => 2, 'groups' => []];
+        foreach ($byGroup as $g => $rows) {
+            usort($rows, static fn (array $a, array $b): int => (int) $a['id'] <=> (int) $b['id']);
+            $suggested = (int) $rows[$this->deduper->keeperIndex($rows)]['id'];
+            $report['groups'][] = [
+                'group' => $g,
+                'rows' => array_map(static fn (array $r): int => (int) $r['id'], $rows),
+                'suggested' => $suggested,
+                'decision' => 'separate',
+                'keep' => null,
+                'skipped' => [],
+                'filled' => [],
+            ];
+        }
+        $this->staging->saveDuplicateReport($batchId, $report);
+        foreach ($report['groups'] as $entry) {
+            $this->resolveDuplicate($batchId, (int) $entry['group'], 'keep', (int) $entry['suggested']);
+        }
+    }
+
+    /**
+     * Decide one duplicate group: keep one row as the person (the others are
+     * set to Skip and fill its blanks), or keep every row as a different
+     * person. The previous decision is undone first, so a group can be
+     * changed back and forth until the batch is applied.
+     *
+     * Undoing only touches what the decision wrote and nobody has changed
+     * since: a filled field still holding the filled value, a row still on
+     * Skip. An edit made by hand in between is left alone.
+     */
+    public function resolveDuplicate(int $batchId, int $group, string $decision, int $keepRowId = 0): void
+    {
+        if (!in_array($decision, ['keep', 'separate'], true)) {
+            throw new InvalidArgumentException('Choose which row to keep, or keep them all.');
+        }
+        $batch = $this->batch($batchId);
+        if ($batch === null) {
+            throw new InvalidArgumentException('Unknown import batch.');
+        }
+        if ((string) $batch['status'] === 'applied') {
+            throw new InvalidArgumentException('That batch has already been applied.');
+        }
+        $report = is_array($batch['duplicate_report'] ?? null) ? $batch['duplicate_report'] : [];
+        $at = null;
+        foreach ($report['groups'] ?? [] as $k => $entry) {
+            if ((int) $entry['group'] === $group) {
+                $at = $k;
+            }
+        }
+        if (($report['version'] ?? 0) !== 2 || $at === null) {
+            throw new InvalidArgumentException('Unknown duplicate group.');
+        }
+        $entry = $report['groups'][$at];
+
+        $rows = [];
+        foreach ($this->staging->listRows($batchId) as $row) {
+            if ((int) ($row['duplicate_group'] ?? 0) === $group) {
+                $rows[(int) $row['id']] = $row;
+            }
+        }
+        ksort($rows);
+        if ($decision === 'keep' && !isset($rows[$keepRowId])) {
+            throw new InvalidArgumentException('That row is not part of this duplicate group.');
+        }
+        $write = function (int $id, string $field, mixed $value) use (&$rows): void {
+            $this->staging->updateRowField($id, $field, $value, self::ROW_FIELDS);
+            $rows[$id][$field] = $value;
+        };
+        $same = static fn (mixed $x, mixed $y): bool => (string) ($x ?? '') === (string) ($y ?? '');
+
+        // Undo the previous decision.
+        $prevKeep = isset($entry['keep']) ? (int) $entry['keep'] : 0;
+        if ($prevKeep > 0 && isset($rows[$prevKeep])) {
+            foreach ((array) ($entry['filled'] ?? []) as $field => [$before, $after]) {
+                if (in_array($field, self::ROW_FIELDS, true) && $same($rows[$prevKeep][$field] ?? null, $after)) {
+                    $write($prevKeep, $field, $before);
+                }
+            }
+        }
+        foreach ((array) ($entry['skipped'] ?? []) as $id => $status) {
+            if (isset($rows[(int) $id]) && $rows[(int) $id]['status'] === 'skip') {
+                $write((int) $id, 'status', (string) $status);
+            }
+        }
+        $entry['filled'] = [];
+        $entry['skipped'] = [];
+        $entry['keep'] = null;
+
+        // Apply the new one.
+        if ($decision === 'keep') {
+            $keeper = $rows[$keepRowId];
+            $merged = $keeper;
+            foreach ($rows as $id => $row) {
+                if ($id === $keepRowId) {
+                    continue;
+                }
+                $merged = $this->deduper->fillFrom($merged, $row);
+                $entry['skipped'][(string) $id] = (string) $row['status'];
+                $write($id, 'status', 'skip');
+            }
+            foreach (self::ROW_FIELDS as $field) {
+                if (!$same($keeper[$field] ?? null, $merged[$field] ?? null)) {
+                    $entry['filled'][$field] = [$keeper[$field] ?? null, $merged[$field]];
+                    $write($keepRowId, $field, $merged[$field]);
+                }
+            }
+            $entry['keep'] = $keepRowId;
+        }
+        $entry['decision'] = $decision;
+        // JSON objects, even when empty, so the stored shape never changes.
+        $entry['filled'] = (object) $entry['filled'];
+        $entry['skipped'] = (object) $entry['skipped'];
+        $report['groups'][$at] = $entry;
+        $this->staging->saveDuplicateReport($batchId, $report);
     }
 
     public function discardBatch(int $batchId): void
@@ -310,12 +520,17 @@ final readonly class MemberCampusImportService
      *   warnings:list<string>
      * }
      */
-    public function preview(string $path, int $campusId, ?string $hubSheet = MemberWorkbookParser::HUB_SHEET, ?string $nySheet = ''): array
-    {
+    public function preview(
+        string $path,
+        int $campusId,
+        ?string $hubSheet = MemberWorkbookParser::HUB_SHEET,
+        ?string $nySheet = '',
+        MemberMatchRules $rules = new MemberMatchRules(),
+    ): array {
         $this->requireCampus($campusId);
         $parsed = $this->parser->parseWorkbook($path, $hubSheet, $nySheet);
         $merged = $this->merger->merge($parsed['hub']['rows'] ?? [], $parsed['ny']['rows'] ?? []);
-        $deduped = $this->deduper->dedupe($merged);
+        $deduped = $this->deduper->dedupe($merged, $rules);
         $merged = $deduped['rows'];
         $ready = 0;
         $draft = 0;
@@ -326,7 +541,7 @@ final readonly class MemberCampusImportService
                 $draft++;
             }
         }
-        $plan = $this->planner->plan(array_map($this->toPlannerRow(...), $merged), $this->people->matchIndex(), $campusId);
+        $plan = $this->planner->plan(array_map($this->toPlannerRow(...), $merged), $this->people->matchIndex(), $campusId, $rules);
         return [
             'sheets' => $parsed['sheets'],
             'primary' => $parsed['hub']['sheet'] ?? null,
@@ -356,13 +571,13 @@ final readonly class MemberCampusImportService
      * @param list<array<string,mixed>> $fileRows
      * @return array{created:int,updated:int,removed:int,warnings:list<string>}
      */
-    public function apply(array $fileRows, int $campusId, int $actorId): array
+    public function apply(array $fileRows, int $campusId, int $actorId, MemberMatchRules $rules = new MemberMatchRules()): array
     {
         $this->requireCampus($campusId);
         if ($fileRows === []) {
             throw new InvalidArgumentException('Nothing to import.');
         }
-        $plan = $this->planner->plan($fileRows, $this->people->matchIndex(), $campusId);
+        $plan = $this->planner->plan($fileRows, $this->people->matchIndex(), $campusId, $rules);
         $clsId = $this->importClassificationId();
         $typeIds = $this->memberTypeIds();
 

@@ -21,6 +21,12 @@ final class MemberImportDeduper
     }
 
     /**
+     * Collapse each duplicate group onto its suggested keeper.
+     *
+     * The staging import does not use this: it keeps every row and lets an
+     * administrator decide each group (MemberCampusImportService). It remains
+     * for the command-line preview, which only reports.
+     *
      * @param list<array<string,mixed>> $rows
      * @return array{
      *   rows:list<array<string,mixed>>,
@@ -28,31 +34,31 @@ final class MemberImportDeduper
      *   warnings:list<string>
      * }
      */
-    public function dedupe(array $rows): array
+    public function dedupe(array $rows, MemberMatchRules $rules = new MemberMatchRules()): array
     {
-        $groups = [];
-        $order = [];
-        foreach ($rows as $i => $row) {
-            $key = $this->identityKey($row, $i);
-            if (!isset($groups[$key])) {
-                $groups[$key] = [];
-                $order[] = $key;
+        $groups = $this->groups($rows, $rules);
+        $inGroup = [];
+        $firstOf = [];
+        foreach ($groups as $g => $indexes) {
+            foreach ($indexes as $i) {
+                $inGroup[$i] = $g;
             }
-            $groups[$key][] = $i;
+            $firstOf[$g] = $indexes[0];
         }
-
-        [$groups, $order] = $this->mergeAbbreviatedNames($rows, $groups, $order);
 
         $kept = [];
         $removed = [];
-        foreach ($order as $key) {
-            $indexes = $groups[$key];
-            if (count($indexes) === 1) {
-                $kept[] = $rows[$indexes[0]];
+        foreach ($rows as $i => $row) {
+            if (!isset($inGroup[$i])) {
+                $kept[] = $row;
                 continue;
             }
-            $cluster = array_map(static fn (int $i) => $rows[$i], $indexes);
-            $winnerIdx = $this->winnerIndex($cluster);
+            $g = $inGroup[$i];
+            if ($firstOf[$g] !== $i) {
+                continue;
+            }
+            $cluster = array_map(static fn (int $j) => $rows[$j], $groups[$g]);
+            $winnerIdx = $this->keeperIndex($cluster);
             $winner = $cluster[$winnerIdx];
             $winnerName = $this->label($winner);
             foreach ($cluster as $j => $dup) {
@@ -83,7 +89,57 @@ final class MemberImportDeduper
         return ['rows' => $kept, 'removed' => $removed, 'warnings' => $warnings];
     }
 
-    /** @param array<string,mixed> $row */
+    /**
+     * Rows that look like the same person, as groups of row indexes (two or
+     * more each, in workbook order). Nothing is removed here.
+     *
+     * Rows sharing a name key are split further by the chosen rules: a row
+     * joins a group only if it agrees with every row already in it.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<list<int>>
+     */
+    public function groups(array $rows, MemberMatchRules $rules = new MemberMatchRules()): array
+    {
+        $groups = [];
+        $order = [];
+        foreach ($rows as $i => $row) {
+            $base = $this->identityKey($row, $i, $rules);
+            $n = 0;
+            while (true) {
+                $key = $base . '#' . $n;
+                if (!isset($groups[$key])) {
+                    $groups[$key] = [$i];
+                    $order[] = $key;
+                    break;
+                }
+                $fits = true;
+                foreach ($groups[$key] as $j) {
+                    if (!$rules->agree($rows[$j], $row)) {
+                        $fits = false;
+                        break;
+                    }
+                }
+                if ($fits) {
+                    $groups[$key][] = $i;
+                    break;
+                }
+                $n++;
+            }
+        }
+
+        [$groups, $order] = $this->mergeAbbreviatedNames($rows, $groups, $order, $rules);
+
+        $out = [];
+        foreach ($order as $key) {
+            if (count($groups[$key]) > 1) {
+                $out[] = $groups[$key];
+            }
+        }
+
+        return $out;
+    }
+
     /**
      * Fold "Santos, A" into "Santos, Ana".
      *
@@ -103,8 +159,14 @@ final class MemberImportDeduper
      * @param list<string>               $order
      * @return array{0:array<string,list<int>>,1:list<string>}
      */
-    private function mergeAbbreviatedNames(array $rows, array $groups, array $order): array
+    private function mergeAbbreviatedNames(array $rows, array $groups, array $order, MemberMatchRules $rules): array
     {
+        // Folding an initial into a full name is exactly what "full first
+        // name" rules out.
+        if ($rules->has(MemberMatchRules::FULL_FIRST_NAME)) {
+            return [$groups, $order];
+        }
+
         $norm = static fn (mixed $v): string => (string) preg_replace('/[^a-z0-9]+/', '', strtolower(trim((string) $v)));
 
         // Describe each group once by its first row: surname, first name, email.
@@ -143,6 +205,13 @@ final class MemberImportDeduper
                 if (!str_starts_with($longer, $shorter)) {
                     continue;
                 }
+                foreach ($groups[$a] as $i) {
+                    foreach ($groups[$b] as $j) {
+                        if (!$rules->agree($rows[$i], $rows[$j])) {
+                            continue 3;
+                        }
+                    }
+                }
                 // Keep the group whose name is spelled out.
                 $keep = $longer === $x['first'] ? $a : $b;
                 $drop = $keep === $a ? $b : $a;
@@ -158,7 +227,8 @@ final class MemberImportDeduper
         return [$groups, $order];
     }
 
-    public function identityKey(array $row, int $index = 0): string
+    /** @param array<string,mixed> $row */
+    public function identityKey(array $row, int $index = 0, MemberMatchRules $rules = new MemberMatchRules()): string
     {
         // Identity is the NAME, not the email address.
         //
@@ -178,7 +248,7 @@ final class MemberImportDeduper
         // under two spellings with the same email. That direction is safe: a
         // missed merge stays visible as two staged rows an administrator can
         // reconcile, whereas a wrong merge silently deletes a member.
-        $key = $this->parser->nameKey((string) ($row['last_name'] ?? ''), (string) ($row['first_name'] ?? ''));
+        $key = $rules->nameKey((string) ($row['last_name'] ?? ''), (string) ($row['first_name'] ?? ''));
         if ($key !== '|') {
             return 'n:' . $key;
         }
@@ -196,9 +266,11 @@ final class MemberImportDeduper
     }
 
     /**
+     * The row suggested as the one to keep: the one with more filled fields.
+     *
      * @param list<array<string,mixed>> $cluster
      */
-    private function winnerIndex(array $cluster): int
+    public function keeperIndex(array $cluster): int
     {
         $best = 0;
         $bestScore = -1;
@@ -241,7 +313,7 @@ final class MemberImportDeduper
      * @param array<string,mixed> $dup
      * @return array<string,mixed>
      */
-    private function fillFrom(array $winner, array $dup): array
+    public function fillFrom(array $winner, array $dup): array
     {
         foreach (self::FILL_FIELDS as $field) {
             if (trim((string) ($winner[$field] ?? '')) === '' && trim((string) ($dup[$field] ?? '')) !== '') {
@@ -280,7 +352,7 @@ final class MemberImportDeduper
     }
 
     /** @param array<string,mixed> $row */
-    private function label(array $row): string
+    public function label(array $row): string
     {
         $raw = trim((string) ($row['name_raw'] ?? ''));
         if ($raw !== '') {
