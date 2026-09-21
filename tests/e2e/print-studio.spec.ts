@@ -40,6 +40,15 @@ test.describe('print studio', () => {
     await expect(page.locator('#pcLeftToggle')).toHaveAttribute('aria-expanded', 'true');
   });
 
+  test('a new calendar starts with no calendars ticked', async ({ page }) => {
+    await page.goto('/calendar/print-setup');
+    // An old per-browser memory of the last selection must not carry over.
+    await page.evaluate(() => localStorage.setItem('church_portal_print_sources_v1', 'birthdays'));
+    await page.reload();
+    await expect(page.locator('input[name=source]:checked')).toHaveCount(0);
+    await expect(page.locator('#pcSrcNote')).toContainText('Nothing selected yet');
+  });
+
   test('tabs move with the arrow keys', async ({ page }) => {
     await page.goto('/calendar/print-setup?' + MONTH);
     await page.focus('#pcTab-content');
