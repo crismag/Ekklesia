@@ -24,9 +24,6 @@ if ($orientation === 'landscape') {
     [$paperW, $paperH] = [$paperH, $paperW];
 }
 $size = $paperW . 'in ' . $paperH . 'in';
-// The sheet fills the page inside its margins.
-$sheetW = round($paperW - 0.945, 3);
-$sheetH = round($paperH - 0.945, 3);
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -53,12 +50,15 @@ $sheetH = round($paperH - 0.945, 3);
     background: #eef1f0;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
+  /* On screen the sheet is the paper itself, with the print margin as its
+     padding, so its content is exactly as wide as on the printed page. That is
+     what lets the page be measured here and fitted to one sheet (below). */
   .sheet {
     background: #fff;
     margin: 16px auto;
-    padding: 14mm;
-    width: <?= $sheetW ?>in;
-    min-height: <?= $sheetH ?>in;
+    padding: 12mm;
+    width: <?= $paperW ?>in;
+    min-height: <?= $paperH ?>in;
     box-shadow: 0 2px 18px rgba(0,0,0,.18);
   }
 
@@ -240,6 +240,7 @@ $sheetH = round($paperH - 0.945, 3);
     <div class="bg-layer" aria-hidden="true" style="background-image:url('<?= $e($background['url']) ?>');--bg-fit:<?= $background['fit'] === 'contain' ? 'contain' : 'cover' ?>;--bg-pos:<?= $e($bgPos) ?>;--bg-o:<?= $e(number_format((float) $background['opacity'], 2)) ?>"></div>
     <div class="bg-wash" aria-hidden="true" style="--bg-wash:<?= $e(number_format((float) $background['overlay'], 2)) ?>"></div>
   <?php endif; ?>
+  <div class="sheet-body">
   <header class="masthead">
     <div class="masthead-row">
       <div class="mh-main">
@@ -305,6 +306,50 @@ $sheetH = round($paperH - 0.945, 3);
     <span><?= $e(implode(' · ', $right)) ?></span>
   </footer>
   <?php endif; ?>
+  </div>
 </div>
+<?php if (!empty($fitOnePage)): ?>
+<script>
+/* One page per month, guaranteed.
+ *
+ * The grid is planned to fit, but a sheet can carry more than was planned for:
+ * a long church or campus name, notes above or below, long holiday names. So
+ * each printed page (the title and first month; then each further month) is
+ * measured, and one that would run past the paper is scaled down just enough
+ * to fit, as "fit to page" does. The scale is set on the page's own elements,
+ * so printing and saving as PDF use it; nothing is ever pushed to a second
+ * sheet. Measured on screen, where the sheet has the printed page's width. */
+(function () {
+  var avail = <?= json_encode(round(($paperH - 0.945) * 96 - 6, 1)) ?>;
+  function fit() {
+    var body = document.querySelector('.sheet-body');
+    if (!body) return;
+    var kids = Array.prototype.slice.call(body.children);
+    kids.forEach(function (k) { k.style.zoom = ''; });
+    var groups = [[]];
+    var months = 0;
+    kids.forEach(function (k) {
+      if (k.matches('section.month') && months++ > 0) groups.push([]);
+      groups[groups.length - 1].push(k);
+    });
+    groups.forEach(function (g) {
+      var shown = g.filter(function (k) { return k.getClientRects().length > 0; });
+      if (!shown.length) return;
+      var top = shown[0].getBoundingClientRect().top;
+      var last = shown[shown.length - 1];
+      var bottom = last.getBoundingClientRect().bottom + parseFloat(getComputedStyle(last).marginBottom || 0);
+      var height = bottom - top;
+      if (height > avail) {
+        var z = Math.max(0.5, Math.floor((avail / height) * 1000) / 1000);
+        g.forEach(function (k) { k.style.zoom = String(z); });
+        document.documentElement.setAttribute('data-fitted', String(z));
+      }
+    });
+  }
+  fit();
+  window.addEventListener('load', fit);
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>

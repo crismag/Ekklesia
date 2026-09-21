@@ -146,6 +146,14 @@ foreach (['weekly', 'agenda', 'planner'] as $layout) {
         && !str_contains($text($html), 'Jessie James Quill'));
 }
 
+echo "\nOne page per month is guaranteed, not only planned\n";
+$fitPage = $composer->render($items, $start, $end, $base + ['pageHeight' => 'fit']);
+check('a one-page monthly calendar carries the fit-to-page measure', str_contains($fitPage, 'One page per month, guaranteed'));
+check('it fits to the printed page height (Letter portrait, less margins)', str_contains($fitPage, 'var avail = 959.3;'));
+check('growing to fit never scales the page', !str_contains($grow, 'One page per month, guaranteed'));
+check('the screen sheet has the printed page\'s width, so it can be measured',
+    str_contains($fitPage, 'padding: 12mm;') && str_contains($fitPage, 'width: 8.5in;'));
+
 echo "\nThe printed calendar follows the chosen campus\n";
 $routes = (string) file_get_contents($root . '/routes/web.php');
 $printRoute = substr($routes, (int) strpos($routes, "'GET /calendar/print' =>"), 4000);
