@@ -157,8 +157,10 @@ final class PrintComposer
         require_once __DIR__ . '/MemberTypeStyle.php';
         require_once __DIR__ . '/EntryPresentation.php';
 
-        // Member types: fixed colours plus the directory's own symbols.
-        $memberTypes = MemberTypeStyle::fromConfig(dirname($this->viewPath, 2) . '/config/member-type-icons.json');
+        // Member types: fixed colours, marked on the name itself.
+        $memberTypes = new MemberTypeStyle();
+        $memberMark = in_array($options['memberMark'] ?? 'highlight', MemberTypeStyle::MARKS, true)
+            ? (string) ($options['memberMark'] ?? 'highlight') : 'highlight';
 
         // The page's title leads the masthead, so it must say what the page
         // is. A title the reader typed wins; otherwise it is worked out from

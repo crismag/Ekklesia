@@ -36,13 +36,11 @@ ob_start(); ?>
 <?php
   // Birthdays print the name the celebrant goes by, with no age
   // (EntryPresentation::celebrant); everything else prints its title.
-  $label = static function (array $entry) use ($e, $nameStyle, $memberTypes): string {
+  $label = static function (array $entry) use ($e, $nameStyle): string {
       if (($entry['kind'] ?? '') !== 'birth') {
           return $e($entry['title']);
       }
-      $type = (string) ($entry['person']['memberType'] ?? '');
-      return (isset($memberTypes) ? $memberTypes->symbol($type) : '')
-          . $e(\App\Services\Calendar\EntryPresentation::celebrant($entry, ($nameStyle ?? 'full') === 'short'));
+      return $e(\App\Services\Calendar\EntryPresentation::celebrant($entry, ($nameStyle ?? 'full') === 'short'));
   };
   $mtClass = static function (array $entry): string {
       if (($entry['kind'] ?? '') !== 'birth') {

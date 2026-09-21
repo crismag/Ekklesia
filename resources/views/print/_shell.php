@@ -77,21 +77,40 @@ $sheetH = round($paperH - 0.945, 3);
   .period { flex: 0 0 auto; font-size: 19pt; line-height: 1.05; font-weight: 400; letter-spacing: -.005em;
     text-align: right; color: #2b3832; white-space: nowrap; }
 
-  /* Member types. Fixed colours (MemberTypeStyle), on the rule and the symbol
-     only; the name stays in ink. The symbol is what survives greyscale. */
+  /* Member types (MemberTypeStyle): colour on the name itself, never an extra
+     mark, so a busy day loses no room. The rule beside the entry carries the
+     hue at full strength; the name is highlighted with a light tint of it
+     (text stays in ink) or, in "text" mode, set in a deeper shade of it. */
   .k-birth { border-left-color: var(--mt-none) !important; }
   .k-birth.mt-gna { border-left-color: var(--mt-gna) !important; }
   .k-birth.mt-trailblazer { border-left-color: var(--mt-trailblazer) !important; }
   .k-birth.mt-radical { border-left-color: var(--mt-radical) !important; }
-  .mt-sym { width: .95em; height: .95em; vertical-align: -.14em; margin-right: .22em; flex: 0 0 auto; }
-  .mt-gna .mt-sym { color: var(--mt-gna); }
-  .mt-trailblazer .mt-sym { color: var(--mt-trailblazer); }
-  .mt-radical .mt-sym { color: var(--mt-radical); }
+  .mark-highlight .k-birth.mt-gna .t { background: var(--mt-gna-tint); }
+  .mark-highlight .k-birth.mt-trailblazer .t { background: var(--mt-trailblazer-tint); }
+  .mark-highlight .k-birth.mt-radical .t { background: var(--mt-radical-tint); }
+  /* The tint hugs the name. The roomier tiers set the name as a block (for
+     line clamping), which would otherwise stretch the tint across the cell. */
+  .mark-highlight .k-birth[class*="mt-"] .t { border-radius: 2pt; padding: 0 2pt; margin: 0 -1pt;
+    width: fit-content; max-width: 100%;
+    -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .mark-highlight .t-showcase .k-birth[class*="mt-"] .t { margin-left: auto; margin-right: auto; }
+  .mark-text .k-birth.mt-gna .t { color: var(--mt-gna-ink); }
+  .mark-text .k-birth.mt-trailblazer .t { color: var(--mt-trailblazer-ink); }
+  .mark-text .k-birth.mt-radical .t { color: var(--mt-radical-ink); }
   .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3pt 14pt; margin-top: 8pt;
     font-size: 8.5pt; color: #46534c; break-inside: avoid; }
   .legend-title { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 7.5pt; }
   .legend-item { display: inline-flex; align-items: center; gap: 4pt; }
-  .legend-item .mt-sym { margin: 0; width: 10pt; height: 10pt; }
+  .legend-swatch { display: inline-block; min-width: 10pt; height: 10pt; border-radius: 2pt; border-left: 2.5pt solid var(--mt-none); }
+  .mark-highlight .legend-swatch.mt-gna { background: var(--mt-gna-tint); }
+  .mark-highlight .legend-swatch.mt-trailblazer { background: var(--mt-trailblazer-tint); }
+  .mark-highlight .legend-swatch.mt-radical { background: var(--mt-radical-tint); }
+  .legend-swatch.mt-gna { border-left-color: var(--mt-gna); }
+  .legend-swatch.mt-trailblazer { border-left-color: var(--mt-trailblazer); }
+  .legend-swatch.mt-radical { border-left-color: var(--mt-radical); }
+  .mark-text .legend .mt-gna-label { color: var(--mt-gna-ink); font-weight: 700; }
+  .mark-text .legend .mt-trailblazer-label { color: var(--mt-trailblazer-ink); font-weight: 700; }
+  .mark-text .legend .mt-radical-label { color: var(--mt-radical-ink); font-weight: 700; }
   .legend-rule { display: inline-block; width: 2.5pt; height: 10pt; background: var(--mt-none); }
 
   .colophon { margin-top: 14pt; padding-top: 6pt; border-top: .5pt solid #c9d4ce; display: flex; justify-content: space-between; gap: 10pt; font-size: 7.5pt; color: #6b7a72; }
@@ -211,7 +230,7 @@ $sheetH = round($paperH - 0.945, 3);
   // sheet (PrintComposer::docTitle).
   $periodNote = $customTitle !== '' ? $customTitle : (string) ($docTitle ?? ($branding['period_note'] ?? ''));
 ?>
-<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?><?= !empty($background) ? ' has-bg' : '' ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
+<div class="sheet title-<?= $e($titleStyle) ?> <?= $e(isset($themeClasses) ? $themeClasses($theme ?? 'classic') : 'theme-' . ($theme ?? 'classic')) ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?><?= !empty($background) ? ' has-bg' : '' ?> mark-<?= $e($memberMark ?? 'highlight') ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
   <?php foreach (($printNotes ?? []) as $note): ?>
     <p class="print-note no-print" role="status"><?= $e($note) ?></p>
   <?php endforeach; ?>
@@ -256,7 +275,7 @@ $sheetH = round($paperH - 0.945, 3);
     <div class="legend" aria-label="Member types">
       <span class="legend-title">Member type</span>
       <?php foreach ($legendRows as $row): ?>
-        <span class="legend-item mt-<?= $e($row['group']) ?>"><?= $row['symbol'] ?><?= $e($row['label']) ?></span>
+        <span class="legend-item"><span class="legend-swatch mt-<?= $e($row['group']) ?>" aria-hidden="true"></span><span class="mt-<?= $e($row['group']) ?>-label"><?= $e($row['label']) ?></span></span>
       <?php endforeach; ?>
       <?php if (!empty($legendNeutral)): ?>
         <span class="legend-item"><span class="legend-rule" aria-hidden="true"></span>Not recorded</span>

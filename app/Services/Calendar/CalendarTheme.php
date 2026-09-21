@@ -142,7 +142,7 @@ final class CalendarTheme
                 'palette' => ['paper' => '#ffffff', 'ink' => '#111111', 'heading' => '#111111', 'accent' => '#111111', 'grid' => '#9a9a9a', 'cell' => '#ffffff', 'band' => '#111111'],
                 'ink' => 'low',
                 'label' => 'Economy',
-                'blurb' => 'The least ink: black hairlines, no fills, no decoration. Member types are told apart by their symbols.',
+                'blurb' => 'The least ink: black hairlines, no fills, no decoration.',
                 'layouts' => ['monthly', 'weekly', 'agenda', 'sunday', 'annual', 'planner'],
                 'defaults' => [
                     'entryDisplay' => 'auto', 'density' => 'standard',
