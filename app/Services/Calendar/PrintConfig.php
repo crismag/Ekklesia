@@ -40,7 +40,27 @@ final class PrintConfig
     public const ENTRY_DISPLAYS = ['compact', 'readable', 'showcase', 'auto'];
     public const TITLE_STYLES = ['classic', 'editorial', 'banner'];
     public const FONTS = ['serif', 'sans', 'display', 'mono'];
-    public const NAME_STYLES = ['full', 'short'];
+    /**
+     * How a celebrant is named on paper: the name they go by (preferred, else
+     * first), optionally with a last initial to tell two of them apart. Never
+     * the full legal name. The old values still load: "full" meant "do not
+     * shorten" and "short" meant "first name and initial".
+     */
+    public const NAME_STYLES = ['first', 'initial'];
+    private const LEGACY_NAME_STYLES = ['full' => 'first', 'short' => 'initial'];
+
+    /** Paper sizes, portrait, in inches. Tabloid is the common large office sheet. */
+    public const PAPERS = [
+        'letter' => [8.5, 11.0], 'legal' => [8.5, 14.0], 'tabloid' => [11.0, 17.0],
+        'a4' => [8.27, 11.69], 'a3' => [11.69, 16.54],
+    ];
+
+    /**
+     * Whether a month may run past one sheet. "grow" lets a busy week take the
+     * height its entries need and hides nothing; "fit" is the original sheet,
+     * one page with "+n more" for what does not fit.
+     */
+    public const PAGE_HEIGHTS = ['grow', 'fit'];
 
     /** @param array<string,mixed> $raw */
     private function __construct(private readonly array $raw)
@@ -67,14 +87,22 @@ final class PrintConfig
             static fn (string $s): bool => $s !== '',
         ));
 
+        // A view saved before "grow" existed was designed as one fitted sheet,
+        // and reopening it must still print that sheet.
+        $storedWithoutHeight = is_array($input['page'] ?? null) && !array_key_exists('height', $input['page']);
         $page = self::section($input, 'page', $d['page']);
-        $page['paper'] = in_array($page['paper'], ['letter', 'legal', 'a4', 'a3'], true) ? $page['paper'] : 'letter';
+        $page['paper'] = isset(self::PAPERS[$page['paper']]) ? $page['paper'] : 'letter';
+        $page['height'] = $storedWithoutHeight ? 'fit'
+            : (in_array($page['height'], self::PAGE_HEIGHTS, true) ? $page['height'] : $d['page']['height']);
         $page['orientation'] = in_array($page['orientation'], ['', 'portrait', 'landscape'], true) ? $page['orientation'] : '';
 
         $appearance = self::section($input, 'appearance', $d['appearance']);
         $appearance['typeScale'] = max(0.85, min(1.3, (float) ($appearance['typeScale'] ?: 1.0)));
         $appearance['font'] = in_array($appearance['font'], self::FONTS, true) ? $appearance['font'] : 'serif';
-        $appearance['names'] = in_array($appearance['names'], self::NAME_STYLES, true) ? $appearance['names'] : 'full';
+        $names = (string) ($appearance['names'] ?? '');
+        $names = self::LEGACY_NAME_STYLES[$names] ?? $names;
+        $appearance['names'] = in_array($names, self::NAME_STYLES, true) ? $names : 'first';
+        $appearance['legend'] = (bool) ($appearance['legend'] ?? true);
         $appearance['density'] = in_array($appearance['density'], self::DENSITIES, true) ? $appearance['density'] : 'standard';
         $appearance['titleStyle'] = in_array($appearance['titleStyle'], self::TITLE_STYLES, true)
             ? $appearance['titleStyle'] : 'classic';
@@ -173,11 +201,13 @@ final class PrintConfig
             // first preset. Baking a source list in here would put the choice
             // in two places.
             'content' => ['sources' => []],
-            'page' => ['paper' => 'letter', 'orientation' => ''],
+            'page' => ['paper' => 'letter', 'orientation' => '', 'height' => 'grow'],
             'appearance' => [
                 'typeScale' => 1.0,
                 'font' => 'serif',
-                'names' => 'full',
+                'names' => 'first',
+                // The member-type key under a sheet that has birthdays on it.
+                'legend' => true,
                 'density' => 'standard',
                 'titleStyle' => 'classic',
                 'accent' => '',
@@ -304,11 +334,16 @@ final class PrintConfig
                     ? array_map('trim', explode(',', (string) $q['sources']))
                     : [],
             ],
-            'page' => ['paper' => $q['paper'] ?? 'letter', 'orientation' => $q['orientation'] ?? ''],
+            'page' => [
+                'paper' => $q['paper'] ?? 'letter',
+                'orientation' => $q['orientation'] ?? '',
+                'height' => $q['height'] ?? $d['page']['height'],
+            ],
             'appearance' => [
                 'typeScale' => (float) ($q['scale'] ?? 1.0),
                 'font' => $q['font'] ?? 'serif',
-                'names' => $q['names'] ?? 'full',
+                'names' => $q['names'] ?? $d['appearance']['names'],
+                'legend' => $bool('legend', true),
                 'density' => $q['density'] ?? 'standard',
                 'titleStyle' => $q['titleStyle'] ?? 'classic',
                 'accent' => $q['accent'] ?? '',
@@ -373,7 +408,7 @@ final class PrintConfig
         $q['sources'] = implode(',', (array) $this->get('content.sources', []));
 
         foreach ([
-            'paper' => 'page.paper', 'orientation' => 'page.orientation',
+            'paper' => 'page.paper', 'orientation' => 'page.orientation', 'height' => 'page.height',
             'scale' => 'appearance.typeScale', 'font' => 'appearance.font',
             'names' => 'appearance.names', 'density' => 'appearance.density',
             'titleStyle' => 'appearance.titleStyle', 'accent' => 'appearance.accent',
@@ -389,6 +424,9 @@ final class PrintConfig
 
         if ($this->get('appearance.inkFriendly')) {
             $q['ink'] = '1';
+        }
+        if (!$this->get('appearance.legend', true)) {
+            $q['legend'] = '0';
         }
 
         foreach (['church' => 'hChurch', 'location' => 'hLocation', 'period' => 'hPeriod', 'docType' => 'hDocType'] as $k => $param) {

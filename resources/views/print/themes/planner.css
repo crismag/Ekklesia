@@ -16,10 +16,10 @@
 .theme-planner .church {
   font-size: 9pt; letter-spacing: .2em; font-weight: 800;
 }
-.theme-planner .period {
+.theme-planner .doc-title {
   font-size: 30pt; font-weight: 800; letter-spacing: -.015em; text-transform: uppercase;
 }
-.theme-planner .period small { letter-spacing: .16em; font-size: 7.5pt; }
+.theme-planner .period { font-weight: 700; color: #8a5a3c; }
 
 .theme-planner .cal th {
   border-bottom: 0; letter-spacing: .16em; color: #8a6a55;

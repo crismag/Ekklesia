@@ -120,6 +120,27 @@ $styles = <<<'CSS'
 
   .more { font-size: calc(6.8pt * var(--ts, 1)); color: #6b7a72; font-style: italic; flex: 0 0 auto; }
   .month + .month { margin-top: 16pt; page-break-before: always; }
+
+  /* Grow to fit. The planned row height becomes a minimum, nothing is hidden
+     and nothing is clamped: names wrap instead of ending in an ellipsis, and a
+     busy week is simply taller. When a month outgrows the sheet it breaks
+     between weeks, never through one, and the weekday row repeats. */
+  .cal.is-grow thead { display: table-header-group; }
+  .cal.is-grow tr { break-inside: avoid; page-break-inside: avoid; }
+  /* The table is given the page's grid height as its *height*, which for a
+     table is only a minimum: spare height is shared out among the weeks, a busy
+     week takes more of it than a quiet one, and only when the month genuinely
+     needs more than the sheet does the table grow past it. So a month fits one
+     page whenever it can and continues on another only when it must. */
+  /* 93%: the grid budget is arithmetic, and asking for all of it left the
+     footer a few points over the edge on some themes. The difference is shared
+     among the weeks and is not visible; a spilled footer is. */
+  .cal.is-grow { height: calc((var(--grid-h, 5.4in) + 0.222in) * .93); }
+  .cal.is-grow .cell { height: auto; min-height: 0.62in; overflow: visible; }
+  .cal.is-grow .ent, .cal.is-grow .w-tight .ent { white-space: normal; overflow: visible; text-overflow: clip; }
+  .cal.is-grow .ent .t, .cal.is-grow .w-tight .ent .t {
+    display: inline; -webkit-line-clamp: none; line-clamp: none; overflow: visible; overflow-wrap: break-word; }
+  .cal.is-grow .t-readable .ent .t, .cal.is-grow .t-showcase .ent .t { display: block; }
   .month-name { font-size: 13pt; margin: 0 0 7pt; font-weight: 700; letter-spacing: .01em; }
 CSS;
 
@@ -127,13 +148,20 @@ CSS;
  * How much of a page the grid may occupy.
  *
  * Measured: page margin (12mm ×2 = 0.945in), sheet padding (14mm ×2 = 1.102in),
- * masthead 0.66in, weekday header row 0.222in, and a little slack so a rounding
+ * masthead ($mastheadIn, from the composer), weekday header row 0.222in, and a little slack so a rounding
  * error does not spill the grid onto a second sheet. $paperHeightIn already
  * accounts for orientation, and for the paper actually chosen.
  */
 $paperHeightIn = (float) ($paperHeightIn ?? 8.5);
 $paperWidthIn = (float) ($paperWidthIn ?? 11.0);
-$gridHeightIn = max(3.0, $paperHeightIn - 0.945 - 1.102 - 0.66 - 0.222 - 0.05);
+$gridHeightIn = max(3.0, $paperHeightIn - 0.945 - 1.102 - (float) ($mastheadIn ?? 0.66) - 0.222 - 0.05);
+// The member-type key under the grid is a line of its own.
+if (($legendRows ?? []) !== []) {
+    $gridHeightIn -= 0.24;
+}
+// Growing, the row height above is the *least* a week gets, not the most: a
+// busy week takes what it needs and the month may continue on another sheet.
+$grow = ($pageHeight ?? 'fit') === 'grow';
 // A theme that spends more of the page on its masthead has that much less to
 // give the grid. Measured per theme and expressed as a difference from
 // Classic, so Classic's arithmetic above is untouched.
@@ -182,7 +210,7 @@ foreach ($model['months'] as $mi => $month): ?>
     <?php if (count($model['months']) > 1): ?>
       <h2 class="month-name"><?= $e($month['title']) ?></h2>
     <?php endif; ?>
-    <table class="cal" style="<?= $e(PrintDensity::cssVars($densityMode)) ?>;--ts:<?= $e(number_format($ts, 3)) ?>;--grid-h:<?= $e(number_format($gridHeightIn, 2)) ?>in;--rows:<?= (int) count($month['weeks']) ?>">
+    <table class="cal<?= $grow ? ' is-grow' : '' ?>" style="<?= $e(PrintDensity::cssVars($densityMode)) ?>;--ts:<?= $e(number_format($ts, 3)) ?>;--grid-h:<?= $e(number_format($gridHeightIn, 2)) ?>in;--rows:<?= (int) count($month['weeks']) ?>">
       <thead><tr><?php foreach ($weekdays as $w): ?><th scope="col"><?= $e($w) ?></th><?php endforeach; ?></tr></thead>
       <tbody>
       <?php foreach ($month['weeks'] as $week): ?>
@@ -205,10 +233,23 @@ foreach ($model['months'] as $mi => $month): ?>
                       + ['source' => $entry['source']];
               }
 
+              // Growing, a day may take a quarter as much height again before the
+              // type tightens, so a busy day is not set in the smallest tier
+              // inside a row that has grown to hold it anyway.
               $plan = CellPlan::plan(
-                  $items, $entryMode, $usableIn, $cellTextWidthIn, $ts, $dm['moreHeight'],
-                  $legacy ? PrintDensity::perDay($densityMode, $rowHeightIn, $ts) : null,
+                  $items, $entryMode, $grow ? $usableIn * 1.25 : $usableIn, $cellTextWidthIn, $ts, $dm['moreHeight'],
+                  $legacy && !$grow ? PrintDensity::perDay($densityMode, $rowHeightIn, $ts) : null,
               );
+              if ($grow) {
+                  // The plan still chooses the type tier, so a busy day is set
+                  // as densely as before; it just no longer hides anything.
+                  $plan['shown'] = count($items);
+                  $plan['hidden'] = 0;
+                  $plan['wrap'] = true;
+                  if ($plan['state'] === 'overflow') {
+                      $plan['state'] = 'dense';
+                  }
+              }
               $hiddenCount += $plan['hidden'];
             ?>
             <td class="<?= $out ? 'out' : ($day['is_weekend'] ? 'wknd' : '') ?>">
@@ -217,8 +258,8 @@ foreach ($model['months'] as $mi => $month): ?>
               <?php if ($plan['shown'] > 0): ?>
               <div class="ents">
                 <?php foreach (array_slice($items, 0, $plan['shown']) as $item): ?>
-                  <div class="ent k-<?= $e($item['category']) ?>" style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
-                    <span class="t"><?= $e($item['primary']) ?></span>
+                  <div class="ent k-<?= $e($item['category']) ?><?= ($item['group'] ?? null) !== null ? ' mt-' . $e($item['group']) : '' ?>" style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
+                    <span class="t"><?= $item['category'] === 'birth' && isset($memberTypes) ? $memberTypes->symbol((string) $item['memberType']) : '' ?><?= $e($item['primary']) ?></span>
                     <?php if ($item['secondary'] !== ''): ?><span class="w"><?php
                       // Inline, a person's age reads as "(29)" and an event's
                       // time as "· 7:00pm". A bare "·" is what appeared when a

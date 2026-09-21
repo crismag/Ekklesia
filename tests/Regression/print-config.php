@@ -40,7 +40,22 @@ $d = PrintConfig::fromArray([]);
 check('the monthly wall calendar', $d->get('layout') === 'monthly');
 check('standard density — the current proportions', $d->get('appearance.density') === 'standard');
 check('normal type size', $d->get('appearance.typeScale') === 1.0);
-check('names in full', $d->get('appearance.names') === 'full');
+// A celebrant is printed by the name they go by, never the full legal name.
+check('celebrants by the name they go by', $d->get('appearance.names') === 'first');
+check('old "in full" views load as first names',
+    App\Services\Calendar\PrintConfig::fromArray(['appearance' => ['names' => 'full']])->get('appearance.names') === 'first');
+check('old "shortened" views load as first name and initial',
+    App\Services\Calendar\PrintConfig::fromArray(['appearance' => ['names' => 'short']])->get('appearance.names') === 'initial');
+check('a new calendar grows to fit its busy days', $d->get('page.height') === 'grow');
+check('a view saved before page height existed keeps its one fitted sheet',
+    App\Services\Calendar\PrintConfig::fromArray(['page' => ['paper' => 'a4', 'orientation' => '']])->get('page.height') === 'fit');
+check('page height round-trips through the query',
+    App\Services\Calendar\PrintConfig::fromQuery(App\Services\Calendar\PrintConfig::fromArray(['page' => ['height' => 'fit']])->toQuery())->get('page.height') === 'fit');
+check('tabloid paper is accepted',
+    App\Services\Calendar\PrintConfig::fromArray(['page' => ['paper' => 'tabloid']])->get('page.paper') === 'tabloid');
+check('the member-type legend is on by default and can be turned off',
+    $d->get('appearance.legend') === true
+    && App\Services\Calendar\PrintConfig::fromQuery(['legend' => '0'])->get('appearance.legend') === false);
 check('the classic serif', $d->get('appearance.font') === 'serif');
 check('the church accent, not an override', $d->get('appearance.accent') === '');
 check('the classic title', $d->get('appearance.titleStyle') === 'classic');

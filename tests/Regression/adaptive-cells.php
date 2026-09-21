@@ -25,6 +25,7 @@ if (!is_dir($root)) {
 }
 require_once $root . '/app/Services/Calendar/DisplayName.php';
 require_once $root . '/app/Services/Calendar/CellPlan.php';
+require_once $root . '/app/Services/Calendar/MemberTypeStyle.php';
 require_once $root . '/app/Services/Calendar/EntryPresentation.php';
 require_once $root . '/app/Services/Calendar/PrintDensity.php';
 
@@ -125,13 +126,22 @@ foreach (CellPlan::TIERS as $tier) {
 $group('An entry is projected into a hierarchy, not printed as a raw title');
 $birthday = ['title' => 'Ramon Bayeta (29)', 'kind' => 'birth', 'all_day' => true, 'time' => null];
 $p = EntryPresentation::of($birthday, false, true);
-$ok('the celebrant is the headline', $p['primary'] === 'Ramon Bayeta');
-$ok('the age becomes the secondary line rather than riding inside it', $p['secondary'] === '29');
+// A feed with no name parts: the title is the last resort, and the age still goes.
+$ok('without name parts, the title is the headline with the age taken off', $p['primary'] === 'Ramon Bayeta');
+$ok('the age is not printed anywhere', $p['secondary'] === '' && !str_contains(implode(' ', [$p['primary'], $p['meta']]), '29'));
 $ok('and it is marked as a person', $p['person'] === true);
 $short = EntryPresentation::of($birthday, true, false);
-$ok('shortening still applies where a row cannot wrap', $short['primary'] === 'Ramon B.');
-$roomy = EntryPresentation::of($birthday, true, true);
-$ok('but a cell that can wrap keeps the full name', $roomy['primary'] === 'Ramon Bayeta');
+$ok('a last initial can still be asked for', $short['primary'] === 'Ramon B.');
+
+$withParts = $birthday + ['person' => ['first' => 'Ramon', 'preferred' => '', 'last' => 'Bayeta', 'memberType' => 'Trailblazer']];
+$ok('with name parts, the first name alone', EntryPresentation::of($withParts, false, true)['primary'] === 'Ramon');
+$ok('with the last initial when asked', EntryPresentation::of($withParts, true, true)['primary'] === 'Ramon B.');
+$preferred = ['title' => 'Jessie James Quill (14)', 'kind' => 'birth', 'all_day' => true,
+    'person' => ['first' => 'Jessie James', 'preferred' => 'JJ', 'last' => 'Quill', 'memberType' => 'Radical']];
+$ok('the preferred name wins over the first name', EntryPresentation::of($preferred, false, true)['primary'] === 'JJ');
+$ok('compact (unsplit) rows print no age either', EntryPresentation::of($preferred, false, false, false)['primary'] === 'JJ'
+    && EntryPresentation::of($preferred, false, false, false)['secondary'] === '');
+$ok('the member type travels with the entry', EntryPresentation::of($preferred, false, true)['group'] === 'radical');
 
 $event = ['title' => 'Leadership Meeting', 'kind' => 'event', 'all_day' => false,
           'time' => '19:00', 'location' => 'Fellowship Hall'];
@@ -144,6 +154,8 @@ $ok('and an event is never shortened like a person', $pe['person'] === false);
 $group('Nothing invents information the loader did not supply');
 $noAge = EntryPresentation::of(['title' => 'Ramon Bayeta', 'kind' => 'birth', 'all_day' => true], false, true);
 $ok('a birthday with no age displayed still has none', $noAge['secondary'] === '');
+$ok('an unknown member type is not guessed', EntryPresentation::of(['title' => 'A', 'kind' => 'birth',
+    'person' => ['first' => 'A', 'preferred' => '', 'last' => 'B', 'memberType' => 'Seniors']], false, true)['group'] === null);
 
 echo "\nPassed: " . $passed . '; failed: ' . $failed . "\n";
 exit($failed === 0 ? 0 : 1);

@@ -33,6 +33,25 @@ ob_start(); ?>
 <?php if ($days === []): ?>
   <p class="empty">Nothing is scheduled in this period.</p>
 <?php else: ?>
+<?php
+  // Birthdays print the name the celebrant goes by, with no age
+  // (EntryPresentation::celebrant); everything else prints its title.
+  $label = static function (array $entry) use ($e, $nameStyle, $memberTypes): string {
+      if (($entry['kind'] ?? '') !== 'birth') {
+          return $e($entry['title']);
+      }
+      $type = (string) ($entry['person']['memberType'] ?? '');
+      return (isset($memberTypes) ? $memberTypes->symbol($type) : '')
+          . $e(\App\Services\Calendar\EntryPresentation::celebrant($entry, ($nameStyle ?? 'full') === 'short'));
+  };
+  $mtClass = static function (array $entry): string {
+      if (($entry['kind'] ?? '') !== 'birth') {
+          return '';
+      }
+      $group = \App\Services\Calendar\MemberTypeStyle::group((string) ($entry['person']['memberType'] ?? ''));
+      return ' k-birth' . ($group !== null ? ' mt-' . $group : '');
+  };
+?>
   <div class="agenda">
     <?php foreach ($days as $day): ?>
       <section class="day<?= $day['is_weekend'] ? ' weekend' : '' ?>">
@@ -44,8 +63,8 @@ ob_start(); ?>
         <?php foreach ($day['entries'] as $entry): ?>
           <div class="row">
             <div class="when"><?= $entry['all_day'] ? 'All day' : $e($entry['time']) . ($entry['end_time'] ? '–' . $e($entry['end_time']) : '') ?></div>
-            <div class="what" style="border-left-color:<?= $e($colors[$entry['source']] ?? '#9aa7a0') ?>">
-              <span class="t"><?= $e($entry['title']) ?></span>
+            <div class="what<?= $mtClass($entry) ?>" style="border-left-color:<?= $e($colors[$entry['source']] ?? '#9aa7a0') ?>">
+              <span class="t"><?= $label($entry) ?></span>
               <?php if ($entry['meta'] !== '' && $entry['meta'] !== $entry['title']): ?>
                 <span class="m"><?= $e($entry['meta']) ?></span>
               <?php endif; ?>
