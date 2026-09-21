@@ -383,10 +383,17 @@ final class MemberWorkbookParser
             return $empty;
         }
         if (is_numeric($raw)) {
+            // A four-digit whole number is a year someone typed, not a date
+            // serial (serials in that range are 1902–1908); strtotime would
+            // otherwise give it today's month and day.
+            if (preg_match('/^(1[89]|2\d)\d\d$/', $raw)) {
+                return $empty;
+            }
             $serial = (float) $raw;
-            if ($serial > 20000 && $serial < 80000) {
+            if ($serial >= 1 && $serial < 80000) {
                 return $this->fromExcelSerial($serial);
             }
+            return $empty;
         }
         $fixed = str_ireplace(
             ['Janaury', 'Januray', 'Febuary', 'Febrary', 'Septemeber'],
@@ -397,29 +404,35 @@ final class MemberWorkbookParser
         if ($ts === false) {
             return $empty;
         }
+        $date = (new \DateTimeImmutable('@' . $ts))->setTimezone(new \DateTimeZone(date_default_timezone_get()));
+        // strtotime reads a two-digit year 00–69 as 20xx, so "3/5/45" became a
+        // birthday in 2045. Neither a birthday nor a membership date is in a
+        // future year, so a year the text did not spell out goes back a century.
+        $year = (int) $date->format('Y');
+        if ($year > (int) date('Y') && !str_contains($fixed, (string) $year)) {
+            $date = $date->modify('-100 years');
+        }
         return [
-            'year' => (int) date('Y', $ts),
-            'month' => (int) date('n', $ts),
-            'day' => (int) date('j', $ts),
-            'iso' => date('Y-m-d', $ts),
+            'year' => (int) $date->format('Y'),
+            'month' => (int) $date->format('n'),
+            'day' => (int) $date->format('j'),
+            'iso' => $date->format('Y-m-d'),
         ];
     }
 
     /** @return array{year:?int,month:?int,day:?int,iso:?string} */
     private function fromExcelSerial(float $serial): array
     {
-        // Google Sheets / Excel 1900 date system, origin 1899-12-30.
+        // Google Sheets / Excel 1900 date system, origin 1899-12-30. Counted
+        // in calendar days rather than Unix seconds: members born before 1970
+        // have serials below the epoch and must convert the same way.
         $days = (int) floor($serial);
-        $unix = ($days - 25569) * 86400;
-        if ($unix < 0) {
-            return ['year' => null, 'month' => null, 'day' => null, 'iso' => null];
-        }
-        $ts = $unix;
+        $date = (new \DateTimeImmutable('1899-12-30', new \DateTimeZone('UTC')))->modify('+' . $days . ' days');
         return [
-            'year' => (int) gmdate('Y', $ts),
-            'month' => (int) gmdate('n', $ts),
-            'day' => (int) gmdate('j', $ts),
-            'iso' => gmdate('Y-m-d', $ts),
+            'year' => (int) $date->format('Y'),
+            'month' => (int) $date->format('n'),
+            'day' => (int) $date->format('j'),
+            'iso' => $date->format('Y-m-d'),
         ];
     }
 
@@ -595,6 +608,7 @@ final class MemberWorkbookParser
     private function readSheetGrid(ZipArchive $zip, string $sheetPath): array
     {
         $strings = $this->sharedStrings($zip);
+        $dateStyles = $this->dateStyles($zip);
         $xml = $zip->getFromName($sheetPath);
         if ($xml === false) {
             throw new RuntimeException('Worksheet XML is missing.');
@@ -616,7 +630,7 @@ final class MemberWorkbookParser
                 while (count($line) <= $col) {
                     $line[] = '';
                 }
-                $line[$col] = $this->cellValue($c, $strings);
+                $line[$col] = $this->cellValue($c, $strings, $dateStyles);
             }
             unset($line);
         }
@@ -713,8 +727,57 @@ final class MemberWorkbookParser
         return implode('', $parts);
     }
 
-    /** @param list<string> $strings */
-    private function cellValue(\SimpleXMLElement $c, array $strings): string
+    /**
+     * Style indexes (cellXfs positions) whose number format shows a date.
+     *
+     * A date cell holds only a day serial; the style is what says it is a
+     * date. Knowing that lets any date convert exactly, however old, instead
+     * of guessing from the size of the number (1905 as a serial is a day in
+     * 1905, as a typed number it is a year).
+     *
+     * @return array<int,true>
+     */
+    private function dateStyles(ZipArchive $zip): array
+    {
+        $xml = $zip->getFromName('xl/styles.xml');
+        if ($xml === false) {
+            return [];
+        }
+        $styles = $this->xml($xml);
+        $custom = [];
+        foreach ($styles->numFmts->numFmt ?? [] as $fmt) {
+            $custom[(int) $fmt['numFmtId']] = (string) $fmt['formatCode'];
+        }
+        $out = [];
+        $i = 0;
+        foreach ($styles->cellXfs->xf ?? [] as $xf) {
+            $id = (int) $xf['numFmtId'];
+            if (isset($custom[$id]) ? $this->isDateFormatCode($custom[$id]) : $this->isBuiltinDateFormat($id)) {
+                $out[$i] = true;
+            }
+            $i++;
+        }
+        return $out;
+    }
+
+    private function isBuiltinDateFormat(int $id): bool
+    {
+        // 45–47 are time-only; 27–36 and 50–58 are the East Asian date formats.
+        return ($id >= 14 && $id <= 17) || $id === 22 || ($id >= 27 && $id <= 36) || ($id >= 50 && $id <= 58);
+    }
+
+    private function isDateFormatCode(string $code): bool
+    {
+        // Ignore quoted literals, escaped characters and [colour]/[locale] tags.
+        $bare = preg_replace(['/"[^"]*"/', '/\\\\./', '/\[[^\]]*\]/'], '', $code) ?? $code;
+        return preg_match('/[dy]/i', $bare) === 1;
+    }
+
+    /**
+     * @param list<string> $strings
+     * @param array<int,true> $dateStyles
+     */
+    private function cellValue(\SimpleXMLElement $c, array $strings, array $dateStyles = []): string
     {
         $type = (string) $c['t'];
         if ($type === 's') {
@@ -725,6 +788,9 @@ final class MemberWorkbookParser
             return $this->siText($c->is ?? $c);
         }
         $v = trim((string) $c->v);
+        if (($type === '' || $type === 'n') && isset($dateStyles[(int) $c['s']]) && is_numeric($v) && (float) $v >= 1) {
+            return (string) $this->fromExcelSerial((float) $v)['iso'];
+        }
         return $v;
     }
 

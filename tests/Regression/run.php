@@ -1425,6 +1425,39 @@ $hub = $parser->parseFile($xlsx, \App\Services\MemberWorkbookParser::DEFAULT_SHE
 assert_true(count($hub['rows']) === 1, 'sample xlsx has one member row');
 assert_true($hub['rows'][0]['last_name'] === 'Abalahon', 'sample xlsx first row is Abalahon');
 assert_true(($hub['rows'][0]['birthday']['iso'] ?? '') === '2005-04-26', 'sample xlsx serial birthday converted');
+// Google Sheets exports dates as day serials; birthdays before the Unix epoch
+// were dropped (1954–1969) or turned into the import day (before 1954).
+assert_true(($parser->parseDate('25568')['iso'] ?? '') === '1969-12-31', 'serial birthday the day before 1970 converted');
+assert_true(($parser->parseDate('21000')['iso'] ?? '') === '1957-06-29', 'serial birthday in the 1950s converted');
+assert_true(($parser->parseDate('12483')['iso'] ?? '') === '1934-03-05', 'serial birthday before 1954 converted');
+assert_true(($parser->parseDate('12483.0')['iso'] ?? '') === '1934-03-05', 'fractional serial birthday converted');
+assert_true($parser->parseDate('1985')['iso'] === null, 'a bare year is not turned into a birthday on the import day');
+assert_true(($parser->parseDate('3/5/45')['iso'] ?? '') === '1945-03-05', 'two-digit year is never a future birthday');
+assert_true(($parser->parseDate('3/5/1945')['iso'] ?? '') === '1945-03-05', 'typed pre-1970 birthday still parsed');
+
+// A Google Sheets export marks date cells with a date number format. With the
+// style read, a birthday as early as 1900 converts exactly — including 1905,
+// whose serial (1891) would otherwise be mistaken for a typed year.
+$styledXlsx = sys_get_temp_dir() . '/portal-styled-dates-' . bin2hex(random_bytes(4)) . '.xlsx';
+copy($xlsx, $styledXlsx);
+$zip = new ZipArchive();
+$zip->open($styledXlsx);
+$zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    . '<numFmts count="1"><numFmt numFmtId="164" formatCode="m&quot;/&quot;d&quot;/&quot;yyyy"/></numFmts>'
+    . '<cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="14"/><xf numFmtId="1"/></cellXfs></styleSheet>');
+$zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
+    . '<row r="2"><c r="A2" t="s"><v>0</v></c><c r="B2" t="s"><v>1</v></c><c r="C2" t="s"><v>2</v></c><c r="D2" t="s"><v>3</v></c><c r="F2" t="s"><v>4</v></c></row>'
+    . '<row r="3"><c r="A3" t="inlineStr"><is><t>Oldest, Ada</t></is></c><c r="B3" s="1"><v>65</v></c><c r="D3" s="2"><v>18415</v></c></row>'
+    . '<row r="4"><c r="A4" t="inlineStr"><is><t>Older, Ben</t></is></c><c r="B4" s="2"><v>1891</v></c></row>'
+    . '<row r="5"><c r="A5" t="inlineStr"><is><t>Plain, Cy</t></is></c><c r="B5" s="3"><v>1891</v></c></row>'
+    . '</sheetData></worksheet>');
+$zip->close();
+$styled = $parser->parseFile($styledXlsx, \App\Services\MemberWorkbookParser::DEFAULT_SHEET)['rows'];
+@unlink($styledXlsx);
+assert_true(($styled[0]['birthday']['iso'] ?? '') === '1900-03-05', 'date-formatted birthday in 1900 imported');
+assert_true(($styled[0]['member_since']['iso'] ?? '') === '1950-06-01', 'built-in date format read for member since');
+assert_true(($styled[1]['birthday']['iso'] ?? '') === '1905-03-05', 'date-formatted birthday whose serial looks like a year imported');
+assert_true(($styled[2]['birthday']['iso'] ?? null) === null, 'a plain number formatted as a number is not read as a date');
 
 $mergedXlsx = $root . '/tests/fixtures/members-merged-address.xlsx';
 $household = $parser->parseFile($mergedXlsx, \App\Services\MemberWorkbookParser::DEFAULT_SHEET);
