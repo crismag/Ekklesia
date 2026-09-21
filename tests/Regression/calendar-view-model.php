@@ -249,8 +249,9 @@ check('no new table is introduced for it',
     !preg_match('/CREATE\s+TABLE/i', $controller));
 
 echo "\nThe day and the month cannot disagree about what is on a date\n";
-check('both feeds compose their items through one method',
-    substr_count($controller, '$this->composeItems(') === 2);
+// The browser feed, the printed calendar's feed and the day view.
+check('every feed composes its items through one method',
+    substr_count($controller, '$this->composeItems(') === 3);
 check('so the month feed no longer builds its own list',
     str_contains($controller, "return ['items' => \$this->composeItems("));
 

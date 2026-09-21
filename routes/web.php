@@ -2692,6 +2692,7 @@ $webRoutes = [
 
         $items = [];
         $colors = [];
+        $labels = [];
         try {
             $controller = new \App\Http\Controllers\Api\CalendarController(
                 \App\Providers\PortalServiceProvider::makeCalendarService(),
@@ -2704,13 +2705,14 @@ $webRoutes = [
             // silently thrown away. Harmless until a template widened the window,
             // at which point the extra months printed empty from data nobody had
             // asked the database for.
-            $feed = $controller->sources(array_merge($req, [
+            $feed = $controller->printSources(array_merge($req, [
                 'start' => $start->format('Y-m-d'),
                 'end' => $end->format('Y-m-d'),
             ]));
             $items = $feed['items'] ?? [];
             foreach (($controller->layers($req)['layers'] ?? []) as $layer) {
                 $colors[$layer['source']] = $layer['color'];
+                $labels[$layer['source']] = $layer['label'];
             }
         } catch (\Throwable) {
             // An empty calendar prints as an empty calendar; it does not 500.
@@ -2745,6 +2747,9 @@ $webRoutes = [
             'orientation' => $orientation !== '' ? $orientation : null,
             'sources' => $sources,
             'colors' => $colors,
+            'sourceLabels' => $labels,
+            'pageHeight' => $config->get('page.height'),
+            'legend' => $config->get('appearance.legend'),
             'church' => (string) ($church['name'] ?? 'Church Portal'),
             'subtitle' => $campusName,
             'website' => (string) ($church['website'] ?? ''),

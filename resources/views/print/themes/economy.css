@@ -1,0 +1,20 @@
+/*
+ * Economy — the least ink a readable calendar can use.
+ *
+ * Black hairlines, no fills and no decoration. Weekend and out-of-month days
+ * are told apart by a lighter date number rather than a shaded cell, and
+ * member types by their symbols (the coloured rule is kept thin). Works with
+ * every layout.
+ */
+
+.theme-economy .masthead { border-bottom: .75pt solid var(--th-ink); }
+.theme-economy .church { color: var(--th-ink); }
+.theme-economy .doc-title, .theme-economy .period { color: var(--th-ink); }
+.theme-economy .cal th { color: var(--th-ink); border-bottom: .5pt solid var(--th-ink); }
+.theme-economy .cal td, .theme-economy .cal td.wknd, .theme-economy .cal td.out { background: transparent; border-color: var(--th-grid); }
+.theme-economy .cal td.out .num { color: #9a9a9a; }
+.theme-economy .ent, .theme-economy .wk-ent { border-left-width: 1.25pt; }
+.theme-economy .ent .w { color: #444; }
+.theme-economy .wk-day, .theme-economy .wk-day.wknd, .theme-economy .wk-day.out { background: transparent; }
+.theme-economy .colophon { border-top: .5pt solid var(--th-grid); color: #555; }
+.theme-economy .legend { color: #333; }

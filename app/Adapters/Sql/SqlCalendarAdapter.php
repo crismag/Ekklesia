@@ -235,13 +235,19 @@ final class SqlCalendarAdapter implements CalendarAdapter
      */
     private function birthdayItems(DateTimeImmutable $start, DateTimeImmutable $end, ?int $campusId): array
     {
+        // Preferred name and member type ride along for the printed calendar,
+        // which names a celebrant by the name they go by and marks their
+        // member type. The screen title below is unchanged.
         $sql = 'SELECT p.id AS person_id,
                        p.first_name,
                        p.last_name,
+                       p.preferred_name,
                        p.birth_month,
                        p.birth_day,
-                       p.birth_year
+                       p.birth_year,
+                       mt.name AS member_type
                   FROM people p
+             LEFT JOIN member_types mt ON mt.id = p.member_type_id
                  WHERE p.birth_month > 0
                    AND p.birth_day > 0';
         $params = [];
@@ -275,6 +281,13 @@ final class SqlCalendarAdapter implements CalendarAdapter
                     'title' => $age !== null && $age > 0 ? $name . ' (' . $age . ')' : $name,
                     'meta' => 'Birthday',
                     'href' => '/people/' . (int) $row['person_id'],
+                    // No age and no birth year: this is what a printout may use.
+                    'person' => [
+                        'first' => trim((string) $row['first_name']),
+                        'preferred' => trim((string) ($row['preferred_name'] ?? '')),
+                        'last' => trim((string) $row['last_name']),
+                        'memberType' => trim((string) ($row['member_type'] ?? '')),
+                    ],
                 ];
             },
         );
@@ -419,7 +432,7 @@ final class SqlCalendarAdapter implements CalendarAdapter
                     'meta' => $payload['meta'] ?? null,
                     'href' => $payload['href'] ?? null,
                     'date' => $parsed->format('Y-m-d'),
-                ];
+                ] + (isset($payload['person']) ? ['person' => $payload['person']] : []);
             }
         }
 

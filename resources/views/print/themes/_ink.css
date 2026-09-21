@@ -12,6 +12,6 @@
   border-bottom: .75pt solid #16211c !important; border-radius: 0 !important; }
 .is-ink .masthead-banner, .is-ink.title-banner .masthead { background: transparent !important; }
 .is-ink.title-banner .church, .is-ink.title-banner .period,
-.is-ink.title-banner .subtitle, .is-ink.title-banner .period small { color: #16211c !important; }
+.is-ink.title-banner .subtitle, .is-ink.title-banner .doc-title { color: #16211c !important; }
 .is-ink .art { display: none !important; }
 .is-ink * { box-shadow: none !important; }

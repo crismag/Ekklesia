@@ -165,7 +165,29 @@ final class CalendarViewModel
             'campus' => trim((string) ($item['campus'] ?? '')),
             'ministry' => trim((string) ($item['ministry'] ?? '')),
             'location' => trim((string) ($item['location'] ?? '')),
-        ];
+        ] + self::person($item['person'] ?? null);
+    }
+
+    /**
+     * The celebrant behind a birthday, when the feed supplied one: the names a
+     * printout may use and the member type. Only these four keys pass, so
+     * nothing else about a person can reach a template by accident.
+     *
+     * @return array{person?:array{first:string,preferred:string,last:string,memberType:string}}
+     */
+    private static function person(mixed $person): array
+    {
+        if (!is_array($person)) {
+            return [];
+        }
+        $text = static fn (string $key): string => trim((string) ($person[$key] ?? ''));
+
+        return ['person' => [
+            'first' => $text('first'),
+            'preferred' => $text('preferred'),
+            'last' => $text('last'),
+            'memberType' => $text('memberType'),
+        ]];
     }
 
     /**

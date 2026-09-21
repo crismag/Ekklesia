@@ -33,6 +33,8 @@ final class CalendarTheme
     /**
      * @return array<string,array{
      *     id:string,label:string,blurb:string,layouts:list<string>,
+     *     palette:array{paper:string,ink:string,heading:string,accent:string,grid:string,cell:string,band:string},
+     *     ink:string,
      *     defaults:array<string,mixed>,artwork:list<string>,chromeIn:float,cellPadIn:float,
      *     safeZone:array{top:float,right:float,bottom:float,left:float}
      * }>
@@ -42,6 +44,8 @@ final class CalendarTheme
         return [
             'classic' => [
                 'id' => 'classic',
+                'palette' => ['paper' => '#ffffff', 'ink' => '#16211c', 'heading' => '#16211c', 'accent' => '#0c5a45', 'grid' => '#d3ddd7', 'cell' => '#ffffff', 'band' => '#0c5a45'],
+                'ink' => 'medium',
                 'label' => 'Classic',
                 'blurb' => 'The church’s usual sheet — restrained, dense, and good for operational calendars.',
                 'layouts' => ['monthly', 'weekly', 'sunday', 'annual'],
@@ -57,6 +61,8 @@ final class CalendarTheme
             ],
             'editorial' => [
                 'id' => 'editorial',
+                'palette' => ['paper' => '#ffffff', 'ink' => '#16211c', 'heading' => '#2a2a2a', 'accent' => '#2a2a2a', 'grid' => '#d8ded9', 'cell' => '#ffffff', 'band' => '#2a2a2a'],
+                'ink' => 'low',
                 'label' => 'Editorial',
                 'blurb' => 'A publication rather than a notice: large title, generous margins, a quiet grid.',
                 'layouts' => ['monthly', 'weekly', 'sunday', 'annual'],
@@ -72,6 +78,8 @@ final class CalendarTheme
             ],
             'planner' => [
                 'id' => 'planner',
+                'palette' => ['paper' => '#fdf7f0', 'ink' => '#3b2a20', 'heading' => '#8a5a3c', 'accent' => '#c2643a', 'grid' => '#e2cdbb', 'cell' => '#fffdfa', 'band' => '#c2643a'],
+                'ink' => 'medium',
                 'label' => 'Planner',
                 'blurb' => 'Warm and open, with room left to write on. Best for quieter months.',
                 'layouts' => ['monthly'],
@@ -93,6 +101,8 @@ final class CalendarTheme
             ],
             'celebration' => [
                 'id' => 'celebration',
+                'palette' => ['paper' => '#ffffff', 'ink' => '#1d3a24', 'heading' => '#1d3a24', 'accent' => '#2f6b3c', 'grid' => '#cfe0d2', 'cell' => '#f2f7f2', 'band' => '#2f6b3c'],
+                'ink' => 'medium',
                 'label' => 'Celebration',
                 'blurb' => 'For birthdays and anniversaries: rounded cells, big names, friendly decoration.',
                 'layouts' => ['monthly'],
@@ -109,6 +119,39 @@ final class CalendarTheme
                 // exactly this much.
                 'cellPadIn' => 0.075,
                 'safeZone' => ['top' => 0.0, 'right' => 0.10, 'bottom' => 0.80, 'left' => 0.10],
+            ],
+            'hearth' => [
+                'id' => 'hearth',
+                'palette' => ['paper' => '#ffffff', 'ink' => '#2a2622', 'heading' => '#5b3a24', 'accent' => '#8a5a2b', 'grid' => '#e3d8cc', 'cell' => '#ffffff', 'band' => '#f4ece2'],
+                'ink' => 'medium',
+                'label' => 'Hearth',
+                'blurb' => 'Warm and welcoming for a noticeboard: a light header band, fine rules and a small sprig in the corner.',
+                'layouts' => ['monthly', 'weekly'],
+                'defaults' => [
+                    'entryDisplay' => 'auto', 'density' => 'standard',
+                    'font' => 'serif', 'titleStyle' => 'classic', 'accent' => '#8a5a2b',
+                ],
+                'artwork' => ['none'],
+                // The band's padding, measured against Classic's masthead.
+                'chromeIn' => 0.3,
+                'cellPadIn' => 0.0,
+                'safeZone' => ['top' => 0.0, 'right' => 0.0, 'bottom' => 0.0, 'left' => 0.0],
+            ],
+            'economy' => [
+                'id' => 'economy',
+                'palette' => ['paper' => '#ffffff', 'ink' => '#111111', 'heading' => '#111111', 'accent' => '#111111', 'grid' => '#9a9a9a', 'cell' => '#ffffff', 'band' => '#111111'],
+                'ink' => 'low',
+                'label' => 'Economy',
+                'blurb' => 'The least ink: black hairlines, no fills, no decoration. Member types are told apart by their symbols.',
+                'layouts' => ['monthly', 'weekly', 'agenda', 'sunday', 'annual', 'planner'],
+                'defaults' => [
+                    'entryDisplay' => 'auto', 'density' => 'standard',
+                    'font' => 'sans', 'titleStyle' => 'classic', 'accent' => '#3f3f46',
+                ],
+                'artwork' => ['none'],
+                'chromeIn' => 0.0,
+                'cellPadIn' => 0.0,
+                'safeZone' => ['top' => 0.0, 'right' => 0.0, 'bottom' => 0.0, 'left' => 0.0],
             ],
         ];
     }
@@ -161,6 +204,34 @@ final class CalendarTheme
     public static function cellPadIn(string $id): float
     {
         return (float) (self::get($id)['cellPadIn'] ?? 0.0);
+    }
+
+    /**
+     * The theme's colour tokens as CSS custom properties (`--th-paper` and so
+     * on), written onto the sheet by the composer. This is the theme contract:
+     * a theme stylesheet colours itself through these, and never touches the
+     * member-type colours (MemberTypeStyle), which mean the same in every theme.
+     */
+    public static function tokenCss(string $id): string
+    {
+        $out = [];
+        foreach ((array) (self::get($id)['palette'] ?? []) as $name => $hex) {
+            if (preg_match('/^#[0-9a-f]{6}$/i', (string) $hex) === 1) {
+                $out[] = '--th-' . $name . ':' . $hex;
+            }
+        }
+
+        return implode(';', $out);
+    }
+
+    /** The same palette for a gallery card's miniature. */
+    public static function swatchCss(string $id): string
+    {
+        $p = (array) (self::get($id)['palette'] ?? []);
+
+        return '--sw-paper:' . ($p['paper'] ?? '#fff') . ';--sw-band:' . ($p['band'] ?? '#0c5a45')
+            . ';--sw-accent:' . ($p['accent'] ?? '#2c6ea5') . ';--sw-grid:' . ($p['grid'] ?? '#dde5e0')
+            . ';--sw-cell:' . ($p['cell'] ?? '#eef2ef');
     }
 
     /** The artwork sets a theme offers, always including 'none'. */

@@ -1,0 +1,36 @@
+/*
+ * Hearth — warm and welcoming, for a noticeboard or a ministry room.
+ *
+ * A light header band, fine warm rules and one small sprig in the corner. It
+ * is a year-round design with no holiday in it. Every colour comes from the
+ * theme tokens (--th-*); member-type colours are left alone.
+ *
+ * Print-safe without background graphics: the band and sprig are backgrounds
+ * and simply drop out, leaving a dark title, a rule and the grid.
+ */
+
+.theme-hearth .masthead {
+  background: var(--th-band); border-bottom: 1pt solid var(--th-accent);
+  padding: 9pt 11pt 8pt; margin: 0 0 12pt; border-radius: 3pt 3pt 0 0;
+}
+.theme-hearth .church { color: var(--th-accent); }
+.theme-hearth .doc-title { color: var(--th-heading); }
+.theme-hearth .period { color: var(--th-heading); font-style: italic; }
+.theme-hearth .subtitle { color: #5a4e44; }
+
+.theme-hearth .cal th { color: var(--th-accent); border-bottom: .75pt solid var(--th-accent); }
+.theme-hearth .cal td { border-color: var(--th-grid); }
+.theme-hearth .cal td.wknd { background: #fffcf8; }
+.theme-hearth .cal td.out { background: #faf6f1; }
+.theme-hearth .num { color: var(--th-heading); }
+.theme-hearth .colophon { border-top-color: var(--th-grid); color: #7a6a5d; }
+.theme-hearth .legend { color: #5a4e44; }
+
+/* One sprig in the top corner: a stem and three leaves, drawn in the accent
+   at low opacity so it can never compete with the title. */
+.theme-hearth.sheet::before {
+  content: ""; position: absolute; top: 6mm; right: 7mm; width: .55in; height: .55in; opacity: .38;
+  background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none' stroke='%238a5a2b' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M8 40C18 30 26 20 40 8'/%3E%3Cpath d='M18 30c-6-1-9-5-9-10 6 0 9 4 9 10zM26 21c-1-6 2-10 7-12 1 6-2 10-7 12zM30 17c5 2 9 1 12-3-5-3-9-2-12 3z'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+@media print { .theme-hearth.sheet::before { top: 0; right: 0; } }

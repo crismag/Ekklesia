@@ -18,10 +18,7 @@ $e = static fn (mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES, '
 // Inches, portrait. One table, used for both the @page rule and the sheet's own
 // box — they were separate, and the sheet's was hardcoded to Letter, so asking
 // for A4 produced a Letter-shaped sheet on an A4 page.
-$paperInches = [
-    'letter' => [8.5, 11.0], 'legal' => [8.5, 14.0],
-    'a4' => [8.27, 11.69], 'a3' => [11.69, 16.54],
-];
+$paperInches = \App\Services\Calendar\PrintConfig::PAPERS;
 [$paperW, $paperH] = $paperInches[$paper] ?? $paperInches['letter'];
 if ($orientation === 'landscape') {
     [$paperW, $paperH] = [$paperH, $paperW];
@@ -43,7 +40,7 @@ $sheetH = round($paperH - 0.945, 3);
      unit and a pixel is a guess about somebody's screen. */
   /* The accent as a custom property as well as a literal, so a theme's own
      stylesheet can tint with it instead of hardcoding a second green. */
-  :root { --accent: <?= $e($branding['accent']) ?>; }
+  :root { --accent: <?= $e($branding['accent']) ?>; <?= $e(\App\Services\Calendar\MemberTypeStyle::cssVars()) ?>; }
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   /* One scale, applied once. Every size in a template is in points and
@@ -65,14 +62,37 @@ $sheetH = round($paperH - 0.945, 3);
     box-shadow: 0 2px 18px rgba(0,0,0,.18);
   }
 
-  /* Masthead. Restrained on purpose — a church calendar should look
-     intentionally set, not branded at. */
-  .masthead { border-bottom: 1.5pt solid <?= $e($branding['accent']) ?>; padding-bottom: 7pt; margin-bottom: 14pt; }
-  .masthead-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16pt; }
-  .church { font-size: 10pt; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; color: <?= $e($branding['accent']) ?>; }
-  .subtitle { font-size: 9pt; color: #5c6b63; margin-top: 2pt; }
-  .period { font-size: 26pt; line-height: 1; font-weight: 400; letter-spacing: -.01em; text-align: right; }
-  .period small { display: block; font-size: 9pt; letter-spacing: .18em; text-transform: uppercase; color: #5c6b63; margin-top: 4pt; font-weight: 700; }
+  /* Masthead. The calendar's title leads: a sheet pinned to a noticeboard has
+     to say what it is before it says which month. The church is a small line
+     above it and the month sits beside it, large but second. A long title
+     wraps to a second line rather than shrinking. */
+  .masthead { border-bottom: 1.5pt solid <?= $e($branding['accent']) ?>; padding-bottom: 8pt; margin-bottom: 12pt; }
+  .masthead-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 18pt; }
+  .mh-main { min-width: 0; flex: 1 1 auto; }
+  .church { font-size: 9pt; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; color: <?= $e($branding['accent']) ?>; }
+  .church .sep { opacity: .55; padding: 0 .35em; }
+  .doc-title { margin: 3pt 0 0; font-size: 30pt; line-height: 1.04; font-weight: 700; letter-spacing: -.012em;
+    text-wrap: balance; overflow-wrap: anywhere; color: #16211c; }
+  .subtitle { font-size: 10pt; color: #46534c; margin-top: 3pt; }
+  .period { flex: 0 0 auto; font-size: 19pt; line-height: 1.05; font-weight: 400; letter-spacing: -.005em;
+    text-align: right; color: #2b3832; white-space: nowrap; }
+
+  /* Member types. Fixed colours (MemberTypeStyle), on the rule and the symbol
+     only; the name stays in ink. The symbol is what survives greyscale. */
+  .k-birth { border-left-color: var(--mt-none) !important; }
+  .k-birth.mt-gna { border-left-color: var(--mt-gna) !important; }
+  .k-birth.mt-trailblazer { border-left-color: var(--mt-trailblazer) !important; }
+  .k-birth.mt-radical { border-left-color: var(--mt-radical) !important; }
+  .mt-sym { width: .95em; height: .95em; vertical-align: -.14em; margin-right: .22em; flex: 0 0 auto; }
+  .mt-gna .mt-sym { color: var(--mt-gna); }
+  .mt-trailblazer .mt-sym { color: var(--mt-trailblazer); }
+  .mt-radical .mt-sym { color: var(--mt-radical); }
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3pt 14pt; margin-top: 8pt;
+    font-size: 8.5pt; color: #46534c; break-inside: avoid; }
+  .legend-title { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 7.5pt; }
+  .legend-item { display: inline-flex; align-items: center; gap: 4pt; }
+  .legend-item .mt-sym { margin: 0; width: 10pt; height: 10pt; }
+  .legend-rule { display: inline-block; width: 2.5pt; height: 10pt; background: var(--mt-none); }
 
   .colophon { margin-top: 14pt; padding-top: 6pt; border-top: .5pt solid #c9d4ce; display: flex; justify-content: space-between; gap: 10pt; font-size: 7.5pt; color: #6b7a72; }
   /* CSS counters are the only way to number a page from inside the document.
@@ -96,14 +116,15 @@ $sheetH = round($paperH - 0.945, 3);
      it can be read, copied and searched, and the same artwork works for any
      month. */
   .title-editorial .church { font-size: 8.5pt; letter-spacing: .22em; }
-  .title-editorial .period { font-size: 34pt; font-weight: 300; letter-spacing: -.02em; }
+  .title-editorial .doc-title { font-size: 34pt; font-weight: 300; letter-spacing: -.02em; }
   .title-editorial .masthead { border-bottom-width: .75pt; }
   .title-banner .masthead {
     background: <?= $e($branding['accent']) ?>; border-bottom: 0;
     padding: 9pt 10pt; margin: -4mm -4mm 14pt; color: #fff;
   }
-  .title-banner .church, .title-banner .subtitle, .title-banner .period small { color: rgba(255,255,255,.86); }
-  .title-banner .period { color: #fff; font-weight: 600; }
+  .title-banner .church, .title-banner .subtitle { color: rgba(255,255,255,.86); }
+  .title-banner .doc-title, .title-banner .period { color: #fff; }
+  .title-banner .period { font-weight: 600; }
 
   .empty { padding: 28pt; text-align: center; color: #6b7a72; font-style: italic; }
 
@@ -158,27 +179,31 @@ $sheetH = round($paperH - 0.945, 3);
   // church name where the campus already does.
   $customTitle = trim((string) ($headerTitle ?? ''));
   $customSubtitle = trim((string) ($headerSubtitle ?? ''));
-  $periodNote = $customTitle !== '' ? $customTitle : (string) ($branding['period_note'] ?? '');
+  // The title: the reader's own, else the one worked out from what is on the
+  // sheet (PrintComposer::docTitle).
+  $periodNote = $customTitle !== '' ? $customTitle : (string) ($docTitle ?? ($branding['period_note'] ?? ''));
 ?>
-<div class="sheet title-<?= $e($titleStyle) ?> theme-<?= $e($theme ?? 'classic') ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?>">
+<div class="sheet title-<?= $e($titleStyle) ?> theme-<?= $e($theme ?? 'classic') ?> ents-<?= $e($entryDisplay ?? 'auto') ?><?= !empty($inkFriendly) ? ' is-ink' : '' ?>" style="<?= $e(\App\Services\Calendar\CalendarTheme::tokenCss($theme ?? 'classic')) ?>">
   <header class="masthead">
     <div class="masthead-row">
-      <div>
-        <?php if ($show['church']): ?>
-          <div class="church"><?= $e($branding['church']) ?></div>
+      <div class="mh-main">
+        <?php
+          $kicker = [];
+          if ($show['church']) { $kicker[] = (string) $branding['church']; }
+          if ($show['location'] && ($branding['subtitle'] ?? '') !== '') { $kicker[] = (string) $branding['subtitle']; }
+        ?>
+        <?php if ($kicker !== []): ?>
+          <div class="church"><?= implode('<span class="sep" aria-hidden="true">·</span>', array_map($e, $kicker)) ?></div>
         <?php endif; ?>
-        <?php if ($show['location'] && ($branding['subtitle'] ?? '') !== ''): ?>
-          <div class="subtitle"><?= $e($branding['subtitle']) ?></div>
+        <?php if ($show['docType'] && $periodNote !== ''): ?>
+          <h1 class="doc-title"><?= $e($periodNote) ?></h1>
         <?php endif; ?>
         <?php if ($customSubtitle !== ''): ?>
           <div class="subtitle subtitle-custom"><?= $e($customSubtitle) ?></div>
         <?php endif; ?>
       </div>
-      <?php if ($show['period'] || ($show['docType'] && $periodNote !== '')): ?>
-      <div class="period">
-        <?= $show['period'] ? $e($branding['period']) : '' ?>
-        <?php if ($show['docType'] && $periodNote !== ''): ?><small><?= $e($periodNote) ?></small><?php endif; ?>
-      </div>
+      <?php if ($show['period']): ?>
+      <div class="period"><?= $e($branding['period']) ?></div>
       <?php endif; ?>
     </div>
   </header>
@@ -189,6 +214,18 @@ $sheetH = round($paperH - 0.945, 3);
   <?php endif; ?>
 
   <?= $body ?>
+
+  <?php if (($legendRows ?? []) !== []): ?>
+    <div class="legend" aria-label="Member types">
+      <span class="legend-title">Member type</span>
+      <?php foreach ($legendRows as $row): ?>
+        <span class="legend-item mt-<?= $e($row['group']) ?>"><?= $row['symbol'] ?><?= $e($row['label']) ?></span>
+      <?php endforeach; ?>
+      <?php if (!empty($legendNeutral)): ?>
+        <span class="legend-item"><span class="legend-rule" aria-hidden="true"></span>Not recorded</span>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
 
   <?php if ($bottomHtml !== ''): ?>
     <section class="doc-info doc-info--bottom"><?= $bottomHtml ?></section>

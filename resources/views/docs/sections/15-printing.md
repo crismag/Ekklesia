@@ -4,17 +4,21 @@ The print studio turns what is on the calendar into something you can put on a n
 
 Open it from **Calendar → Print this view**, which carries across the dates and layers you are already looking at. **Printables** remains the hub for the standard sheets: roster lists, event lists, birthday directories.
 
-[Insert Screenshot: The print studio with the options panel on the left and a page preview on the right.]
+[Insert Screenshot: The print studio with calendar settings on the left, the page in the middle and themes on the right.]
 
 ## How the screen is arranged
 
-The options sit on the left, grouped into sections you can fold away, and the page itself fills the right. Everything you change redraws the preview, so the sheet on screen is the sheet that will come out of the printer.
+Three parts, with the page in the middle:
 
-- **Hide options** collapses the panel when you want to judge the page itself.
-- **Publication** at the top says which saved sheet you are looking at, or *Untitled calendar* if you have not saved one.
-- **Print** and **Save as PDF** sit at the bottom, under the options.
+- **Calendar** (left) — what goes on the sheet, in four tabs: Content, People & events, Layout and Print. **Publication** sits above the tabs and says which saved sheet you have open.
+- **The page** (middle) — the sheet exactly as it will print. Everything you change redraws it.
+- **Theme** (right) — how the sheet looks.
 
-> **Tip:** The preview is scaled to fit, and the percentage is shown above it. It is showing you a whole page — if a month is running onto a second sheet, the preview says so rather than hiding it.
+Each side has its own **Hide** button. A hidden side leaves a narrow labelled strip; click it to bring the side back. Hiding a side never changes a setting. On a smaller screen the Theme side starts hidden, and on a phone the sides stack above the page.
+
+Above the page, **Fit** shows one whole page, **100%** shows it at actual size, and **−** and **+** step the size. The size only changes what you see on screen, never what prints. The label beside them says how many pages the sheet will print on.
+
+> **Tip:** Pressing **Ctrl+P** (or **⌘P**) in the studio prints the sheet, not the studio.
 
 ## Saving a publication
 
@@ -31,86 +35,81 @@ A publication stores the *period*, not the dates. A sheet saved as "This month" 
 
 Administrators can share a publication with everyone. Anyone may open a shared one; only its owner or an administrator can change it.
 
-## Content — what goes on the sheet
+## Content
 
-**When** sets the period: this month, next month, the next three months, this year, or dates you pick.
+- **Calendar title** — printed large at the top of the sheet, so a page on a noticeboard says what it is before it says which month. Left blank, the sheet is named after what is on it: *Birthdays* for a birthday sheet, the calendar's name when there is one calendar, otherwise the layout.
+- **Line under the title** — optional.
+- **Period** — this month, next month, the next three months, this year, or dates you pick.
+- **Note above / below the calendar** — optional text for a reminder, a verse or a contact number. Left blank, neither takes any room.
 
-**Two presets cover what a church usually prints**, and everything else is a one-off:
+## People & events
+
+**Calendars on the sheet.** Two presets cover what a church usually prints:
 
 - **Birthdays & holidays** — the celebrant sheet for the noticeboard.
 - **Ministry & leadership** — who is serving, and the leadership diary.
 - **Clear** unticks everything so you can build a sheet from scratch.
 
-Below the presets, tick the calendars you want: General, Ministry events, Leadership, Role assignments, Ministry schedules, Ministry rosters, Birthdays, and the holiday calendars. Ticking nothing prints an empty sheet, and the studio says so rather than quietly printing everything.
+Below the presets, tick the calendars you want. Ticking nothing prints an empty sheet, and the studio says so rather than quietly printing everything.
 
-## Design — layout, theme and how much room entries get
+**Birthdays.** A celebrant is printed by the name they go by: their preferred name, or their first name when there is none. Choose **with a last initial** when two people with the same name share a day. **Ages are never printed**, on any layout.
 
-**Layout** is the kind of document:
+Each celebrant is marked with their member type — a colour and a symbol beside the name:
 
-- **Monthly calendar** — the wall calendar, one grid to a month.
-- **Weekly calendar** — a week to a row, with far more room in each day.
-- **Agenda** — a list rather than a grid, for a handout.
-- **Sunday schedule** — the service sheet.
-- **Year at a glance** — twelve months on one page.
-- **Ministry planner** — the consolidated duty roster.
+- **G&A** — sky blue, an arrow
+- **Trailblazer** — green, a pennant
+- **Radical** — orange, a seedling
+- No member type recorded — a grey mark and no symbol
 
-**Theme** is how it is dressed. The same dates can be four quite different publications:
-
-- **Classic** — the church's usual sheet. Restrained and dense; right for operational calendars.
-- **Editorial** — a publication rather than a notice. Large title, generous margins, a quiet grid.
-- **Planner** — warm and open, with room left to write on. Best for quieter months.
-- **Celebration** — for birthdays and anniversaries. Rounded cells, big names, friendly decoration.
-
-Planner and Celebration are designed for the monthly grid, so they are offered only when that layout is chosen.
+The symbols are what tell the types apart on a black-and-white printer. **Print the member-type key** adds a one-line key under the calendar; it lists only the types that appear on the sheet.
 
 **How much room entries get** decides the writing inside each day:
 
 - **Auto** — each day decides for itself. A quiet day gets larger writing; a busy one stays dense. This is the default and suits most sheets.
 - **Compact** — the church's existing wall calendar exactly. Use it when most days are busy.
 - **Readable** — larger type and more air, for calendars with a few entries a day.
-- **Showcase** — one or two names set large and centred. This is the setting for a birthday sheet.
+- **Showcase** — one or two names set large and centred. The setting for a birthday sheet.
 
-> **Tip:** A birthday calendar is the clearest case. On **Compact** a single celebrant is a small line in the corner of an empty square; on **Showcase** their name fills the day. Nothing is ever shrunk to fit — if a day genuinely holds too much, the sheet says "+2 more" rather than printing something too small to read.
+## Layout
 
-## Page
+**Layout** is the kind of document: Monthly calendar, Weekly calendar, Agenda, Sunday schedule, Year at a glance, or Ministry planner.
 
-**Paper** is Letter, A4, Legal or A3. **Direction** is portrait, landscape, or Auto, which lets the layout choose — a month grid wants landscape, an agenda wants portrait.
+**Paper** is Letter, A4, Legal, Tabloid (11 × 17) or A3. **Direction** is portrait, landscape, or Auto, which lets the layout choose.
 
-## Header & footer
+**Busy days** decides what happens when a day holds a lot:
 
-Tick what the masthead shows: church name, campus, the month or period, and what the document is. You can replace the document label with a **title** of your own — "Birthday calendar" reads better than "Monthly calendar" on a celebrant sheet — and add a line under the church name.
+- **Grow to fit** (the default) — nothing is hidden. A busy week is simply taller and names wrap instead of being cut short. A month stays on one sheet whenever it can; when it genuinely cannot, it continues on the next sheet, breaking between weeks and repeating the day names.
+- **One page** — the month always fits one sheet, and a day that cannot hold everything says "+2 more". Publications saved before this setting existed keep printing this way.
 
-The footer can carry the date printed, the website, the church name, a page number, and a note of your own.
+The rest of the tab sets **Text size**, **Density** (how tightly the grid is set, a separate choice from text size), **Typeface**, **Title style**, what the header and footer show, and a **footer note**.
 
-## Notes on the sheet
+## Theme
 
-Two optional blocks of text: one above the calendar and one below it. Use them for a reminder, a verse, or a contact number.
+A theme is how the sheet is dressed; the dates and names are the same in every one. Each card shows the theme's colours and a small birthday and event row. The selected card has a border, a fill and a tick.
 
-Left blank, neither takes any room at all. An empty block that still reserved space would cost you a row of the calendar, so a note you have not written simply is not there.
+- **Classic** — the church's usual sheet. Restrained and dense; right for operational calendars.
+- **Editorial** — a publication rather than a notice. Large title, generous margins, a quiet grid. *Low ink.*
+- **Planner** — warm and open, with room left to write on. Monthly grid only.
+- **Celebration** — for birthdays: rounded cells, big names, friendly decoration. Monthly grid only.
+- **Hearth** — warm and welcoming for a noticeboard: a light header band, fine rules and a small sprig in the corner.
+- **Economy** — the least ink: black hairlines, no fills, no decoration. *Low ink.*
 
-## Appearance
+Member types keep their colours and symbols in every theme.
 
-- **Text size** — small through largest. It scales the whole document consistently.
-- **Density** — how tightly the grid is set. A separate choice from text size: the same large type can have less air around it.
-- **Names** — in full, or shortened to a first name and an initial. Where a cell has room to wrap, the full name is kept anyway.
-- **Typeface** — classic serif, plain sans, bold display, or typewriter.
-- **Title style** — classic, editorial, or banner.
-- **Accent** — the church colour, or one of the alternatives.
-- **Decoration** and **How much** — appear only for themes that carry artwork. Choose the artwork set, then how much of it you want.
-- **Ink friendly** — drops the page fills and decoration and keeps the design otherwise as drawn. Worth using for a long print run.
+Under the cards: **Accent** colour, **Decoration** (only for themes that carry artwork), and **Ink friendly**, which drops page fills and decoration from whichever theme you chose.
 
 ## Printing, and saving a PDF
 
-**Print** and **Save as PDF** open the same dialog, because a web page cannot choose the destination for you. To get a PDF, pick **Save as PDF** as the destination in that dialog.
+**Print** is on the Print tab and above the page. **Print** and **Save as PDF** open the same dialog, because a web page cannot choose the destination for you; to get a PDF, pick **Save as PDF** as the destination.
 
-> **Warning:** Turn on **background graphics** in the print dialog, or the coloured headers and tinted cells will come out blank. Most browsers keep this under "More settings".
+Turn on **background graphics** in the print dialog for tinted cells and header bands. Every theme still prints a complete calendar without them.
 
-**Open in a new tab** gives you the document on its own, which is useful for checking a long sheet before committing it to paper.
+**Open in a new tab** gives you the document on its own, which is useful for checking a long sheet before committing it to paper. **Restore the default settings** resets how the sheet looks and keeps the calendars, dates, title and notes you chose.
 
 ## Common mistakes to avoid
 
 - **Printing the wrong campus.** The campus selector in the top bar decides whose events appear, and a saved publication does not override it.
 - **Expecting a saved publication to change the calendar screen.** It is a printing recipe. Opening one does not change what Month or Week shows.
-- **Leaving background graphics off** and then wondering why the banner printed white.
+- **A very long title on a busy month.** The title wraps rather than shrinking, and on the busiest months that can push the key and footer onto a second sheet. Shorten the title or choose **One page**.
 - **Choosing Compact for a birthday sheet.** Compact is for busy days; a celebrant list wants Showcase or Auto.
-- **Ticking nothing under Content** and printing an empty page. The studio warns you, but the warning is easy to scroll past.
+- **Ticking nothing under People & events** and printing an empty page. The studio warns you, but the warning is easy to miss.

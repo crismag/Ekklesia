@@ -30,6 +30,25 @@ ob_start(); ?>
 <?php if ($days === []): ?>
   <p class="empty">Nothing is scheduled in this period.</p>
 <?php else: ?>
+<?php
+  // Birthdays print the name the celebrant goes by, with no age
+  // (EntryPresentation::celebrant); everything else prints its title.
+  $label = static function (array $entry) use ($e, $nameStyle, $memberTypes): string {
+      if (($entry['kind'] ?? '') !== 'birth') {
+          return $e($entry['title']);
+      }
+      $type = (string) ($entry['person']['memberType'] ?? '');
+      return (isset($memberTypes) ? $memberTypes->symbol($type) : '')
+          . $e(\App\Services\Calendar\EntryPresentation::celebrant($entry, ($nameStyle ?? 'full') === 'short'));
+  };
+  $mtClass = static function (array $entry): string {
+      if (($entry['kind'] ?? '') !== 'birth') {
+          return '';
+      }
+      $group = \App\Services\Calendar\MemberTypeStyle::group((string) ($entry['person']['memberType'] ?? ''));
+      return ' k-birth' . ($group !== null ? ' mt-' . $group : '');
+  };
+?>
   <table class="plan">
     <thead><tr>
       <th scope="col">Date</th><th scope="col">Activity</th><th scope="col">Time</th>
@@ -40,7 +59,7 @@ ob_start(); ?>
       <?php foreach ($day['entries'] as $entry): ?>
         <tr class="<?= $first ? 'newday' : '' ?>">
           <td class="c-date"><?php if ($first): ?><?= $e($day['month_short']) ?> <?= (int) $day['day'] ?><span class="dow"><?= $e($day['weekday_short']) ?></span><?php endif; ?></td>
-          <td><span class="tag" style="background:<?= $e($colors[$entry['source']] ?? '#9aa7a0') ?>"></span><?= $e($entry['title']) ?></td>
+          <td class="<?= trim($mtClass($entry)) ?>"><span class="tag" style="background:<?= $e($colors[$entry['source']] ?? '#9aa7a0') ?>"></span><?= $label($entry) ?></td>
           <td class="c-when"><?= $entry['all_day'] ? '—' : $e($entry['time']) . ($entry['end_time'] ? '–' . $e($entry['end_time']) : '') ?></td>
           <td class="c-where"><?= $e($entry['location'] !== '' ? $entry['location'] : $entry['meta']) ?></td>
           <td class="c-note"></td>

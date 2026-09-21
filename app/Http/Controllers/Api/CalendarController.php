@@ -112,6 +112,31 @@ final readonly class CalendarController
         $start = new DateTimeImmutable((string) ($request['start'] ?? 'now'));
         $end   = new DateTimeImmutable((string) ($request['end']   ?? '+30 days'));
 
+        // The browser feed keeps the shape it has always had. Birthday items
+        // also carry a `person` block (preferred name, member type) that only
+        // the printed calendar uses, so it is not handed to the browser.
+        $items = array_map(static function (array $item): array {
+            unset($item['person']);
+            return $item;
+        }, $this->composeItems($actor, $start, $end));
+
+        return ['items' => $items];
+    }
+
+    /**
+     * The same feed for the printed calendar, with each birthday's `person`
+     * block kept: the name the celebrant goes by and their member type. No
+     * age or birth year is in it.
+     *
+     * @param array<string, mixed> $request
+     * @return array<string, mixed>
+     */
+    public function printSources(array $request): array
+    {
+        $actor = $this->requestContext->fromArray($request);
+        $start = new DateTimeImmutable((string) ($request['start'] ?? 'now'));
+        $end   = new DateTimeImmutable((string) ($request['end']   ?? '+30 days'));
+
         return ['items' => $this->composeItems($actor, $start, $end)];
     }
 
@@ -139,7 +164,10 @@ final readonly class CalendarController
         // A day is a closed window on itself. listSystemItems widens the end to
         // cover the whole final date, so passing the same date twice is one day
         // rather than an empty range.
-        $items = $this->composeItems($actor, $day, $day);
+        $items = array_map(static function (array $item): array {
+            unset($item['person']);   // print-only; see sources()
+            return $item;
+        }, $this->composeItems($actor, $day, $day));
 
         return [
             'date' => $day->format('Y-m-d'),

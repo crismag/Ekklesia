@@ -15,10 +15,11 @@
 .theme-celebration .masthead { border-bottom: 0; margin-bottom: 10pt; padding-bottom: 0; }
 .theme-celebration .masthead-row { display: block; text-align: center; }
 .theme-celebration .church { font-size: 9pt; letter-spacing: .24em; font-weight: 800; }
-.theme-celebration .period {
-  text-align: center; font-size: 34pt; font-weight: 800; letter-spacing: -.02em; margin-top: 6pt;
+.theme-celebration .doc-title {
+  text-align: center; font-size: 34pt; font-weight: 800; letter-spacing: -.02em; margin-top: 5pt;
 }
-.theme-celebration .period small { letter-spacing: .2em; font-size: 8pt; margin-top: 6pt; }
+.theme-celebration .period { text-align: center; letter-spacing: .16em; text-transform: uppercase;
+  font-size: 11pt; font-weight: 700; margin-top: 4pt; }
 
 /* Pills rather than a header rule — the weekday strip becomes part of the
    design instead of a caption above it. */

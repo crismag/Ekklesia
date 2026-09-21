@@ -39,10 +39,15 @@ $weeks = $model['weeks'] ?? [];
 $weekCount = max(1, count($weeks));
 
 // The page's usable height, shared between the weeks on it. Page margins
-// (0.945in), sheet padding (1.102in) and the masthead (0.66in) come off first.
+// (0.945in), sheet padding (1.102in) and the masthead ($mastheadIn) come off first.
 $paperHeightIn = (float) ($paperHeightIn ?? 8.5);
 $paperWidthIn = (float) ($paperWidthIn ?? 11.0);
-$gridHeightIn = max(2.5, $paperHeightIn - 0.945 - 1.102 - 0.66 - 0.05);
+$gridHeightIn = max(2.5, $paperHeightIn - 0.945 - 1.102 - (float) ($mastheadIn ?? 0.66) - 0.05);
+if (($legendRows ?? []) !== []) {
+    $gridHeightIn -= 0.24;
+}
+// As in the monthly grid: growing, the planned row height is a minimum.
+$grow = ($pageHeight ?? 'fit') === 'grow';
 // A theme that spends more of the page on its masthead has that much less to
 // give the grid. Measured per theme, as a difference from Classic.
 $gridHeightIn = max(2.5, $gridHeightIn - (float) ($themeChromeIn ?? 0.0));
@@ -141,6 +146,13 @@ $styles = <<<'CSS'
   .w-tight .wk-ent { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .w-tight .wk-ent .t { display: inline; overflow: visible;
     -webkit-line-clamp: none; line-clamp: none; }
+
+  /* Grow to fit: a week takes the height its busiest day needs, nothing is
+     clamped or hidden, and a week never splits across two sheets. */
+  .wk.is-grow { break-inside: avoid; page-break-inside: avoid; }
+  .wk.is-grow .wk-day { height: auto; min-height: calc(var(--row-h, 1.6in) * .8); overflow: visible; }
+  .wk.is-grow .wk-ent, .wk.is-grow .w-tight .wk-ent { white-space: normal; overflow: visible; text-overflow: clip; }
+  .wk.is-grow .wk-ent .t { display: inline; -webkit-line-clamp: none; line-clamp: none; overflow: visible; }
   .t-showcase .wk-ent { border-left: 0; padding-left: 0; text-align: center; }
 
   .wk-ent .t { font-weight: 700; }
@@ -168,7 +180,7 @@ if ($weeks === []): ?>
         – <?= $e((new DateTimeImmutable($last['date']))->format('j M Y')) ?>
       </p>
     <?php endif; ?>
-    <div class="wk" style="--ts:<?= $e(number_format($ts, 3)) ?>;--row-h:<?= $e(number_format($rowHeightIn, 3)) ?>in">
+    <div class="wk<?= $grow ? ' is-grow' : '' ?>" style="--ts:<?= $e(number_format($ts, 3)) ?>;--row-h:<?= $e(number_format($rowHeightIn, 3)) ?>in">
       <?php foreach ($weekdays as $w): ?>
         <div class="wk-head"><?= $e($w) ?></div>
       <?php endforeach; ?>
@@ -183,9 +195,17 @@ if ($weeks === []): ?>
                   + ['source' => $entry['source']];
           }
           $plan = CellPlan::plan(
-              $items, $entryMode, $usableIn, $cellTextWidthIn, $ts, 0.134,
-              $legacy ? $perDay : null,
+              $items, $entryMode, $grow ? $usableIn * 1.25 : $usableIn, $cellTextWidthIn, $ts, 0.134,
+              $legacy && !$grow ? $perDay : null,
           );
+          if ($grow) {
+              $plan['shown'] = count($items);
+              $plan['hidden'] = 0;
+              $plan['wrap'] = true;
+              if ($plan['state'] === 'overflow') {
+                  $plan['state'] = 'dense';
+              }
+          }
           // Compact keeps the row it has always had, rather than being restyled
           // by a tier that happens to carry the same measurements.
           $tierClass = $legacy ? '' : ' t-' . $plan['tier'] . ' s-' . $plan['state']
@@ -196,8 +216,8 @@ if ($weeks === []): ?>
           <?php if ($plan['shown'] > 0): ?>
           <div class="wk-ents">
             <?php foreach (array_slice($items, 0, $plan['shown']) as $item): ?>
-              <div class="wk-ent" style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
-                <span class="t"><?= $e($item['primary']) ?></span>
+              <div class="wk-ent k-<?= $e($item['category']) ?><?= ($item['group'] ?? null) !== null ? ' mt-' . $e($item['group']) : '' ?>" style="border-left-color:<?= $e($colors[$item['source']] ?? '#9aa7a0') ?>">
+                <span class="t"><?= $item['category'] === 'birth' && isset($memberTypes) ? $memberTypes->symbol((string) $item['memberType']) : '' ?><?= $e($item['primary']) ?></span>
                 <?php if ($item['secondary'] !== ''): ?><span class="w"><?php
                     // Inline, a person's age reads as "(29)" and an event's time
                     // as "· 7:00pm". A bare "·" is what appeared when a long

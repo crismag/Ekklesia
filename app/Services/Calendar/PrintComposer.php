@@ -65,7 +65,11 @@ final class PrintComposer
         // budgeting for the wrong row height.
         $typeScale = (float) ($options['typeScale'] ?? 1.0);
         $typeScale = max(0.85, min(1.3, $typeScale ?: 1.0));
-        $nameStyle = ($options['nameStyle'] ?? 'full') === 'short' ? 'short' : 'full';
+        // "initial" adds a last initial to a celebrant's name; "short" is the
+        // same choice as older links spelled it.
+        $nameStyle = in_array($options['nameStyle'] ?? 'first', ['initial', 'short'], true) ? 'short' : 'full';
+        // Whether a month may run past one sheet (see PrintConfig::PAGE_HEIGHTS).
+        $pageHeight = ($options['pageHeight'] ?? 'grow') === 'fit' ? 'fit' : 'grow';
         // How tightly the grid is set. A separate axis from type size: a reader
         // may want the same large type with less air around it.
         // Read once, then validate. Reading it again inside the ternary meant
@@ -94,8 +98,8 @@ final class PrintComposer
         $paper = strtolower((string) ($options['paper'] ?? 'letter'));
         // Inches, portrait. The shell owns the CSS @page size; this is the same
         // fact in a form a template can compute with.
-        $paperSizes = ['letter' => [8.5, 11.0], 'legal' => [8.5, 14.0],
-                       'a4' => [8.27, 11.69], 'a3' => [11.69, 16.54]];
+        require_once __DIR__ . '/PrintConfig.php';
+        $paperSizes = PrintConfig::PAPERS;
         [$paperWidthIn, $paperHeightIn] = $paperSizes[$paper] ?? $paperSizes['letter'];
         if ($orientation === 'landscape') {
             [$paperWidthIn, $paperHeightIn] = [$paperHeightIn, $paperWidthIn];
@@ -137,7 +141,47 @@ final class PrintComposer
         // keeps the composer the one place that knows the view path.
         require_once __DIR__ . '/PrintDensity.php';
         require_once __DIR__ . '/CellPlan.php';
+        require_once __DIR__ . '/MemberTypeStyle.php';
         require_once __DIR__ . '/EntryPresentation.php';
+
+        // Member types: fixed colours plus the directory's own symbols.
+        $memberTypes = MemberTypeStyle::fromConfig(dirname($this->viewPath, 2) . '/config/member-type-icons.json');
+
+        // The page's title leads the masthead, so it must say what the page
+        // is. A title the reader typed wins; otherwise it is worked out from
+        // what is on the sheet (see docTitle()).
+        $headerTitle = trim((string) ($options['headerTitle'] ?? ''));
+        $docTitle = $headerTitle !== '' ? $headerTitle
+            : self::docTitle((array) ($options['sources'] ?? []), (array) ($options['sourceLabels'] ?? []), (string) $template['label']);
+        // Height of that masthead, in inches, for templates that budget a
+        // fitted page. Measured off the rendered Classic masthead.
+        $mastheadIn = 0.98;
+        // A long title wraps rather than shrinking, and each extra line of a
+        // 30pt title costs about 0.43in the grid has to give up. Estimated from
+        // its length at half an em a character, beside the month (~2.2in).
+        if ($docTitle !== '') {
+            $titleWidthIn = max(2.0, $paperWidthIn - 1.1 - 2.2);
+            $perLine = max(8, (int) floor($titleWidthIn / (30 * 0.52 / 72)));
+            $mastheadIn += 0.43 * (max(1, (int) ceil(mb_strlen($docTitle) / $perLine)) - 1);
+        }
+
+        // The member-type key, for layouts that print birthdays at all.
+        $legendRows = [];
+        $legendNeutral = false;
+        if (($options['legend'] ?? true) && !in_array($templateId, ['annual', 'sunday'], true)) {
+            $printedTypes = [];
+            foreach ($model['entries'] as $entry) {
+                if (($entry['kind'] ?? '') === 'birth' && isset($entry['person'])) {
+                    $printedTypes[] = (string) $entry['person']['memberType'];
+                }
+            }
+            $legendRows = $memberTypes->legend($printedTypes);
+            // "Not recorded" is listed only when a celebrant on the sheet has no type.
+            $legendNeutral = $legendRows !== [] && array_filter(
+                $printedTypes,
+                static fn (string $t): bool => MemberTypeStyle::group($t) === null,
+            ) !== [];
+        }
 
         // Each template writes $body and $styles from $model and $colors.
         $body = '';
@@ -162,7 +206,6 @@ final class PrintComposer
         // PrintConfig, which is the only place that judgement is made.
         $headerShow = $options['headerShow'] ?? ['church' => true, 'location' => true, 'period' => true, 'docType' => true];
         $footerShow = $options['footerShow'] ?? ['printed' => true, 'website' => true, 'church' => false, 'page' => false];
-        $headerTitle = (string) ($options['headerTitle'] ?? '');
         $headerSubtitle = (string) ($options['headerSubtitle'] ?? '');
         $footerNote = (string) ($options['footerNote'] ?? '');
         $topInfo = (string) ($options['topInfo'] ?? '');
@@ -179,6 +222,26 @@ final class PrintComposer
         require $this->viewPath . '/print/_shell.php';
 
         return (string) ob_get_clean();
+    }
+
+    /**
+     * The title a sheet gets when nobody typed one.
+     *
+     * Named after what is on it, ignoring holiday calendars (they decorate a
+     * sheet; they are not what it is for): birthdays alone are "Birthdays",
+     * one calendar is that calendar, and anything broader is the layout.
+     *
+     * @param list<string> $sources
+     * @param array<string,string> $labels source => the layer's label
+     */
+    public static function docTitle(array $sources, array $labels, string $layoutLabel): string
+    {
+        $main = array_values(array_filter($sources, static fn (string $s): bool => !str_starts_with($s, 'holidays:')));
+        if (count($main) === 1) {
+            return $main[0] === 'birthdays' ? 'Birthdays' : (string) ($labels[$main[0]] ?? $layoutLabel);
+        }
+
+        return $layoutLabel;
     }
 
     /**

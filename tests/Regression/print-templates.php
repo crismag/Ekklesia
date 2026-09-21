@@ -243,7 +243,7 @@ check('both grids share one shortening rule rather than a copy each',
     && str_contains($presentation, 'DisplayName::shorten'));
 check('and the week grid adapts its cells on the same terms as the month',
     str_contains($weekly, 'CellPlan::plan(')
-    && str_contains($weekly, "\$legacy ? \$perDay : null")
+    && str_contains($weekly, "\$legacy && !\$grow ? \$perDay : null")
     && str_contains($weekly, "+<?= (int) \$plan['hidden'] ?> more"));
 
 echo "\nPresentation choices reach the sheet\n";
@@ -279,7 +279,8 @@ check('artwork is decorative only — hidden from assistive technology, and text
     && !preg_match('/<text[\s>]/', (string) file_get_contents(__DIR__ . '/../../resources/views/print/artwork/garden.svg'))
     && !preg_match('/<text[\s>]/', (string) file_get_contents(__DIR__ . '/../../resources/views/print/artwork/confetti.svg')));
 check('the calendar grid itself stays real HTML text, never an image',
-    str_contains($monthly, '<table class="cal"') && !str_contains($monthly, '<svg'));
+    // Member-type symbols are small inline icons beside a name; the grid is a table of text.
+    str_contains($monthly, '<table class="cal') && !str_contains($monthly, '<img'));
 check('the artwork band takes real space rather than floating over the page',
     str_contains($shell, '.art { height: var(--art-h')
     && !str_contains($shell, '.art { position: absolute'));
