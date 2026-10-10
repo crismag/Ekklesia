@@ -531,7 +531,7 @@ ok(servingGrid.includes('function applyCopy'), 'a date can be copied on to other
   ok(body.includes("mode === 'fill'"),
     'copying can fill only the empty roles instead of overwriting people');
 }
-ok(servingGrid.includes('new Date(o.startsOn) >= today'),
+ok(servingGrid.includes('EkklesiaTime.parse(o.startsOn) >= today'),
   'only dates still to come are offered to copy on to');
 // Copying starts from a date, not from a control in the toolbar: the click
 // says which schedule is being copied, so the dialog asks only where it goes.

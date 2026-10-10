@@ -721,7 +721,7 @@ ob_start();
   }
   /* The first month the sheet will print, worked out as the server will. */
   function firstPrintedMonth(){
-    var mode = $('pcRange').value, now = new Date();
+    var mode = $('pcRange').value, now = EkklesiaTime.now();
     if (mode === 'custom' && $('pcStart').value) return parseInt($('pcStart').value.slice(5, 7), 10);
     if (mode === 'next-month') return (now.getMonth() + 1) % 12 + 1;
     if (mode === 'year') return 1;

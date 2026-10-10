@@ -1368,7 +1368,7 @@ if ($whenLabel === '') {
         if (!fStartDate) return;
 
         // Defaults: today, 09:00–10:30 (1h30m)
-        const today = new Date().toISOString().slice(0, 10);
+        const today = EkklesiaTime.today();
         fStartDate.value = today;
         fEndDate.value   = today;
         fStartTime.value = '09:00';
@@ -1402,7 +1402,7 @@ if ($whenLabel === '') {
             if (!mins || !fStartDate.value) return;
             const dt = new Date(fStartDate.value + 'T' + (fStartTime.value || '00:00'));
             dt.setTime(dt.getTime() + mins * 60000);
-            fEndDate.value = dt.toISOString().slice(0, 10);
+            fEndDate.value = EkklesiaTime.key(dt);
             fEndTime.value = dt.toTimeString().slice(0, 5);
         }
 

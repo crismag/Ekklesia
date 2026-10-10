@@ -142,7 +142,7 @@ require_once __DIR__ . '/_portal-shell.php';
     }
 
     async function loadEntries() {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = EkklesiaTime.today();
         const res = await fetch(base + '/api/availability?active_from=' + today, { credentials: 'same-origin' });
         const data = await res.json().catch(() => ({}));
         list.innerHTML = '';

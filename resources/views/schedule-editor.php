@@ -967,7 +967,7 @@ require_once __DIR__ . '/_portal-shell.php';
         return window.confirm('You have unsaved assignment changes. Discard them?');
     }
     function fmtOcc(o) {
-        const d = new Date(o.startsOn);
+        const d = EkklesiaTime.parse(o.startsOn) || new Date(NaN);
         return {
             label: o.eventTitle || ('event ' + o.eventId),
             when:  d.toLocaleString([], { weekday:'short', month:'short', day:'numeric',
@@ -1079,10 +1079,10 @@ require_once __DIR__ . '/_portal-shell.php';
         const roles = (baseline && baseline.roles) ? baseline.roles : [];
         const ministryPersonIds = {};
         for (const p of ((baseline && baseline.people) || [])) ministryPersonIds[p.id] = true;
-        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const today = EkklesiaTime.startOfToday();
         let total = 0, filled = 0, conflicts = 0, unfilled = 0;
         for (const occ of occs) {
-            if (new Date(occ.startsOn) < today) continue;   // past dates are not work
+            if (EkklesiaTime.parse(occ.startsOn) < today) continue;   // past dates are not work
             for (const role of roles) {
                 const st = slotState(cells.get(keyOf(occ.id, role.id)), occ.id, role.id, ministryPersonIds);
                 total++;
@@ -1413,7 +1413,7 @@ require_once __DIR__ . '/_portal-shell.php';
        filling a single Sunday. */
     function renderStackedLayout(wrap, occs, roles, ctx, today) {
         for (const occ of occs) {
-            const isPast = new Date(occ.startsOn) < today;
+            const isPast = EkklesiaTime.parse(occ.startsOn) < today;
             const f = fmtOcc(occ);
             const sec = document.createElement('section');
             sec.className = 'occ' + (isPast ? ' is-past' : '');
@@ -1459,7 +1459,7 @@ require_once __DIR__ . '/_portal-shell.php';
         corner.textContent = 'Role';
         hrow.appendChild(corner);
         for (const occ of occs) {
-            const isPast = new Date(occ.startsOn) < today;
+            const isPast = EkklesiaTime.parse(occ.startsOn) < today;
             const f = fmtOcc(occ);
             const th = document.createElement('th');
             th.scope = 'col';
@@ -1490,7 +1490,7 @@ require_once __DIR__ . '/_portal-shell.php';
             rh.textContent = role.name;
             tr.appendChild(rh);
             for (const occ of occs) {
-                const isPast = new Date(occ.startsOn) < today;
+                const isPast = EkklesiaTime.parse(occ.startsOn) < today;
                 const td = document.createElement('td');
                 td.className = 'gcell' + (isPast ? ' is-past' : '');
                 td.dataset.occId = String(occ.id);
@@ -1527,8 +1527,8 @@ require_once __DIR__ . '/_portal-shell.php';
             specialNameToId[p.displayName.toLowerCase()] = p.id;
         }
 
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const editable = occs.some(o => new Date(o.startsOn) >= today);
+        const today = EkklesiaTime.startOfToday();
+        const editable = occs.some(o => EkklesiaTime.parse(o.startsOn) >= today);
 
         const ctx = {
             peopleById, nameToId, specialNameToId, people, specialCandidates,
@@ -1693,8 +1693,8 @@ require_once __DIR__ . '/_portal-shell.php';
 
     function futureOccurrences() {
         const occs = (baseline && baseline.occurrences) ? baseline.occurrences : [];
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        return occs.filter(o => new Date(o.startsOn) >= today);
+        const today = EkklesiaTime.startOfToday();
+        return occs.filter(o => EkklesiaTime.parse(o.startsOn) >= today);
     }
 
     /* A date can be copied when it has somebody on it and there is somewhere

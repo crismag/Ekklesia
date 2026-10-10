@@ -108,6 +108,14 @@ if echo "$PENDING_BEFORE" | grep -qi 'checksum'; then
   exit 1
 fi
 
+# Whose clock the installation keeps (Church information); reported, never changed.
+CHURCH_TZ="$(ssh "$REMOTE" "grep -oE '\"timeZone\": *\"[^\"]*\"' '$REMOTE_PATH/config/church-info.json' 2>/dev/null | sed -E 's/.*: *\"(.*)\"/\\1/'" || true)"
+if [ -n "$CHURCH_TZ" ]; then
+  echo "  church time zone: $CHURCH_TZ"
+else
+  echo "  church time zone: NOT SET — the default (America/Toronto) is used; set it in Administration → Church information"
+fi
+
 # The recovery login and first-time passwords exist only in the server's .env.
 # Without them a release silently switches both off, so stop unless the
 # installation chose that. Only presence is checked; values are never read here.

@@ -678,7 +678,7 @@ require_once __DIR__ . '/_portal-shell.php';
             memberTypes = Array.isArray(data.memberTypes) ? data.memberTypes : memberTypes;
             renderMemberTypeChips();
         } else if (mode === 'new') {
-            const today = new Date().toISOString().slice(0, 10);
+            const today = EkklesiaTime.today();
             document.getElementById('startsOn').value = today;
             document.getElementById('endsOn').value   = today;
             document.getElementById('entryDate').value = today;

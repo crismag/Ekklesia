@@ -192,24 +192,22 @@ require_once __DIR__ . '/_portal-shell.php';
     }
 
     function monthDay(value) {
-        const date = new Date(value);
+        const date = EkklesiaTime.parse(value) || new Date(NaN);
         return Number.isNaN(date.getTime()) ? ['-', ''] : [date.toLocaleString([], { month: 'short' }), String(date.getDate())];
     }
 
     function formatDateTime(value) {
-        const date = new Date(value);
+        const date = EkklesiaTime.parse(value) || new Date(NaN);
         if (Number.isNaN(date.getTime())) return 'Unknown';
         return date.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     }
 
     function startOfToday() {
-        const date = new Date();
-        date.setHours(0, 0, 0, 0);
-        return date;
+        return EkklesiaTime.startOfToday();
     }
 
     function isoDate(date) {
-        return date.toISOString().slice(0, 10);
+        return EkklesiaTime.key(date);
     }
 
     function withCampus(url) {
@@ -254,7 +252,7 @@ require_once __DIR__ . '/_portal-shell.php';
         }
 
         const today = startOfToday();
-        const nextDate = new Date(assignments[0].startsOn);
+        const nextDate = EkklesiaTime.parse(assignments[0].startsOn);
         setText('daysUntilNext', Math.max(0, Math.floor((nextDate - today) / 86400000)));
     }
 
@@ -273,7 +271,7 @@ require_once __DIR__ . '/_portal-shell.php';
                 return payload;
             });
 
-            assignments = Array.isArray(data.assignments) ? data.assignments.slice().sort((a, b) => new Date(a.startsOn) - new Date(b.startsOn)) : [];
+            assignments = Array.isArray(data.assignments) ? data.assignments.slice().sort((a, b) => EkklesiaTime.parse(a.startsOn) - EkklesiaTime.parse(b.startsOn)) : [];
             windowLabel.textContent = `${escapeHtml(data.start)} to ${escapeHtml(data.end)}`;
             updateSummary(data);
             renderAssignments();

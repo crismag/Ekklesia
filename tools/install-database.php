@@ -31,6 +31,7 @@ declare(strict_types=1);
 require __DIR__ . '/../app/Core/Config/EnvLoader.php';
 require __DIR__ . '/../app/Core/Migrations/SqlStatements.php';
 require __DIR__ . '/../app/Core/Migrations/SchemaExpectations.php';
+require __DIR__ . '/../app/Core/ChurchTime.php';
 
 use App\Core\Config\EnvLoader;
 use App\Core\Migrations\SchemaExpectations;
@@ -203,6 +204,10 @@ if (!$visitorsExists) {
     out("  created the visitors database");
 }
 
+$tz = \App\Core\ChurchTime::describe();
+out();
+out('  church time zone: ' . $tz['zone'] . ' · ' . $tz['label'] . ($tz['configured'] ? '' : ' (default: not set yet)'));
+out('    Every date and time follows it. Set it first, in Administration → Church information.');
 out();
 out('  Done. Next:');
 out('    php tools/migrate.php --status        should report nothing pending');

@@ -508,7 +508,7 @@ const state = {
     // A shared link should land on the period it was shared from, not on today.
     var d = new URLSearchParams(location.search).get('date');
     var parsed = d ? new Date(d + 'T00:00:00') : null;
-    return (parsed && !Number.isNaN(parsed.getTime())) ? parsed : new Date();
+    return (parsed && !Number.isNaN(parsed.getTime())) ? parsed : EkklesiaTime.now();
   })(),
   filters: loadFilters(),
   data: [],
@@ -610,10 +610,10 @@ function endOfWeek(date){const d = startOfWeek(date); d.setDate(d.getDate() + 6)
 function startOfDay(date){const d = new Date(date); d.setHours(0,0,0,0); return d;}
 function endOfDay(date){const d = startOfDay(date); d.setDate(d.getDate()+1); return d;}
 function rangeForView(view, cursor){if(view==='agenda') return [startOfMonth(cursor), (()=>{const d=startOfMonth(cursor); d.setMonth(d.getMonth()+1); return d;})()]; if(view==='day') return [startOfDay(cursor), endOfDay(cursor)]; if(view==='week') return [startOfWeek(cursor), (()=>{const d = endOfWeek(cursor); d.setDate(d.getDate()+1); return d;})()]; const start = startOfMonth(cursor); const end = new Date(start.getFullYear(), start.getMonth()+1, 1); return [start, end];}
-function dayKey(date){return date.toISOString().slice(0,10);}
+function dayKey(date){return EkklesiaTime.key(date);}
 function inRange(date, start, end){return date >= start && date < end;}
 function fmtDay(date){return date.toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' });}
-function fmtClock(value){const d = new Date(value); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });}
+function fmtClock(value){const d = EkklesiaTime.parse(value) || new Date(NaN); return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });}
 function fmtRange(start, end){if(state.view==='agenda') return start.toLocaleDateString([], {month:'long', year:'numeric'}); if(state.view==='day') return fmtDay(start); if(state.view==='week') return `${fmtDay(start)} - ${fmtDay(new Date(end.getTime()-86400000))}`; return start.toLocaleDateString([], { month:'long', year:'numeric' });}
 function itemHref(item){if(item.href) return item.href; if(item.kind==='assignment') return `${basePath}/my-schedule`; if(item.kind==='event') return `${basePath}/events/${item.eventId || ''}`; return '#';}
 function colorClass(kind){return {event:'event',assignment:'assignment',schedule:'schedule',custom:'custom',birth:'birth',anniv:'anniv',roster:'roster'}[kind] || 'custom';}
@@ -632,28 +632,30 @@ async function json(url){const res = await fetch(url, { credentials:'same-origin
 // /api/events?limit=120 path returned only one date per event (next_occurrence_at)
 // which silently dropped the rest of any recurring series.
 
-async function loadAssignments(start, end){if(!canViewSelf) return []; try{const data = await json(withCampus(`${basePath}/api/my-schedule?start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`)); return (data.assignments || []).flatMap(a => {
-  const date = new Date(a.startsOn);
+async function loadAssignments(start, end){if(!canViewSelf) return []; try{const data = await json(withCampus(`${basePath}/api/my-schedule?start=${dayKey(start)}&end=${dayKey(end)}`)); return (data.assignments || []).flatMap(a => {
+  const date = EkklesiaTime.parse(a.startsOn);
+  if(!date) return [];
   if(!inRange(date, start, end)) return [];
   return [{ kind:'assignment', source:'assignments', sourceLabel:'Role assignments', date, title:a.eventTitle || a.ministryName || 'Assignment', meta:`${a.roleName || 'Role'} · ${a.ministryName || 'Ministry'}`, href:`${basePath}/my-schedule` }];
 }); } catch { return []; }}
 
-async function loadMinistrySchedules(start, end){try{const data = await json(withCampus(`${basePath}/api/ministry-dashboard?since=${start.toISOString().slice(0,10)}&until=${end.toISOString().slice(0,10)}`)); return (data.cards || []).flatMap(card => {
+async function loadMinistrySchedules(start, end){try{const data = await json(withCampus(`${basePath}/api/ministry-dashboard?since=${dayKey(start)}&until=${dayKey(end)}`)); return (data.cards || []).flatMap(card => {
   const rows = Array.isArray(card.upcomingSchedule) ? card.upcomingSchedule : [];
   return rows.flatMap(row => {
-    const date = new Date(row.startsOn);
+    const date = EkklesiaTime.parse(row.startsOn);
+    if(!date) return [];
     if(!inRange(date, start, end)) return [];
     return [{ kind:'schedule', source:'schedules', sourceLabel:'Ministry schedules', date, title:row.eventTitle || card.name || 'Ministry schedule', meta:`${card.name || 'Ministry'} · ${row.assignmentCount ?? 0} assignments`, href:`${basePath}/ministries/${encodeURIComponent(card.ministryId)}` }];
   });
 }); } catch { return []; }}
 
-async function loadSystemCalendar(start, end){try{const data = await json(withCampus(`${basePath}/api/calendar/sources?start=${start.toISOString().slice(0,10)}&end=${end.toISOString().slice(0,10)}`)); return (data.items || []).flatMap(item => {
+async function loadSystemCalendar(start, end){try{const data = await json(withCampus(`${basePath}/api/calendar/sources?start=${dayKey(start)}&end=${dayKey(end)}`)); return (data.items || []).flatMap(item => {
   // Prefer the precise occurrence start (carried as starts_at) when the
   // adapter supplied one — gives us correct day/week placement. Fall back
   // to "date" (Y-m-d) for items without a specific time (birthdays, etc.).
   const dateRaw = item.starts_at || item.date;
-  const date = new Date(dateRaw);
-  if(!inRange(date, start, end)) return [];
+  const date = EkklesiaTime.parse(dateRaw);
+  if(!date || !inRange(date, start, end)) return [];
   return [{
     kind: item.kind || 'custom',
     source: item.source || 'custom',
@@ -665,7 +667,8 @@ async function loadSystemCalendar(start, end){try{const data = await json(withCa
     // The adapter has always returned ends_at; the frontend simply dropped it,
     // so every block had to be drawn as a fixed stub. With it, the time grid
     // shows how long something actually runs.
-    endsAt: item.ends_at ? new Date(item.ends_at) : null,
+    endsAt: item.ends_at ? EkklesiaTime.parse(item.ends_at) : null,
+    allDay: !item.starts_at,
     // A cancelled date stays on the calendar and says so, both in the title
     // the feed supplies and in the styling.
     cancelled: !!item.cancelled,
@@ -735,7 +738,7 @@ function agendaTime(item){
   return fmtClock(item.date) || 'All day';
 }
 function monthItemHtml(item){
-  const time = (item.kind === 'birth' || item.kind === 'anniv') ? '' : fmtClockShort(item.date);
+  const time = isAllDayItem(item) ? '' : fmtClockShort(item.date);
   const meta = time ? `<span class="meta">${escapeHtml(time)}</span>` : '';
   return `<a class="item ${itemClasses(item)}" href="${escapeHtml(item.href)}" title="${escapeHtml(item.title)}${item.meta ? ' — ' + escapeHtml(item.meta) : ''}">${meta}<span class="title">${escapeHtml(item.title)}</span></a>`;
 }
@@ -762,7 +765,7 @@ function renderMonth(start, end, items){
        drag or a hover. It is also why the button is the day number rather than
        the whole cell — a cell already contains links, and a control containing
        links is not a control. */
-    cells.push(`<div class="month-day ${dayKey(day)===dayKey(new Date()) ? 'today' : ''} ${day.getMonth()===state.cursor.getMonth() ? '' : 'out'}" data-new-on="${key}"><button type="button" class="day-num" data-open-inspector="${key}" aria-label="Show what is on ${dayLabel}">${day.getDate()}</button><div class="month-items">${visible.map(monthItemHtml).join('')}${more>0 ? `<button type="button" class="item-more" data-open-day="${key}">+${more} more</button>` : ''}</div></div>`);
+    cells.push(`<div class="month-day ${dayKey(day)===EkklesiaTime.today() ? 'today' : ''} ${day.getMonth()===state.cursor.getMonth() ? '' : 'out'}" data-new-on="${key}"><button type="button" class="day-num" data-open-inspector="${key}" aria-label="Show what is on ${dayLabel}">${day.getDate()}</button><div class="month-items">${visible.map(monthItemHtml).join('')}${more>0 ? `<button type="button" class="item-more" data-open-day="${key}">+${more} more</button>` : ''}</div></div>`);
   }
   calendarRoot.innerHTML = `<div class="month-grid">${cells.join('')}</div>`;
   rangeLabel.textContent = fmtRange(start, end);
@@ -774,7 +777,8 @@ const TG_SLOT_PX = 44;          // one hour row
 const TG_MIN_BLOCK = 22;        // a block stays legible even with no duration
 
 function isAllDayItem(item){
-  return item.kind === 'birth' || item.kind === 'anniv';
+  // A date with no time (a birthday, a holiday) belongs to the whole day.
+  return item.allDay === true || item.kind === 'birth' || item.kind === 'anniv';
 }
 
 /* The visible hour window is derived from the data rather than fixed at 0-23.
@@ -842,7 +846,7 @@ function renderTimeGrid(days, items){
     const label = new Date(2000,0,1,h).toLocaleTimeString([], {hour:'numeric'});
     hours.push(`<div class="tg-hour"><span>${escapeHtml(label)}</span></div>`);
   }
-  const todayKey = dayKey(new Date());
+  const todayKey = EkklesiaTime.today();
   const cols = [];
   const heads = [];
   const allday = [];
@@ -877,7 +881,7 @@ function renderTimeGrid(days, items){
     }
     let now = '';
     if(isToday){
-      const n = new Date();
+      const n = EkklesiaTime.now();
       const mins = n.getHours()*60 + n.getMinutes();
       if(n.getHours() >= lo && n.getHours() <= hi){
         now = `<div class="tg-now" style="top:${((mins - lo*60)/60)*TG_SLOT_PX}px"></div>`;
@@ -943,7 +947,7 @@ function renderAgenda(start, end, items){
     if(!byDay.has(k)) byDay.set(k, []);
     byDay.get(k).push(item);
   });
-  const todayKey = dayKey(new Date());
+  const todayKey = EkklesiaTime.today();
   const groups = [];
   byDay.forEach((dayItems, k) => {
     const d = new Date(k + 'T00:00:00');
@@ -981,7 +985,7 @@ function step(dir){
   else state.cursor.setMonth(state.cursor.getMonth()+dir);
   loadCalendar(true);
 }
-function goToday(){ state.cursor = startOfDay(new Date()); loadCalendar(true); }
+function goToday(){ state.cursor = startOfDay(EkklesiaTime.now()); loadCalendar(true); }
 function setView(view, date){
   state.view = view;
   if(date) state.cursor = startOfDay(date);

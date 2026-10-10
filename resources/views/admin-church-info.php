@@ -79,7 +79,10 @@ ob_start();
       <?= $field('country', 'Country', 100) ?>
       <div class="is-wide">
         <?= $field('timeZone', 'Time zone', 100, 'text', ' list="ciZones" aria-describedby="ciZoneHint" placeholder="America/Toronto"') ?>
-        <span class="ek-hint" id="ciZoneHint">A place name such as America/Toronto. Start typing to see the options.</span>
+        <?php $tzNow = \App\Core\ChurchTime::describe(); ?>
+        <span class="ek-hint" id="ciZoneHint">A place name such as America/Toronto. Start typing to see the options.
+            Every date and time in the portal follows it, for everyone.
+            <?= $tzNow['configured'] ? 'In use now: ' . admin_e($tzNow['label']) . '.' : 'Not set yet: the default, ' . admin_e($tzNow['zone']) . ', is in use.' ?></span>
         <datalist id="ciZones">
           <?php foreach (DateTimeZone::listIdentifiers() as $zone): ?><option value="<?= admin_e($zone) ?>"><?php endforeach; ?>
         </datalist>

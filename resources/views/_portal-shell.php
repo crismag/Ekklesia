@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_portal-components.php';
 require_once __DIR__ . '/../../app/Core/Navigation/Workspaces.php';
+require_once __DIR__ . '/../../app/Core/ChurchTime.php';
 
 if (!function_exists('portal_theme_style_block')) {
     /**
@@ -1668,7 +1669,7 @@ function renderResults(q){
     :[];
   var events=cache.events
     ?cache.events.filter(function(e){return match(e.title,ql);}).slice(0,6).map(function(e){
-      var d=e.next_occurrence_at?new Date(e.next_occurrence_at).toLocaleDateString():null;
+      var d=e.next_occurrence_at?(EkklesiaTime.parse(e.next_occurrence_at)||new Date(NaN)).toLocaleDateString():null;
       var id=e.event_id||e.eventId||0;
       return{title:e.title,sub:d?'Next: '+d:'Upcoming event',href:id?basePath+'/events/'+id:basePath+'/events',type:'event'};
     })
@@ -1806,7 +1807,8 @@ SRCHJS;
 
         // Sidebar first (fixed, desktop only), then the slim top bar:
         // [brand, phones only] [where you are] [campus · search · you · menu]
-        return portal_theme_style_block() . portal_shell_styles() . sprintf(
+        // Church time first, so every page script can use window.EkklesiaTime.
+        return \App\Core\ChurchTime::script() . portal_theme_style_block() . portal_shell_styles() . sprintf(
             '<a class="skip-link" href="#portal-main">Skip to main content</a>'
             . '%s%s'
             . '<header class="topbar">'
