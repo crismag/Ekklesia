@@ -1,6 +1,7 @@
 {
   "name": "church-portal",
   "private": true,
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "check": "node --check vite.config.js && node --check resources/js/app.js && node --check resources/js/Components/Schedules/ScheduleGrid.js && node --check resources/js/Pages/Schedules/Index.js",

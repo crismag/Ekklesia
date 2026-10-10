@@ -1,0 +1,44 @@
+name: Feature proposal
+description: Propose a capability, or describe a church workflow Ekklesia should support.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describing the real need is the most useful part, even without a proposed solution.
+        Please use fictional examples, not real people.
+  - type: textarea
+    id: workflow
+    attributes:
+      label: The church or institution workflow
+      description: What do people do today, and what is hard about it?
+    validations:
+      required: true
+  - type: textarea
+    id: who
+    attributes:
+      label: Who benefits
+      description: Members, ministry leaders, schedulers, administrators, guests...
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Campuses, ministries and permissions
+      description: Does this differ per campus or ministry? Who should be allowed to see or change what?
+  - type: dropdown
+    id: help
+    attributes:
+      label: Can you help?
+      multiple: true
+      options:
+        - I can help implement it
+        - I can help test it
+        - I can describe our process in more detail
+        - Not at the moment

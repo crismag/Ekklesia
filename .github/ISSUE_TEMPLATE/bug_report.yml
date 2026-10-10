@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in Ekklesia does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not include real church data.** Remove names, emails, phone numbers, birthdays,
+        addresses, passwords and `.env` contents from text, logs and screenshots.
+        Security problems go to the private channel in SECURITY.md, not here.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: A release tag, or the commit you run (git rev-parse --short HEAD).
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation type
+      options:
+        - Public web host
+        - Intranet
+        - Local development
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: PHP version, database (MySQL/MariaDB and version), web server, browser and device.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as a ministry leader
+        2. Open ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots (redacted)
+      description: Only with fictional or redacted data.

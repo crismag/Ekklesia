@@ -11,6 +11,20 @@ mobile-friendly workspace for members, leaders, schedulers, and administrators.
 church on its own host. See the [feature guides](docs/features/README.md) for
 everything it does, area by area.
 
+## Choose how to get started
+
+| Goal | Start here |
+| --- | --- |
+| Install it for your organization | [Installation guide](docs/deploy/installation.md); use a tagged release once published |
+| Develop or contribute | [CONTRIBUTING.md](CONTRIBUTING.md) and its development setup |
+| Understand what it can do | [Feature guides](docs/features/README.md) |
+| Get help deploying it | [CrisHub contact page](https://crishub.com/contact/) |
+| Understand the license | [LICENSE](LICENSE) and the [licensing guide](docs/licensing.md) |
+
+Christlikeness Church's own installation is private: it holds real members'
+information and is not a public demonstration or sandbox. To try Ekklesia,
+install a copy with fictional data.
+
 ## What the church can do
 
 | Area | Included capabilities |
@@ -80,13 +94,16 @@ remain available for migrating that installation.
 
 ## Local development
 
-Copy `.env.example` to `.env`, configure a local database and private storage,
-and follow the [installation guide](docs/deploy/installation.md) for schema setup.
-Leave `PORTAL_BASE_PATH` empty for the built-in development server:
+Copy `.env.example` to `.env` and point it at a local, empty database, then:
 
 ```bash
+php tools/install-database.php --install
+php tools/create-admin-user.php you@example.org 'a-long-local-password' 'Your Name'
 php -S 127.0.0.1:8765 -t public public/index.php
 ```
+
+Leave `PORTAL_BASE_PATH` empty for the built-in server. See
+[CONTRIBUTING.md](CONTRIBUTING.md#development-setup) for details.
 
 ## Verification
 
@@ -104,10 +121,38 @@ Browser checks and prerequisites: [regression harness](docs/regression-harness.m
 The release script runs local checks, preserves server-owned settings, applies
 migrations behind a temporary maintenance gate, and smoke-checks the release.
 
+## Contributing
+
+Bug fixes, features, documentation, accessibility improvements, tests and
+descriptions of real church workflows are all welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md); see [GOVERNANCE.md](GOVERNANCE.md) for how
+decisions are made and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work
+together. Report security problems privately, as described in
+[SECURITY.md](SECURITY.md).
+
+If you extend Ekklesia for your church, please consider contributing reusable
+improvements back to this repository so other churches can benefit.
+
+## License
+
+Ekklesia is free software, licensed under the
+[GNU Affero General Public License v3.0 only](LICENSE) (`AGPL-3.0-only`).
+Copyright © 2026 Cris Magalang.
+
+- You may use, change and share it, including commercially.
+- If you distribute it, or run a modified version that people use over a
+  network, you must offer them its corresponding source code. Every
+  installation has a **Source code** page for this; see the
+  [licensing guide](docs/licensing.md).
+- Third-party material keeps its own license, and the church's name and logo
+  are not covered; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+- A church's records, credentials and installation data are not part of the
+  application source and are never required to be published.
+
 ## Documentation
 
 [Documentation index](docs/README.md) · [Feature guides](docs/features/README.md) ·
-[In-app help](resources/views/docs/sections/) · [Support](docs/help.md)
+[In-app help](resources/views/docs/sections/) · [Getting help](SUPPORT.md)
 
 Current product documentation describes shipped capabilities. Dated design
 records are retained for engineering context and future enhancements.

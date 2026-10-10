@@ -1,8 +1,9 @@
 # Ekklesia documentation
 
-Ekklesia is a production church application in use by Christlikeness Church.
-Start with the product guide for capabilities, the in-app guide for everyday
-work, or the installation guide for a new host.
+Ekklesia is a production church application in use by Christlikeness Church,
+and free software that other churches can install. Start with the product guide
+for capabilities, the in-app guide for everyday work, the installation guide
+for a new host, or the contributing guide to help improve it.
 
 | Document | Purpose |
 | --- | --- |
@@ -10,7 +11,7 @@ work, or the installation guide for a new host.
 | [Feature guides](features/README.md) | Every area in detail: people, ministries and serving, events and calendar, publications, visitors, accounts, administration |
 | [Feature summary](features.md) | A one-page summary of the guides |
 | In-app `/docs` · [source sections](../resources/views/docs/sections/) | Screen-by-screen help for members, leaders and administrators |
-| [Installation and deployment](deploy/installation.md) | Runtime, configuration, database setup and release checklist |
+| [Installation and deployment](deploy/installation.md) | New installations, development setup, Church Portal migration and upgrades |
 | [Release and routing](deploy/README.md) | Deployment script, server rewrites, maintenance gate and recovery |
 | [Production configuration](deploy/production-config.md) | Debugging, logging, Google and email sign-in configuration |
 | [Database guide](../database/README.md) | Active member/visitor schemas and legacy-data migration |
@@ -21,7 +22,21 @@ work, or the installation guide for a new host.
 | [Site gate](../tools/site-gate/README.md) | Whole-site password protection for private installations |
 | [Regression harness](regression-harness.md) | PHP, source-contract and browser verification |
 | [Local nginx](nginx_christlikeness_local.md) | Local web-server configuration |
-| [Help and support](help.md) | Reporting problems and requesting access |
+| [Church help page](help.md) | Christlikeness Church's internal notes on reporting problems and requesting access |
+
+## Licensing and collaboration
+
+| Document | Purpose |
+| --- | --- |
+| [LICENSE](../LICENSE) | GNU Affero General Public License v3.0 (`AGPL-3.0-only`) |
+| [Licensing guide](licensing.md) | What the license allows and requires, and how an installation offers its source |
+| [Third-party notices](../THIRD_PARTY_NOTICES.md) | Bundled material with its own terms, and church branding |
+| [Contributing](../CONTRIBUTING.md) | Ways to help, development setup, checks, data rules |
+| [Governance](../GOVERNANCE.md) | Who maintains Ekklesia and how decisions are made |
+| [Releases and workflow](releasing.md) | Pull requests, versions, release notes, labels, contributor opportunities |
+| [Code of conduct](../CODE_OF_CONDUCT.md) | Expected behavior and private reporting |
+| [Security policy](../SECURITY.md) | Reporting vulnerabilities privately |
+| [Getting help](../SUPPORT.md) | Where each kind of question goes, including paid assistance |
 
 ## Engineering records
 
