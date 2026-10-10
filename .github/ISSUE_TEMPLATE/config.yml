@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem privately
+    url: https://github.com/crismag/Ekklesia/blob/main/SECURITY.md
+    about: Never post vulnerabilities in a public issue. Follow the security policy.
+  - name: Help with installing or running Ekklesia
+    url: https://github.com/crismag/Ekklesia/blob/main/SUPPORT.md
+    about: Where to find documentation and which questions belong where.
+  - name: Paid deployment or customization
+    url: https://crishub.com/contact/
+    about: Deployment, configuration, data import and agreed customization through CrisHub.
