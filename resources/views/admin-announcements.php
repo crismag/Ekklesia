@@ -129,7 +129,7 @@ ob_start();
   let dirty = false;
 
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const today = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const today = () => EkklesiaTime.today();
   const say = (text, kind) => { toast.textContent = text; toast.className = 'pn-toast' + (kind ? ' is-' + kind : ''); };
 
   function state(item) {

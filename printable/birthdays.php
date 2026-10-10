@@ -78,7 +78,7 @@ echo printable_page([
             const res = await fetch(BASE + withCampus('/api/people-directory'), { credentials: 'same-origin' });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || ('Failed to load (' + res.status + ')'));
-            const nowYear = new Date().getFullYear();
+            const nowYear = EkklesiaTime.now().getFullYear();
             people = (Array.isArray(data.people) ? data.people : [])
                 .filter((p) => Number(p.birthMonth) > 0)
                 .map((p) => ({
@@ -125,7 +125,7 @@ echo printable_page([
         // print header meta
         const monthLabel = m === 0 ? 'All months' : MONTHS_FULL[m];
         document.getElementById('printMeta').textContent =
-            monthLabel + ' · ' + currentCampusName() + ' · ' + rows.length + ' people · Generated ' + new Date().toLocaleDateString();
+            monthLabel + ' · ' + currentCampusName() + ' · ' + rows.length + ' people · Generated ' + EkklesiaTime.now().toLocaleDateString();
         // sort arrows
         document.querySelectorAll('#prTable th[data-sort]').forEach((th) => {
             th.querySelector('.arrow').textContent = th.dataset.sort === sortKey ? (sortDir > 0 ? '▲' : '▼') : '';

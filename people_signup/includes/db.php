@@ -71,6 +71,9 @@ if (!function_exists('signup_members_db')) {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
+        // Event times are the church's local time; CURDATE() must agree.
+        require_once dirname(__DIR__, 2) . '/app/Core/ChurchTime.php';
+        \App\Core\ChurchTime::applyTo($pdo);
         return $pdo;
     }
 }
@@ -84,7 +87,14 @@ if (!function_exists('signup_time_zone')) {
     function signup_time_zone(): DateTimeZone
     {
         static $tz = null;
-        return $tz ??= new DateTimeZone((string) (signup_secure()['time_zone'] ?? 'America/Toronto'));
+        if ($tz === null) {
+            // The church's zone (Administration → Church information), unless
+            // this module's settings name one of their own.
+            require_once dirname(__DIR__, 2) . '/app/Core/ChurchTime.php';
+            $own = trim((string) (signup_secure()['time_zone'] ?? ''));
+            $tz = new DateTimeZone($own !== '' ? $own : \App\Core\ChurchTime::zone());
+        }
+        return $tz;
     }
 
     /** Now, in the church's local time, as stored in the visitors database. */

@@ -36,6 +36,9 @@ spl_autoload_register(function (string $class): void {
 // Load .env early so PORTAL_BASE_PATH is available before route lookup.
 EnvLoader::loadOnce(__DIR__ . '/../.env');
 
+// Every date and time is the church's local time, whatever the server's zone.
+\App\Core\ChurchTime::apply();
+
 // A release is landing: hold requests rather than serve new code against a
 // schema its migration has not reached yet. Deployment overwrites files in
 // place, so this window is real and has broken this site twice. One stat() per

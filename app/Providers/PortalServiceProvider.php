@@ -250,6 +250,7 @@ final class PortalServiceProvider
                 'signup' => $prefix('people_signup/config/signup.config.json'),
                 'rsvp' => $prefix('events_rsvp/config/rsvp.config.json'),
             ],
+            timeZone: new \DateTimeZone(\App\Core\ChurchTime::zone()),
         );
     }
 

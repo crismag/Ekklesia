@@ -54,14 +54,14 @@ echo printable_page([
     function currentCampusName() { const s = document.getElementById('campusSelect'); if (!s || !s.value) return 'All campuses'; const o = s.options[s.selectedIndex]; return o ? o.textContent.trim() : 'All campuses'; }
     function withCampus(path) { const c = currentCampus(); return c ? path + (path.includes('?') ? '&' : '?') + 'current_campus_id=' + encodeURIComponent(c) : path; }
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-    const ymd = (d) => d.toISOString().slice(0, 10);
-    function fmtWhen(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+    const ymd = (d) => EkklesiaTime.key(d);
+    function fmtWhen(iso) { const d = (EkklesiaTime.parse(iso) || new Date(NaN)); return isNaN(d) ? '' : d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
 
     let ministries = [];
 
     // default range: today → +14 days
     (function initDates() {
-        const now = new Date(); const end = new Date(); end.setDate(end.getDate() + 14);
+        const now = EkklesiaTime.now(); const end = EkklesiaTime.now(); end.setDate(end.getDate() + 14);
         document.getElementById('prStart').value = ymd(now);
         document.getElementById('prEnd').value = ymd(end);
     })();
@@ -118,7 +118,7 @@ echo printable_page([
             // only occurrences that have assignments, sorted by date
             const occs = Object.values(occ)
                 .filter((o) => Object.keys(o.roles).length > 0)
-                .sort((a, b) => new Date(a.startsOn) - new Date(b.startsOn));
+                .sort((a, b) => EkklesiaTime.parse(a.startsOn) - EkklesiaTime.parse(b.startsOn));
             if (!occs.length) return;
 
             const count = occs.reduce((s, o) => s + Object.values(o.roles).reduce((n, arr) => n + arr.length, 0), 0);
@@ -135,9 +135,9 @@ echo printable_page([
         });
 
         roster.innerHTML = sections || '<div class="pr-empty">No assignments in this date range for the selected ministries.</div>';
-        const rangeLabel = new Date(start).toLocaleDateString() + ' – ' + new Date(end).toLocaleDateString();
+        const rangeLabel = (EkklesiaTime.parse(start) || new Date(NaN)).toLocaleDateString() + ' – ' + (EkklesiaTime.parse(end) || new Date(NaN)).toLocaleDateString();
         document.getElementById('prCount').textContent = totalAssign + ' assignment' + (totalAssign === 1 ? '' : 's') + ' · ' + ids.length + ' ministr' + (ids.length === 1 ? 'y' : 'ies');
-        document.getElementById('printMeta').textContent = rangeLabel + ' · ' + currentCampusName() + ' · ' + totalAssign + ' assignments · Generated ' + new Date().toLocaleDateString();
+        document.getElementById('printMeta').textContent = rangeLabel + ' · ' + currentCampusName() + ' · ' + totalAssign + ' assignments · Generated ' + EkklesiaTime.now().toLocaleDateString();
     }
 
     document.getElementById('prApply').addEventListener('click', generate);

@@ -306,7 +306,7 @@ require_once __DIR__ . '/_portal-shell.php';
     function escapeHtml(value){return String(value??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
     function selectedCampusId(){return campusSelect?.value||'';}
     function withCampus(url,name='campus_id'){const id=selectedCampusId();return id?url+(url.includes('?')?'&':'?')+`${name}=${encodeURIComponent(id)}`:url;}
-    function formatDate(value){if(!value)return'Never';const d=new Date(value);return Number.isNaN(d.getTime())?'Unknown':d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
+    function formatDate(value){if(!value)return'Never';const d=EkklesiaTime.parse(value)||new Date(NaN);return Number.isNaN(d.getTime())?'Unknown':d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
     function birthday(person){return person.birthMonth&&person.birthDay?new Date(2026,Number(person.birthMonth)-1,Number(person.birthDay)).toLocaleDateString([],{month:'short',day:'numeric'}):'Not listed';}
     function firstNameOf(person){return String(person.firstName||'').trim();}
     function lastNameOf(person){return String(person.lastName||person.lastInitial||'').trim();}
@@ -371,7 +371,7 @@ require_once __DIR__ . '/_portal-shell.php';
     function filteredPeople(){
         const ministry=ministrySelect.value;
         const monthRaw=monthSelect.value;
-        const month=monthRaw==='current'?String(new Date().getMonth()+1):monthRaw;
+        const month=monthRaw==='current'?String(EkklesiaTime.now().getMonth()+1):monthRaw;
         const status=statusSelect.value;
         const activity=activitySelect.value;
         const memberType=memberTypeSelect.value;

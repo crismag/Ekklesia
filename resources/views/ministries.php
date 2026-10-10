@@ -215,7 +215,7 @@ $subtitle = $minSettings['subtitle'] ?? 'Who is assigned across ministries — g
     const shell = document.querySelector('.shell');
     const BASE = shell.dataset.base || '';
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-    const isoDate = (d) => d.toISOString().slice(0, 10);
+    const isoDate = (d) => EkklesiaTime.key(d);
     // "Gift and Arrows" → "gift_and_arrows" for friendly /ministry/<slug> links
     const slugify = (name) => String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 
@@ -249,13 +249,13 @@ $subtitle = $minSettings['subtitle'] ?? 'Who is assigned across ministries — g
     }
 
     // default range: today → +30 days
-    (function () { const t = new Date(), u = new Date(); u.setDate(u.getDate() + 30); sinceInput.value = isoDate(t); untilInput.value = isoDate(u); })();
+    (function () { const t = EkklesiaTime.now(), u = EkklesiaTime.now(); u.setDate(u.getDate() + 30); sinceInput.value = isoDate(t); untilInput.value = isoDate(u); })();
 
     function fmtDayHead(iso) {
-        const d = new Date(iso);
+        const d = (EkklesiaTime.parse(iso) || new Date(NaN));
         return { wk: d.toLocaleDateString([], { weekday: 'long' }), md: d.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' }) };
     }
-    function fmtTime(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+    function fmtTime(iso) { const d = (EkklesiaTime.parse(iso) || new Date(NaN)); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 
     // Full ministry list (independent of the date range / schedules).
     async function loadMinistryList() {
@@ -343,11 +343,11 @@ $subtitle = $minSettings['subtitle'] ?? 'Who is assigned across ministries — g
             const r = o.roles[a.serving_role_id] || (o.roles[a.serving_role_id] = { id: a.serving_role_id, name: a.role_name || 'Assigned', people: [] });
             if (a.person_name) r.people.push(a.person_name);
         });
-        return Object.values(days).sort((x, y) => new Date(x.startsOn) - new Date(y.startsOn))
+        return Object.values(days).sort((x, y) => EkklesiaTime.parse(x.startsOn) - EkklesiaTime.parse(y.startsOn))
             .map((d) => ({
                 ...d,
                 ministries: Object.values(d.ministries).sort((a, b) => a.name.localeCompare(b.name))
-                    .map((m) => ({ ...m, occ: Object.values(m.occ).sort((a, b) => new Date(a.startsOn) - new Date(b.startsOn)) })),
+                    .map((m) => ({ ...m, occ: Object.values(m.occ).sort((a, b) => EkklesiaTime.parse(a.startsOn) - EkklesiaTime.parse(b.startsOn)) })),
             }));
     }
 

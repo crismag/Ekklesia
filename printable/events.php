@@ -60,8 +60,8 @@ echo printable_page([
     // next_occurrence_at may be null, an ISO string, or a serialized DateTime object.
     function parseDate(v) {
         if (!v) return null;
-        if (typeof v === 'string') { const d = new Date(v); return isNaN(d) ? null : d; }
-        if (typeof v === 'object' && v.date) { const d = new Date(v.date.replace(' ', 'T')); return isNaN(d) ? null : d; }
+        if (typeof v === 'string') { return EkklesiaTime.parse(v); }
+        if (typeof v === 'object' && v.date) { return EkklesiaTime.parse(v.date); }
         return null;
     }
     function fmt(d) { return d ? d.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No upcoming date'; }
@@ -109,7 +109,7 @@ echo printable_page([
             : '<tr><td colspan="3"><div class="pr-empty">No events match.</div></td></tr>';
         document.getElementById('prCount').textContent = rows.length + ' ' + (rows.length === 1 ? 'event' : 'events');
         document.getElementById('printMeta').textContent =
-            currentCampusName() + ' · ' + rows.length + ' events · Generated ' + new Date().toLocaleDateString();
+            currentCampusName() + ' · ' + rows.length + ' events · Generated ' + EkklesiaTime.now().toLocaleDateString();
         document.querySelectorAll('#prTable th[data-sort]').forEach((th) => {
             th.querySelector('.arrow').textContent = th.dataset.sort === sortKey ? (sortDir > 0 ? '▲' : '▼') : '';
         });

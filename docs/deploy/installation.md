@@ -61,6 +61,13 @@ either. Choose your own and keep them private. `.env.example` explains each
 setting; [production configuration](production-config.md) covers Google and
 mail in detail.
 
+**Time zone.** Set the church's time zone under **Administration → Church
+information** (stored as `timeZone` in `config/church-info.json`, for example
+`America/Toronto` or `Asia/Manila`). Every date and time follows it: what is
+stored, what "today" and "upcoming" mean, and what every visitor's browser
+shows, wherever they are. The server's own time zone does not matter, so the
+same installation works on any host.
+
 Church-specific settings live in `config/` (church name and address, theme,
 announcements, ministries). The repository's copies are Christlikeness Church's
 starting values: replace the church name, logo (`public/images/`) and details
@@ -103,9 +110,10 @@ the release script does not overwrite it.
    [Web server routing](#web-server-routing)) and **make private storage
    writable** by the web server user: `storage/private/` (or your
    `MAINTENANCE_PRIVATE_PATH`) and the visitors database file.
-8. **Sign in and set up the church**: campuses, member types and other lists
-   under **Administration**, church details and appearance, then people,
-   households and ministries. A new installation starts empty.
+8. **Sign in and set up the church**: first the time zone and church details
+   under **Administration → Church information**, then campuses, member types
+   and other lists, appearance, and finally people, households and ministries.
+   A new installation starts empty.
 9. **Verify** (see [Checking an installation](#checking-an-installation)).
 
 ## Development installation

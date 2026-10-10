@@ -25,9 +25,12 @@ use DateTimeZone;
  */
 final class CalendarViewModel
 {
-    public function __construct(
-        private readonly DateTimeZone $timezone = new DateTimeZone('America/Toronto'),
-    ) {
+    private readonly DateTimeZone $timezone;
+
+    /** $timezone defaults to PHP's, which App\Core\ChurchTime sets to the church's. */
+    public function __construct(?DateTimeZone $timezone = null)
+    {
+        $this->timezone = $timezone ?? new DateTimeZone(date_default_timezone_get());
     }
 
     /**

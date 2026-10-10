@@ -98,9 +98,9 @@ const shell=document.querySelector('.shell');const basePath=shell.dataset.base||
 function escapeHtml(v){return String(v??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
 function selectedCampusId(){return campusSelect?.value||'';}
 function withCampus(url,name='campus_id'){const id=selectedCampusId();return id?url+(url.includes('?')?'&':'?')+`${name}=${encodeURIComponent(id)}`:url;}
-function formatDate(v){if(!v)return'Never';const d=new Date(v);return Number.isNaN(d.getTime())?'Unknown':d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
+function formatDate(v){if(!v)return'Never';const d=EkklesiaTime.parse(v)||new Date(NaN);return Number.isNaN(d.getTime())?'Unknown':d.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'});}
 function birthday(p){return p.birthMonth&&p.birthDay?new Date(2026,Number(p.birthMonth)-1,Number(p.birthDay)).toLocaleDateString([],{month:'long',day:'numeric'}):'Not listed';}
-function age(p){if(!p.birthYear||Number(p.birthYear)<=0)return'Not listed';const today=new Date();let years=today.getFullYear()-Number(p.birthYear);if(p.birthMonth&&p.birthDay){const birthdayThisYear=new Date(today.getFullYear(),Number(p.birthMonth)-1,Number(p.birthDay));if(today<birthdayThisYear)years--;}return years>=0?`${years}`:'Not listed';}
+function age(p){if(!p.birthYear||Number(p.birthYear)<=0)return'Not listed';const today=EkklesiaTime.now();let years=today.getFullYear()-Number(p.birthYear);if(p.birthMonth&&p.birthDay){const birthdayThisYear=new Date(today.getFullYear(),Number(p.birthMonth)-1,Number(p.birthDay));if(today<birthdayThisYear)years--;}return years>=0?`${years}`:'Not listed';}
 function initials(p){const name=String(p.displayName||'').trim();return name.split(/\s+/).map(part=>part[0]||'').join('').slice(0,2).toUpperCase()||'?';}
 function detail(label,value){return `<div class="detail-row"><strong>${escapeHtml(label)}</strong><span>${value}</span></div>`;}
 function campusName(person){return person.primaryCampusName||Array.from(campusSelect?.options||[]).find(option=>String(option.value)===String(person.primaryCampusId))?.textContent||'Campus not set';}

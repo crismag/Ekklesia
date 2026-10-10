@@ -76,6 +76,11 @@ final class ChurchInfoService
         if ($clean['email'] !== '' && !filter_var($clean['email'], FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Email address looks invalid.');
         }
+        // Every date in the portal is shown in this zone, so a typo would move
+        // the whole calendar. Blank keeps the default.
+        if ($clean['timeZone'] !== '' && !\App\Core\ChurchTime::isValidZone($clean['timeZone'])) {
+            throw new InvalidArgumentException('Time zone is not recognised. Use a name such as America/Toronto or Asia/Manila.');
+        }
 
         $encoded = json_encode($clean, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($encoded === false) {

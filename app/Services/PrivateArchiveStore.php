@@ -35,7 +35,8 @@ final class PrivateArchiveStore
 
     public function timezone(): DateTimeZone
     {
-        return $this->tz ?? new DateTimeZone('America/Toronto');
+        // PHP's zone, which App\Core\ChurchTime sets to the church's.
+        return $this->tz ?? new DateTimeZone(date_default_timezone_get());
     }
 
     /**

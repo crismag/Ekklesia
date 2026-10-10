@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Database;
 
+use App\Core\ChurchTime;
 use App\Core\Config\EnvLoader;
 use PDO;
 use RuntimeException;
@@ -46,6 +47,10 @@ final class MembersConnection
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
+        // Stored times are the church's local time; NOW() and CURDATE() must be
+        // too. See ChurchTime.
+        ChurchTime::apply();
+        ChurchTime::applyTo(self::$instance);
 
         return self::$instance;
     }
