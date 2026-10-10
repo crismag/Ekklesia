@@ -1851,8 +1851,13 @@ if (!function_exists('portal_footer')) {
      * Render the global footer. Pages can pass left/right strings to override,
      * otherwise we read config/chrome.json so admins can manage the text +
      * minimal-mode toggle from /admin/footer without code changes.
+     *
+     * Every footer links to /source, where the people using an installation
+     * get its source code (AGPL-3.0-only). The base path is the request's, or
+     * the one public/index.php resolved for this request when a caller does
+     * not pass it.
      */
-    function portal_footer(string $left = '', string $right = ''): string
+    function portal_footer(string $left = '', string $right = '', ?string $basePath = null): string
     {
         $chrome = portal_chrome();
         $cfgLeft  = (string) ($chrome['footer']['leftText']  ?? 'Ekklesia');
@@ -1868,7 +1873,10 @@ if (!function_exists('portal_footer')) {
         $minimalCss = $minimal
             ? '<style>.portal-footer.is-minimal{border:0;padding:8px 0;margin-top:14px;font-size:12px;opacity:.78}.portal-footer.is-minimal>span:nth-child(2):empty{display:none}</style>'
             : '';
-        return $minimalCss . '<footer class="' . $cls . '"><span>' . htmlspecialchars($finalLeft, ENT_QUOTES, 'UTF-8') . '</span><span>' . htmlspecialchars($finalRight, ENT_QUOTES, 'UTF-8') . '</span></footer>';
+        $base = rtrim((string) ($basePath ?? ($GLOBALS['basePath'] ?? '')), '/');
+        $source = '<a class="portal-footer-source" href="' . htmlspecialchars($base . '/source', ENT_QUOTES, 'UTF-8') . '">Source code</a>';
+        $right = htmlspecialchars($finalRight, ENT_QUOTES, 'UTF-8');
+        return $minimalCss . '<footer class="' . $cls . '"><span>' . htmlspecialchars($finalLeft, ENT_QUOTES, 'UTF-8') . '</span><span>' . ($right !== '' ? $right . ' · ' : '') . $source . '</span></footer>';
     }
 }
 

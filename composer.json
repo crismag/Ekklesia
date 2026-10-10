@@ -2,7 +2,7 @@
   "name": "christlikeness/church-portal",
   "description": "Ekklesia: people, ministries, calendar, serving schedules and visitor sign-ups for Christlikeness Church.",
   "type": "project",
-  "license": "proprietary",
+  "license": "AGPL-3.0-only",
   "require": {
     "php": "^8.2",
     "laravel/framework": "^11.0",

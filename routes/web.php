@@ -1178,6 +1178,17 @@ $webRoutes = [
         return (string) ob_get_clean();
     },
 
+    // Where people using this installation get its source code (AGPL-3.0-only).
+    'GET /source' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
+        $basePath = (string) ($req['_base_path'] ?? '');
+        $actor = $resolvePortalActor($req);
+        $campusSelector = $resolveCampusSelector($req);
+        $offer = \App\Services\SourceCodeOffer::fromEnvironment();
+        ob_start();
+        require __DIR__ . '/../resources/views/source.php';
+        return (string) ob_get_clean();
+    },
+
     'GET /docs' => function (array $req) use ($resolvePortalActor, $resolveCampusSelector): string {
         $basePath = (string) ($req['_base_path'] ?? '');
         $actor = $resolvePortalActor($req);

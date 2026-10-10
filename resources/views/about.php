@@ -148,10 +148,18 @@ $technology = [
                         <p>The <a href="<?= $base ?>/docs">user guide</a> explains each workspace step by step.</p>
                     </div>
                 </section>
+
+                <section class="ek-card" aria-labelledby="ab-source">
+                    <div class="ek-card-head"><h2 id="ab-source">Source code</h2></div>
+                    <div class="ek-card-body ab-prose">
+                        <p>Ekklesia is free software under the GNU AGPL v3.
+                            <a href="<?= $base ?>/source">Get the source code</a> of the version running here.</p>
+                    </div>
+                </section>
             </aside>
         </div>
     </main>
-    <?= portal_footer() ?>
+    <?= portal_footer('', '', $basePath) ?>
 </div>
 </body>
 </html>
