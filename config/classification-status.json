@@ -1,0 +1,16 @@
+{
+  "_comment": "Which status each classification represents, so the people directory can colour it. Colour is never the only cue: the circle carries the classification's short code, and its full name is on hover, read by screen readers, and printed in the 'By classification' card which doubles as the key. A classification not listed here is drawn neutral rather than guessed at. Names match case-insensitively, ignoring punctuation.",
+  "statuses": {
+    "active":       { "label": "Attending" },
+    "prospective":  { "label": "Guest or prospective" },
+    "inactive":     { "label": "Not attending" },
+    "unknown":      { "label": "Not recorded" }
+  },
+  "classifications": {
+    "Member": "active",
+    "Regular Attender": "active",
+    "Guest": "prospective",
+    "Non-Attender": "inactive",
+    "Non-Attender (staff)": "inactive"
+  }
+}

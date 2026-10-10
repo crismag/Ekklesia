@@ -1,0 +1,25 @@
+{
+  "_comment": "Municipalities that may appear at the end of an address line that has no commas. Used only to split street from city, and to settle casing. Extend as the roster spreads; order does not matter.",
+  "cities": [
+    "Toronto", "North York", "Scarborough", "Etobicoke", "East York", "York",
+    "Willowdale", "Downsview", "Agincourt", "Rexdale", "Weston", "Don Mills",
+    "Markham", "Unionville", "Thornhill", "Richmond Hill", "Vaughan", "Maple",
+    "Woodbridge", "Concord", "Kleinburg", "Aurora", "Newmarket", "Stouffville",
+    "Whitchurch-Stouffville", "King City", "Nobleton", "Schomberg", "Keswick",
+    "Bradford", "Innisfil", "Barrie", "Georgina", "Sutton",
+    "Mississauga", "Brampton", "Caledon", "Bolton", "Malton", "Streetsville",
+    "Port Credit", "Cooksville", "Meadowvale", "Milton", "Georgetown", "Acton",
+    "Halton Hills", "Oakville", "Burlington", "Waterdown",
+    "Pickering", "Ajax", "Whitby", "Oshawa", "Brooklin", "Courtice",
+    "Bowmanville", "Clarington", "Uxbridge", "Port Perry", "Beaverton",
+    "Hamilton", "Stoney Creek", "Ancaster", "Dundas", "Binbrook", "Grimsby",
+    "St. Catharines", "Niagara Falls", "Welland", "Fort Erie", "Thorold",
+    "Kitchener", "Waterloo", "Cambridge", "Guelph", "Brantford", "Woodstock",
+    "London", "Windsor", "Chatham", "Sarnia", "Stratford",
+    "Orangeville", "Shelburne", "Collingwood", "Wasaga Beach", "Midland",
+    "Orillia", "Peterborough", "Cobourg", "Port Hope", "Belleville",
+    "Kingston", "Brockville", "Cornwall", "Ottawa", "Nepean", "Kanata",
+    "Gloucester", "Orleans", "Barrhaven", "Sudbury", "North Bay",
+    "Sault Ste. Marie", "Thunder Bay", "Timmins"
+  ]
+}

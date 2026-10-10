@@ -1,0 +1,1239 @@
+{
+    "_comment": "Holiday calendars drawn on the church calendar. Fetched, not computed: the rules look simple and are not, and legislatures change them. Cached rather than fetched at render time so the calendar draws with no network. Managed from Administration → Calendar & events → Calendar.",
+    "_source": "https://date.nager.at",
+    "calendars": [
+        {
+            "id": "ca-on",
+            "label": "Canada holidays (Ontario)",
+            "country": "CA",
+            "region": "CA-ON",
+            "color": "#b3261e",
+            "enabled": true,
+            "fetched_on": "2026-08-26",
+            "holidays": [
+                {
+                    "date": "2026-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-02-16",
+                    "name": "Family Day",
+                    "national": false
+                },
+                {
+                    "date": "2026-04-03",
+                    "name": "Good Friday",
+                    "national": true
+                },
+                {
+                    "date": "2026-05-18",
+                    "name": "Victoria Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-07-01",
+                    "name": "Canada Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-08-03",
+                    "name": "Civic Holiday",
+                    "national": false
+                },
+                {
+                    "date": "2026-09-07",
+                    "name": "Labour Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-09-30",
+                    "name": "National Day for Truth and Reconciliation",
+                    "national": true
+                },
+                {
+                    "date": "2026-10-12",
+                    "name": "Thanksgiving",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-26",
+                    "name": "Boxing Day",
+                    "national": false
+                },
+                {
+                    "date": "2027-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-02-15",
+                    "name": "Family Day",
+                    "national": false
+                },
+                {
+                    "date": "2027-03-26",
+                    "name": "Good Friday",
+                    "national": true
+                },
+                {
+                    "date": "2027-05-24",
+                    "name": "Victoria Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-07-01",
+                    "name": "Canada Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-08-02",
+                    "name": "Civic Holiday",
+                    "national": false
+                },
+                {
+                    "date": "2027-09-06",
+                    "name": "Labour Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-09-30",
+                    "name": "National Day for Truth and Reconciliation",
+                    "national": true
+                },
+                {
+                    "date": "2027-10-11",
+                    "name": "Thanksgiving",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-26",
+                    "name": "Boxing Day",
+                    "national": false
+                },
+                {
+                    "date": "2028-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-02-21",
+                    "name": "Family Day",
+                    "national": false
+                },
+                {
+                    "date": "2028-04-14",
+                    "name": "Good Friday",
+                    "national": true
+                },
+                {
+                    "date": "2028-05-22",
+                    "name": "Victoria Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-07-01",
+                    "name": "Canada Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-08-07",
+                    "name": "Civic Holiday",
+                    "national": false
+                },
+                {
+                    "date": "2028-09-04",
+                    "name": "Labour Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-09-30",
+                    "name": "National Day for Truth and Reconciliation",
+                    "national": true
+                },
+                {
+                    "date": "2028-10-09",
+                    "name": "Thanksgiving",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-26",
+                    "name": "Boxing Day",
+                    "national": false
+                },
+                {
+                    "date": "2029-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-02-19",
+                    "name": "Family Day",
+                    "national": false
+                },
+                {
+                    "date": "2029-03-30",
+                    "name": "Good Friday",
+                    "national": true
+                },
+                {
+                    "date": "2029-05-21",
+                    "name": "Victoria Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-07-01",
+                    "name": "Canada Day",
+                    "national": false
+                },
+                {
+                    "date": "2029-08-06",
+                    "name": "Civic Holiday",
+                    "national": false
+                },
+                {
+                    "date": "2029-09-03",
+                    "name": "Labour Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-09-30",
+                    "name": "National Day for Truth and Reconciliation",
+                    "national": true
+                },
+                {
+                    "date": "2029-10-08",
+                    "name": "Thanksgiving",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-26",
+                    "name": "Boxing Day",
+                    "national": false
+                },
+                {
+                    "date": "2030-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-02-18",
+                    "name": "Family Day",
+                    "national": false
+                },
+                {
+                    "date": "2030-04-19",
+                    "name": "Good Friday",
+                    "national": true
+                },
+                {
+                    "date": "2030-05-20",
+                    "name": "Victoria Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-07-01",
+                    "name": "Canada Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-08-05",
+                    "name": "Civic Holiday",
+                    "national": false
+                },
+                {
+                    "date": "2030-09-02",
+                    "name": "Labour Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-09-30",
+                    "name": "National Day for Truth and Reconciliation",
+                    "national": true
+                },
+                {
+                    "date": "2030-10-14",
+                    "name": "Thanksgiving",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-26",
+                    "name": "Boxing Day",
+                    "national": false
+                },
+                {
+                    "date": "2031-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-02-17",
+                    "name": "Family Day",
+                    "national": false
+                },
+                {
+                    "date": "2031-04-11",
+                    "name": "Good Friday",
+                    "national": true
+                },
+                {
+                    "date": "2031-05-19",
+                    "name": "Victoria Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-07-01",
+                    "name": "Canada Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-08-04",
+                    "name": "Civic Holiday",
+                    "national": false
+                },
+                {
+                    "date": "2031-09-01",
+                    "name": "Labour Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-09-30",
+                    "name": "National Day for Truth and Reconciliation",
+                    "national": true
+                },
+                {
+                    "date": "2031-10-13",
+                    "name": "Thanksgiving",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-26",
+                    "name": "Boxing Day",
+                    "national": false
+                }
+            ]
+        },
+        {
+            "id": "ph",
+            "label": "Philippine holidays",
+            "country": "PH",
+            "region": null,
+            "color": "#1f6b3c",
+            "enabled": true,
+            "fetched_on": "2026-08-26",
+            "holidays": [
+                {
+                    "date": "2026-01-01",
+                    "name": "Bagong Taon",
+                    "national": true
+                },
+                {
+                    "date": "2026-02-17",
+                    "name": "Chinese New Year",
+                    "national": true
+                },
+                {
+                    "date": "2026-04-02",
+                    "name": "Huwebes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2026-04-03",
+                    "name": "Biyernes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2026-04-04",
+                    "name": "Sabado de Gloria",
+                    "national": true
+                },
+                {
+                    "date": "2026-04-09",
+                    "name": "Araw ng Kagitingan",
+                    "national": true
+                },
+                {
+                    "date": "2026-05-01",
+                    "name": "Araw ng Paggawa",
+                    "national": true
+                },
+                {
+                    "date": "2026-06-12",
+                    "name": "Araw ng Kalayaan",
+                    "national": true
+                },
+                {
+                    "date": "2026-08-21",
+                    "name": "Araw ng Kamatayan ni Senador Benigno Simeon \"Ninoy\" Aquino Jr.",
+                    "national": true
+                },
+                {
+                    "date": "2026-08-31",
+                    "name": "Araw ng mga Bayani",
+                    "national": true
+                },
+                {
+                    "date": "2026-10-31",
+                    "name": "All Saints' Day Eve",
+                    "national": true
+                },
+                {
+                    "date": "2026-11-01",
+                    "name": "Araw ng mga Santo",
+                    "national": true
+                },
+                {
+                    "date": "2026-11-30",
+                    "name": "Araw ni Gat Andres Bonifacio",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-08",
+                    "name": "Kapistahan ng Immaculada Concepcion",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-24",
+                    "name": "Christmas Eve",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-25",
+                    "name": "Araw ng Pasko",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-30",
+                    "name": "Araw ng Kamatayan ni Dr. Jose Rizal",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-31",
+                    "name": "Huling Araw ng Taon",
+                    "national": true
+                },
+                {
+                    "date": "2027-01-01",
+                    "name": "Bagong Taon",
+                    "national": true
+                },
+                {
+                    "date": "2027-02-06",
+                    "name": "Chinese New Year",
+                    "national": true
+                },
+                {
+                    "date": "2027-03-25",
+                    "name": "Huwebes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2027-03-26",
+                    "name": "Biyernes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2027-03-27",
+                    "name": "Sabado de Gloria",
+                    "national": true
+                },
+                {
+                    "date": "2027-04-09",
+                    "name": "Araw ng Kagitingan",
+                    "national": true
+                },
+                {
+                    "date": "2027-05-01",
+                    "name": "Araw ng Paggawa",
+                    "national": true
+                },
+                {
+                    "date": "2027-06-12",
+                    "name": "Araw ng Kalayaan",
+                    "national": true
+                },
+                {
+                    "date": "2027-08-21",
+                    "name": "Araw ng Kamatayan ni Senador Benigno Simeon \"Ninoy\" Aquino Jr.",
+                    "national": true
+                },
+                {
+                    "date": "2027-08-30",
+                    "name": "Araw ng mga Bayani",
+                    "national": true
+                },
+                {
+                    "date": "2027-10-31",
+                    "name": "All Saints' Day Eve",
+                    "national": true
+                },
+                {
+                    "date": "2027-11-01",
+                    "name": "Araw ng mga Santo",
+                    "national": true
+                },
+                {
+                    "date": "2027-11-30",
+                    "name": "Araw ni Gat Andres Bonifacio",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-08",
+                    "name": "Kapistahan ng Immaculada Concepcion",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-24",
+                    "name": "Christmas Eve",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-25",
+                    "name": "Araw ng Pasko",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-30",
+                    "name": "Araw ng Kamatayan ni Dr. Jose Rizal",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-31",
+                    "name": "Huling Araw ng Taon",
+                    "national": true
+                },
+                {
+                    "date": "2028-01-01",
+                    "name": "Bagong Taon",
+                    "national": true
+                },
+                {
+                    "date": "2028-01-26",
+                    "name": "Chinese New Year",
+                    "national": true
+                },
+                {
+                    "date": "2028-04-09",
+                    "name": "Araw ng Kagitingan",
+                    "national": true
+                },
+                {
+                    "date": "2028-04-13",
+                    "name": "Huwebes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2028-04-14",
+                    "name": "Biyernes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2028-04-15",
+                    "name": "Sabado de Gloria",
+                    "national": true
+                },
+                {
+                    "date": "2028-05-01",
+                    "name": "Araw ng Paggawa",
+                    "national": true
+                },
+                {
+                    "date": "2028-06-12",
+                    "name": "Araw ng Kalayaan",
+                    "national": true
+                },
+                {
+                    "date": "2028-08-21",
+                    "name": "Araw ng Kamatayan ni Senador Benigno Simeon \"Ninoy\" Aquino Jr.",
+                    "national": true
+                },
+                {
+                    "date": "2028-08-28",
+                    "name": "Araw ng mga Bayani",
+                    "national": true
+                },
+                {
+                    "date": "2028-10-31",
+                    "name": "All Saints' Day Eve",
+                    "national": true
+                },
+                {
+                    "date": "2028-11-01",
+                    "name": "Araw ng mga Santo",
+                    "national": true
+                },
+                {
+                    "date": "2028-11-30",
+                    "name": "Araw ni Gat Andres Bonifacio",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-08",
+                    "name": "Kapistahan ng Immaculada Concepcion",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-24",
+                    "name": "Christmas Eve",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-25",
+                    "name": "Araw ng Pasko",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-30",
+                    "name": "Araw ng Kamatayan ni Dr. Jose Rizal",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-31",
+                    "name": "Huling Araw ng Taon",
+                    "national": true
+                },
+                {
+                    "date": "2029-01-01",
+                    "name": "Bagong Taon",
+                    "national": true
+                },
+                {
+                    "date": "2029-02-13",
+                    "name": "Chinese New Year",
+                    "national": true
+                },
+                {
+                    "date": "2029-03-29",
+                    "name": "Huwebes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2029-03-30",
+                    "name": "Biyernes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2029-03-31",
+                    "name": "Sabado de Gloria",
+                    "national": true
+                },
+                {
+                    "date": "2029-04-09",
+                    "name": "Araw ng Kagitingan",
+                    "national": true
+                },
+                {
+                    "date": "2029-05-01",
+                    "name": "Araw ng Paggawa",
+                    "national": true
+                },
+                {
+                    "date": "2029-06-12",
+                    "name": "Araw ng Kalayaan",
+                    "national": true
+                },
+                {
+                    "date": "2029-08-21",
+                    "name": "Araw ng Kamatayan ni Senador Benigno Simeon \"Ninoy\" Aquino Jr.",
+                    "national": true
+                },
+                {
+                    "date": "2029-08-27",
+                    "name": "Araw ng mga Bayani",
+                    "national": true
+                },
+                {
+                    "date": "2029-10-31",
+                    "name": "All Saints' Day Eve",
+                    "national": true
+                },
+                {
+                    "date": "2029-11-01",
+                    "name": "Araw ng mga Santo",
+                    "national": true
+                },
+                {
+                    "date": "2029-11-30",
+                    "name": "Araw ni Gat Andres Bonifacio",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-08",
+                    "name": "Kapistahan ng Immaculada Concepcion",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-24",
+                    "name": "Christmas Eve",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-25",
+                    "name": "Araw ng Pasko",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-30",
+                    "name": "Araw ng Kamatayan ni Dr. Jose Rizal",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-31",
+                    "name": "Huling Araw ng Taon",
+                    "national": true
+                },
+                {
+                    "date": "2030-01-01",
+                    "name": "Bagong Taon",
+                    "national": true
+                },
+                {
+                    "date": "2030-02-03",
+                    "name": "Chinese New Year",
+                    "national": true
+                },
+                {
+                    "date": "2030-04-09",
+                    "name": "Araw ng Kagitingan",
+                    "national": true
+                },
+                {
+                    "date": "2030-04-18",
+                    "name": "Huwebes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2030-04-19",
+                    "name": "Biyernes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2030-04-20",
+                    "name": "Sabado de Gloria",
+                    "national": true
+                },
+                {
+                    "date": "2030-05-01",
+                    "name": "Araw ng Paggawa",
+                    "national": true
+                },
+                {
+                    "date": "2030-06-12",
+                    "name": "Araw ng Kalayaan",
+                    "national": true
+                },
+                {
+                    "date": "2030-08-21",
+                    "name": "Araw ng Kamatayan ni Senador Benigno Simeon \"Ninoy\" Aquino Jr.",
+                    "national": true
+                },
+                {
+                    "date": "2030-08-26",
+                    "name": "Araw ng mga Bayani",
+                    "national": true
+                },
+                {
+                    "date": "2030-10-31",
+                    "name": "All Saints' Day Eve",
+                    "national": true
+                },
+                {
+                    "date": "2030-11-01",
+                    "name": "Araw ng mga Santo",
+                    "national": true
+                },
+                {
+                    "date": "2030-11-30",
+                    "name": "Araw ni Gat Andres Bonifacio",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-08",
+                    "name": "Kapistahan ng Immaculada Concepcion",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-24",
+                    "name": "Christmas Eve",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-25",
+                    "name": "Araw ng Pasko",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-30",
+                    "name": "Araw ng Kamatayan ni Dr. Jose Rizal",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-31",
+                    "name": "Huling Araw ng Taon",
+                    "national": true
+                },
+                {
+                    "date": "2031-01-01",
+                    "name": "Bagong Taon",
+                    "national": true
+                },
+                {
+                    "date": "2031-01-23",
+                    "name": "Chinese New Year",
+                    "national": true
+                },
+                {
+                    "date": "2031-04-09",
+                    "name": "Araw ng Kagitingan",
+                    "national": true
+                },
+                {
+                    "date": "2031-04-10",
+                    "name": "Huwebes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2031-04-11",
+                    "name": "Biyernes Santo",
+                    "national": true
+                },
+                {
+                    "date": "2031-04-12",
+                    "name": "Sabado de Gloria",
+                    "national": true
+                },
+                {
+                    "date": "2031-05-01",
+                    "name": "Araw ng Paggawa",
+                    "national": true
+                },
+                {
+                    "date": "2031-06-12",
+                    "name": "Araw ng Kalayaan",
+                    "national": true
+                },
+                {
+                    "date": "2031-08-21",
+                    "name": "Araw ng Kamatayan ni Senador Benigno Simeon \"Ninoy\" Aquino Jr.",
+                    "national": true
+                },
+                {
+                    "date": "2031-08-25",
+                    "name": "Araw ng mga Bayani",
+                    "national": true
+                },
+                {
+                    "date": "2031-10-31",
+                    "name": "All Saints' Day Eve",
+                    "national": true
+                },
+                {
+                    "date": "2031-11-01",
+                    "name": "Araw ng mga Santo",
+                    "national": true
+                },
+                {
+                    "date": "2031-11-30",
+                    "name": "Araw ni Gat Andres Bonifacio",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-08",
+                    "name": "Kapistahan ng Immaculada Concepcion",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-24",
+                    "name": "Christmas Eve",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-25",
+                    "name": "Araw ng Pasko",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-30",
+                    "name": "Araw ng Kamatayan ni Dr. Jose Rizal",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-31",
+                    "name": "Huling Araw ng Taon",
+                    "national": true
+                }
+            ]
+        },
+        {
+            "id": "us",
+            "label": "US holidays",
+            "country": "US",
+            "region": null,
+            "color": "#254d74",
+            "enabled": true,
+            "fetched_on": "2026-08-26",
+            "holidays": [
+                {
+                    "date": "2026-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-01-19",
+                    "name": "Martin Luther King, Jr. Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-02-16",
+                    "name": "Washington's Birthday",
+                    "national": true
+                },
+                {
+                    "date": "2026-05-25",
+                    "name": "Memorial Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-06-19",
+                    "name": "Juneteenth National Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-07-03",
+                    "name": "Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-09-07",
+                    "name": "Labor Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-10-12",
+                    "name": "Columbus Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-11-11",
+                    "name": "Veterans Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-11-26",
+                    "name": "Thanksgiving Day",
+                    "national": true
+                },
+                {
+                    "date": "2026-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-01-18",
+                    "name": "Martin Luther King, Jr. Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-02-15",
+                    "name": "Washington's Birthday",
+                    "national": true
+                },
+                {
+                    "date": "2027-05-31",
+                    "name": "Memorial Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-06-18",
+                    "name": "Juneteenth National Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-07-05",
+                    "name": "Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-09-06",
+                    "name": "Labor Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-10-11",
+                    "name": "Columbus Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-11-11",
+                    "name": "Veterans Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-11-25",
+                    "name": "Thanksgiving Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-24",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2027-12-31",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-01-17",
+                    "name": "Martin Luther King, Jr. Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-02-21",
+                    "name": "Washington's Birthday",
+                    "national": true
+                },
+                {
+                    "date": "2028-05-29",
+                    "name": "Memorial Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-06-19",
+                    "name": "Juneteenth National Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-07-04",
+                    "name": "Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-09-04",
+                    "name": "Labor Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-10-09",
+                    "name": "Columbus Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-11-10",
+                    "name": "Veterans Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-11-23",
+                    "name": "Thanksgiving Day",
+                    "national": true
+                },
+                {
+                    "date": "2028-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-01-15",
+                    "name": "Martin Luther King, Jr. Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-02-19",
+                    "name": "Washington's Birthday",
+                    "national": true
+                },
+                {
+                    "date": "2029-05-28",
+                    "name": "Memorial Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-06-19",
+                    "name": "Juneteenth National Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-07-04",
+                    "name": "Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-09-03",
+                    "name": "Labor Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-10-08",
+                    "name": "Columbus Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-11-12",
+                    "name": "Veterans Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-11-22",
+                    "name": "Thanksgiving Day",
+                    "national": true
+                },
+                {
+                    "date": "2029-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-01-21",
+                    "name": "Martin Luther King, Jr. Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-02-18",
+                    "name": "Washington's Birthday",
+                    "national": true
+                },
+                {
+                    "date": "2030-05-27",
+                    "name": "Memorial Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-06-19",
+                    "name": "Juneteenth National Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-07-04",
+                    "name": "Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-09-02",
+                    "name": "Labor Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-10-14",
+                    "name": "Columbus Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-11-11",
+                    "name": "Veterans Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-11-28",
+                    "name": "Thanksgiving Day",
+                    "national": true
+                },
+                {
+                    "date": "2030-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-01-01",
+                    "name": "New Year's Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-01-20",
+                    "name": "Martin Luther King, Jr. Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-02-17",
+                    "name": "Washington's Birthday",
+                    "national": true
+                },
+                {
+                    "date": "2031-05-26",
+                    "name": "Memorial Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-06-19",
+                    "name": "Juneteenth National Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-07-04",
+                    "name": "Independence Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-09-01",
+                    "name": "Labor Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-10-13",
+                    "name": "Columbus Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-11-11",
+                    "name": "Veterans Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-11-27",
+                    "name": "Thanksgiving Day",
+                    "national": true
+                },
+                {
+                    "date": "2031-12-25",
+                    "name": "Christmas Day",
+                    "national": true
+                }
+            ]
+        }
+    ]
+}

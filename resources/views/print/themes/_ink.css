@@ -1,0 +1,23 @@
+/*
+ * Ink friendly.
+ *
+ * Not a theme and not a redesign: the chosen design, minus the parts that
+ * flood a cartridge. Page fills go, tints go, decoration is dropped before it
+ * ever reaches the page (the composer suppresses the artwork layer), and every
+ * rule that was carrying meaning stays exactly where it was.
+ */
+.is-ink { background: #fff !important; }
+.is-ink .cal td, .is-ink .cal td.wknd, .is-ink .cal td.out { background: #fff !important; }
+.is-ink .cal th { background: transparent !important; color: #16211c !important;
+  border-bottom: .75pt solid #16211c !important; border-radius: 0 !important; }
+.is-ink .masthead-banner, .is-ink.title-banner .masthead { background: transparent !important; }
+.is-ink.title-banner .church, .is-ink.title-banner .period,
+.is-ink.title-banner .subtitle, .is-ink.title-banner .doc-title { color: #16211c !important; }
+.is-ink .art { display: none !important; }
+.is-ink * { box-shadow: none !important; }
+
+/* The monthly themes: the title band and its motif go; the rules stay. */
+.is-ink.theme-seasonal .masthead, .is-ink .theme-seasonal .month-name,
+.is-ink.theme-seasonal .month-name { background: transparent !important; }
+.is-ink.theme-seasonal .masthead::after, .is-ink .month-name::after { display: none !important; }
+.is-ink .wk-day, .is-ink .wk-day.wknd, .is-ink .wk-day.out { background: #fff !important; }

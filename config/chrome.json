@@ -1,0 +1,39 @@
+{
+    "_comment": "Site-wide header + footer text. Edit via /admin/header and /admin/footer. Navigation is NOT configured here: since Phase 2 the workspace map (app/Core/Navigation/Workspaces.php) is the single source of the portal's navigation. primaryNav is retained only so older saves round-trip; nothing renders it.",
+    "header": {
+        "brandTitle": "Ekklesia",
+        "brandSubtitle": "Campus-aware ministry operations",
+        "primaryNav": [
+            {
+                "label": "Home",
+                "href": "/",
+                "icon": "dashboard"
+            },
+            {
+                "label": "Calendar",
+                "href": "/calendar",
+                "icon": "calendar"
+            },
+            {
+                "label": "Ministries",
+                "href": "/ministries",
+                "icon": "ministry"
+            },
+            {
+                "label": "People",
+                "href": "/people",
+                "icon": "people"
+            },
+            {
+                "label": "Events",
+                "href": "/events",
+                "icon": "events"
+            }
+        ]
+    },
+    "footer": {
+        "leftText": "Ekklesia",
+        "rightText": "Church records and operations portal",
+        "minimal": true
+    }
+}

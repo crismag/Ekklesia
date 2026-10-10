@@ -1,0 +1,112 @@
+{
+  "generatedAt": "2026-08-25T16:28:21.805Z",
+  "contrast": {
+    "presets": 9,
+    "checked": 135,
+    "failures": []
+  },
+  "privacyFailures": 0,
+  "privacyChecks": [
+    {
+      "label": "/api/people-directory anonymous",
+      "status": 401,
+      "ok": true
+    },
+    {
+      "label": "/api/me anonymous",
+      "status": 401,
+      "ok": true
+    },
+    {
+      "label": "/api/ministries anonymous",
+      "status": 401,
+      "ok": true
+    },
+    {
+      "label": "/api/admin/ministries anonymous",
+      "status": 401,
+      "ok": true
+    },
+    {
+      "label": "/api/admin/leaders anonymous",
+      "status": 401,
+      "ok": true
+    },
+    {
+      "label": "public omits \"email\"",
+      "ok": true
+    },
+    {
+      "label": "public omits \"address\"",
+      "ok": true
+    },
+    {
+      "label": "public omits \"address1\"",
+      "ok": true
+    },
+    {
+      "label": "public omits \"homephone\"",
+      "ok": true
+    },
+    {
+      "label": "public omits \"cellphone\"",
+      "ok": true
+    },
+    {
+      "label": "surname-masked (253 entries)",
+      "ok": true,
+      "unmasked": 0
+    },
+    {
+      "label": "/people HTML omits mailto:",
+      "ok": true
+    },
+    {
+      "label": "/people HTML omits @gmail.",
+      "ok": true
+    },
+    {
+      "label": "/people HTML omits @yahoo.",
+      "ok": true
+    },
+    {
+      "label": "/people HTML omits @hotmail.",
+      "ok": true
+    }
+  ],
+  "standalone": [
+    {
+      "url": "http://christlikeness.local/church_portal/people_signup/",
+      "status": 200
+    },
+    {
+      "url": "http://christlikeness.local/people_signup/",
+      "status": 404
+    },
+    {
+      "url": "http://christlikeness.local/church_portal/events_rsvp/",
+      "status": 302
+    },
+    {
+      "url": "http://christlikeness.local/events_rsvp/",
+      "status": 404
+    }
+  ],
+  "distinctNavAnon": 2,
+  "distinctNavMember": 0,
+  "overflow": 0,
+  "clippedNav": 0,
+  "missingH1": 0,
+  "missingMain": 0,
+  "chromelessRouteChecksExempted": 10,
+  "chromelessRoutes": [
+    "/password/change"
+  ],
+  "missingSkip": 0,
+  "campusHidden": 0,
+  "searchHidden": 0,
+  "drawerTabs": 0,
+  "duplicateMain": 0,
+  "sub24": 0,
+  "memberLogin": "skipped"
+}

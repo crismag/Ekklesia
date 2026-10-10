@@ -1,0 +1,76 @@
+/*
+ * The twelve monthly themes.
+ *
+ * One stylesheet for all twelve, so the sheet has the same structure every
+ * month: a tinted title band with the month's motif in its corner, a quietly
+ * ruled grid, the member-type key and the footer. Everything that changes from
+ * month to month arrives as tokens (--th-*, from CalendarTheme), which is also
+ * what lets a three-month print give each month its own theme: a month's
+ * section carries its own tokens and everything below it follows.
+ *
+ * The season sets the title's character: winter light and airy, spring fresh,
+ * summer bold, fall rich. Member-type colours are never touched.
+ *
+ * Print-safe without background graphics: the band and motif drop out and the
+ * title, rules and grid remain.
+ */
+
+.theme-seasonal .masthead {
+  position: relative; background: var(--th-band); border-bottom: 1.25pt solid var(--th-accent);
+  padding: 9pt 64pt 8pt 11pt; margin: 0 0 12pt; border-radius: 3pt 3pt 0 0;
+}
+.theme-seasonal .masthead::after {
+  content: ""; position: absolute; top: 5pt; right: 9pt; width: 46pt; height: 46pt;
+  background: no-repeat center / contain var(--th-motif, none); opacity: .55; pointer-events: none;
+}
+.theme-seasonal .church { color: var(--th-accent); }
+.theme-seasonal .doc-title { color: var(--th-heading); }
+.theme-seasonal .period { color: var(--th-heading); }
+.theme-seasonal .subtitle { color: var(--th-ink); opacity: .8; }
+
+.theme-seasonal .cal th { color: var(--th-heading); border-bottom: .75pt solid var(--th-accent); }
+.theme-seasonal .cal td { border-color: var(--th-grid); }
+.theme-seasonal .cal td.wknd { background: var(--th-cell); }
+.theme-seasonal .cal td.out { background: var(--th-cell); }
+.theme-seasonal .cal td.out .num { color: var(--th-grid); }
+.theme-seasonal .num { color: var(--th-heading); }
+.theme-seasonal .ent .t { color: var(--th-ink); }
+.theme-seasonal .wk-day { border-color: var(--th-grid); }
+.theme-seasonal .wk-day.wknd, .theme-seasonal .wk-day.out { background: var(--th-cell); }
+.theme-seasonal .colophon { border-top-color: var(--th-grid); color: var(--th-ink); opacity: .75; }
+.theme-seasonal .legend { color: var(--th-ink); }
+
+/* Later months of a multi-month print: the month's name carries its motif. */
+.theme-seasonal .month-name {
+  display: flex; align-items: center; gap: 8pt; color: var(--th-heading);
+  padding: 4pt 8pt; background: var(--th-band); border-bottom: 1pt solid var(--th-accent);
+}
+.theme-seasonal .month-name::after {
+  content: ""; width: 20pt; height: 20pt; margin-left: auto; opacity: .55;
+  background: no-repeat center / contain var(--th-motif, none);
+}
+
+/* The season's voice, in the title only. */
+.season-winter .doc-title { font-weight: 400; letter-spacing: .01em; }
+.season-winter .period { font-style: italic; }
+.season-spring .doc-title { font-weight: 600; }
+.season-spring .period { letter-spacing: .06em; }
+.season-summer .doc-title { font-weight: 800; letter-spacing: -.015em; }
+.season-summer .period { font-weight: 700; }
+.season-fall .doc-title { font-weight: 700; font-variant: small-caps; letter-spacing: .01em; }
+.season-fall .period { font-style: italic; }
+
+/* Each season has one structural signature as well as a voice, so a winter
+   sheet and a summer sheet differ at a glance and not only in tint. All are
+   rules and borders — no fills beyond the pale band. */
+.season-winter .masthead { border-bottom: 3pt double var(--th-accent); }
+.season-winter .cal th { font-style: italic; letter-spacing: .18em; }
+
+.season-spring .masthead { border-radius: 12pt 12pt 3pt 3pt; border-left: 4pt solid var(--th-accent); }
+.season-spring .cal th { border-bottom-style: dotted; border-bottom-width: 1.25pt; }
+
+.season-summer .masthead { border-top: 4pt solid var(--th-accent); border-radius: 0; }
+.season-summer .cal th { color: var(--th-accent); font-weight: 800; }
+
+.season-fall .masthead { border-left: 7pt solid var(--th-accent); border-radius: 0 3pt 0 0; }
+.season-fall .cal th { font-variant: small-caps; text-transform: none; letter-spacing: .08em; font-size: calc(9pt * var(--ts, 1)); }

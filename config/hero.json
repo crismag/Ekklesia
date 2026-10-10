@@ -1,0 +1,41 @@
+{
+    "behavior": {
+        "autoRotate": true,
+        "rotationMs": 7000,
+        "showControls": true,
+        "displayMode": "rotator",
+        "titleScale": "md"
+    },
+    "slides": [
+        {
+            "kicker": "Ministry Schedules Center",
+            "title": "Choose the Ministry First. Then Lead the Work.",
+            "lead": "Calling comes before coordination. \nService is not a task—it is a response to God’s call."
+        },
+        {
+            "kicker": "Living with Conviction",
+            "title": "Serve with Conviction, Not Convenience",
+            "lead": "True service costs something. \nBut obedience to God produces eternal impact."
+        },
+        {
+            "kicker": "Called to Follow",
+            "title": "A Disciple Serves Before He Leads",
+            "lead": "Jesus called servants, not spectators. Follow closely—serve faithfully."
+        },
+        {
+            "kicker": "Godly Leadership",
+            "title": "Lead by Serving. Serve by Obeying.",
+            "lead": "Authority in God’s kingdom flows from humility. \nThe greatest are those who serve."
+        },
+        {
+            "kicker": "Breakthrough Faith",
+            "title": "Obedience Unlocks the Work of God",
+            "lead": "Every act of service is a step of faith. God moves through those who obey."
+        },
+        {
+            "kicker": "Kingdom Identity",
+            "title": "Not My Will, But Yours Be Done",
+            "lead": "A servant’s life is not self-directed.\nIt is fully surrendered to God’s purpose."
+        }
+    ]
+}

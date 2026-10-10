@@ -1,0 +1,42 @@
+<!--
+  Garden — original decorative foliage for the Celebration and Planner themes.
+
+  Drawn in the band's own proportions (roughly 13:1) rather than in a square
+  that then has to be letterboxed into it. Two earlier versions were full-sheet
+  layers; both put shapes wherever the page happened to end, and one landed the
+  hedge across the colophon. Artwork is a strip, the strip is in the flow, and
+  the strip has a height the theme and the grid budget both know about.
+
+  Purely ornamental: the shell marks the layer aria-hidden, there is no text in
+  it, and removing it changes nothing a reader needs to know.
+-->
+<svg viewBox="0 0 1360 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" focusable="false">
+  <g fill="#9cc09a">
+    <ellipse cx="70" cy="96" rx="62" ry="34"/><ellipse cx="168" cy="99" rx="46" ry="26"/>
+    <ellipse cx="272" cy="94" rx="58" ry="36"/><ellipse cx="372" cy="99" rx="42" ry="24"/>
+    <ellipse cx="560" cy="97" rx="50" ry="28"/><ellipse cx="680" cy="93" rx="64" ry="37"/>
+    <ellipse cx="800" cy="97" rx="50" ry="28"/><ellipse cx="988" cy="99" rx="42" ry="24"/>
+    <ellipse cx="1088" cy="94" rx="58" ry="36"/><ellipse cx="1192" cy="99" rx="46" ry="26"/>
+    <ellipse cx="1290" cy="96" rx="62" ry="34"/>
+  </g>
+  <g fill="#7fa87f" opacity=".55" data-art="extra">
+    <ellipse cx="120" cy="100" rx="36" ry="18"/><ellipse cx="322" cy="100" rx="32" ry="16"/>
+    <ellipse cx="620" cy="100" rx="34" ry="17"/><ellipse cx="740" cy="100" rx="32" ry="16"/>
+    <ellipse cx="1038" cy="100" rx="32" ry="16"/><ellipse cx="1240" cy="100" rx="36" ry="18"/>
+  </g>
+  <g fill="none" stroke="#8fb492" stroke-width="3.5" stroke-linecap="round" data-art="extra">
+    <path d="M446 74 C 474 44, 502 76, 530 50"/>
+    <path d="M914 74 C 886 44, 858 76, 830 50"/>
+  </g>
+  <g fill="#a8c7a4" data-art="extra">
+    <ellipse cx="452" cy="60" rx="22" ry="11" transform="rotate(-22 452 60)"/>
+    <ellipse cx="516" cy="50" rx="20" ry="10" transform="rotate(16 516 50)"/>
+    <ellipse cx="908" cy="60" rx="22" ry="11" transform="rotate(22 908 60)"/>
+    <ellipse cx="844" cy="50" rx="20" ry="10" transform="rotate(-16 844 50)"/>
+  </g>
+  <g fill="#e6c96a">
+    <circle cx="228" cy="74" r="7"/><circle cx="330" cy="80" r="6"/>
+    <circle cx="660" cy="70" r="7"/><circle cx="1030" cy="80" r="6"/>
+    <circle cx="1132" cy="74" r="7"/>
+  </g>
+</svg>
