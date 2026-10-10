@@ -66,7 +66,9 @@ information** (stored as `timeZone` in `config/church-info.json`, for example
 `America/Toronto` or `Asia/Manila`). Every date and time follows it: what is
 stored, what "today" and "upcoming" mean, and what every visitor's browser
 shows, wherever they are. The server's own time zone does not matter, so the
-same installation works on any host.
+same installation works on any host. **Administration → System** shows the
+zone in use, the server's own zone and how the database connection was set;
+installing and every deployment also report it.
 
 Church-specific settings live in `config/` (church name and address, theme,
 announcements, ministries). The repository's copies are Christlikeness Church's
@@ -206,6 +208,8 @@ until people sign in.
 - `/.env`, `/storage/private/`, `/database/` and `/app/` are **not**
   downloadable.
 - `php tools/migrate.php --status` reports nothing pending.
+- **Administration → System → Time zone** names the church's zone, not the
+  default, and shows the church's current time correctly.
 - You can sign in, choose a campus, see the calendar, assign someone to serve,
   review a visitor, preview a print layout and download an editable PowerPoint.
 - Google sign-in and emailed links work, if you enabled them.

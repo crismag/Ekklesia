@@ -105,6 +105,27 @@ final class AdminDashboardService
             ],
             'archives' => is_array($archives) ? $archives : [],
             'environment' => $this->environment(),
+            'timeZone' => $this->timeZone(),
+        ];
+    }
+
+    /**
+     * Whose clock the portal keeps: the church's zone (Church information),
+     * the server's own PHP zone, and how the database connection was set.
+     *
+     * @return array{label:string,zone:string,configured:bool,now:string,server:string,database:?string}
+     */
+    private function timeZone(): array
+    {
+        $tz = \App\Core\ChurchTime::describe();
+
+        return [
+            'label' => $tz['label'],
+            'zone' => $tz['zone'],
+            'configured' => $tz['configured'],
+            'now' => (new \DateTimeImmutable('now', new \DateTimeZone($tz['zone'])))->format('l j F Y, g:i a'),
+            'server' => \App\Core\ChurchTime::serverZone(),
+            'database' => \App\Core\ChurchTime::databaseSetting(),
         ];
     }
 

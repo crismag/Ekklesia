@@ -33,6 +33,11 @@ final class ChurchTime
     public const DEFAULT_ZONE = 'America/Toronto';
 
     private static ?string $zone = null;
+    private static ?bool $configured = null;
+    /** PHP's zone before apply(): the server's own, from php.ini. */
+    private static ?string $serverZone = null;
+    /** How the last database connection was set: by name, or by offset. */
+    private static ?string $databaseSetting = null;
 
     /** The church's IANA time zone, e.g. "America/Toronto". */
     public static function zone(): string
@@ -53,7 +58,53 @@ final class ChurchTime
     /** Make the church's zone PHP's default for this process. */
     public static function apply(): void
     {
+        self::$serverZone ??= date_default_timezone_get();
         date_default_timezone_set(self::zone());
+    }
+
+    /** The server's own PHP zone, as it was before the church's was applied. */
+    public static function serverZone(): string
+    {
+        return self::$serverZone ?? date_default_timezone_get();
+    }
+
+    /** False when Church information names no valid zone and the default is used. */
+    public static function isConfigured(): bool
+    {
+        self::zone();
+
+        return (bool) self::$configured;
+    }
+
+    /** How the database connection was set, e.g. "America/Toronto" or "-04:00 (offset; ...)". */
+    public static function databaseSetting(): ?string
+    {
+        return self::$databaseSetting;
+    }
+
+    /**
+     * The church's zone for people to read: "Toronto (EDT, UTC−04:00)".
+     *
+     * @return array{zone:string,place:string,abbreviation:string,offset:string,label:string,configured:bool}
+     */
+    public static function describe(?DateTimeImmutable $at = null): array
+    {
+        $tz = new DateTimeZone(self::zone());
+        $now = ($at ?? new DateTimeImmutable('now', $tz))->setTimezone($tz);
+        $place = self::zone() === 'UTC' ? 'UTC' : str_replace('_', ' ', (string) substr(strrchr('/' . self::zone(), '/'), 1));
+        $abbr = $now->format('T');
+        $offset = 'UTC' . str_replace('-', '−', $now->format('P'));
+        // Zones without a letter abbreviation report the offset itself ("+08").
+        $label = $place . ' (' . (preg_match('/^[A-Z]{2,5}$/', $abbr) === 1 && $abbr !== 'UTC' ? $abbr . ', ' : '') . $offset . ')';
+
+        return [
+            'zone' => self::zone(),
+            'place' => $place,
+            'abbreviation' => $abbr,
+            'offset' => $offset,
+            'label' => $label,
+            'configured' => self::isConfigured(),
+        ];
     }
 
     /**
@@ -66,11 +117,13 @@ final class ChurchTime
     {
         try {
             $pdo->exec('SET time_zone = ' . $pdo->quote(self::zone()));
+            self::$databaseSetting = self::zone();
             return;
         } catch (Throwable) {
             // Named zones unavailable on this server; use the offset.
         }
         $pdo->exec('SET time_zone = ' . $pdo->quote(self::offset()));
+        self::$databaseSetting = self::offset() . ' (offset; the database server has no time-zone tables)';
     }
 
     /** The church's current UTC offset, e.g. "-04:00". */
@@ -98,6 +151,7 @@ final class ChurchTime
     public static function override(?string $zone): void
     {
         self::$zone = $zone;
+        self::$configured = $zone !== null ? true : null;
     }
 
     private static function readZone(string $path): string
@@ -106,6 +160,8 @@ final class ChurchTime
         $data = $raw !== '' ? json_decode($raw, true) : null;
         $zone = is_array($data) ? trim((string) ($data['timeZone'] ?? '')) : '';
 
-        return self::isValidZone($zone) ? $zone : self::DEFAULT_ZONE;
+        self::$configured = self::isValidZone($zone);
+
+        return self::$configured ? $zone : self::DEFAULT_ZONE;
     }
 }

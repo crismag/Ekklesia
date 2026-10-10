@@ -126,6 +126,33 @@ foreach (['resources/views', 'printable'] as $dir) {
 }
 check('dates come from EkklesiaTime, not toISOString(), getTimezoneOffset() or new Date()', $offenders === [], implode(', ', $offenders));
 
+echo "\nWhat administrators see\n";
+$at = static fn (string $when): DateTimeImmutable => new DateTimeImmutable($when, new DateTimeZone('UTC'));
+ChurchTime::override('America/Toronto');
+check('the zone is described in words, with daylight saving',
+    ChurchTime::describe($at('2026-07-01 12:00'))['label'] === 'Toronto (EDT, UTC−04:00)'
+    && ChurchTime::describe($at('2026-12-01 12:00'))['label'] === 'Toronto (EST, UTC−05:00)');
+ChurchTime::override('America/Argentina/Buenos_Aires');
+check('a zone without a letter abbreviation shows its offset', ChurchTime::describe($at('2026-10-10 12:00'))['label'] === 'Buenos Aires (UTC−03:00)');
+$read = new ReflectionMethod(ChurchTime::class, 'readZone');
+$cfg = tempnam(sys_get_temp_dir(), 'tz-');
+file_put_contents($cfg, '{"timeZone": "Asia/Manila"}');
+ChurchTime::override(null);
+check('a zone set in Church information counts as configured', $read->invoke(null, $cfg) === 'Asia/Manila' && ChurchTime::isConfigured());
+file_put_contents($cfg, '{"timeZone": ""}');
+check('an empty one falls back to the default and says so', $read->invoke(null, $cfg) === ChurchTime::DEFAULT_ZONE && !ChurchTime::isConfigured());
+@unlink($cfg);
+ChurchTime::override(null);
+check("the server's own zone is remembered from before the church's was applied", ChurchTime::serverZone() === 'UTC');
+$system = (string) file_get_contents($root . '/resources/views/admin-system.php');
+check('Administration → System shows the church zone, the server zone and the database setting',
+    str_contains($system, 'Church time zone') && str_contains($system, "Server's own PHP time zone") && str_contains($system, 'Database connection'));
+check('and warns when no zone has been set', str_contains($system, "No time zone is set for the church"));
+check('Church information says which zone is in use', str_contains((string) file_get_contents($root . '/resources/views/admin-church-info.php'), 'ChurchTime::describe()'));
+check('the footer does not carry it: it is an administrative setting', !str_contains((string) file_get_contents($root . '/resources/views/_portal-shell.php'), 'portal-footer-tz'));
+check('installing reports the zone the new installation uses', str_contains((string) file_get_contents($root . '/tools/install-database.php'), 'church time zone:'));
+check('every deployment reports the zone of the installation it updates', str_contains((string) file_get_contents($root . '/tools/deploy.sh'), 'church time zone:'));
+
 echo "\nChurch information\n";
 $tmp = tempnam(sys_get_temp_dir(), 'church-info-');
 $info = new ChurchInfoService($tmp);

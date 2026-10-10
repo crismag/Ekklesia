@@ -79,6 +79,34 @@ ob_start();
         </div>
     </section>
 
+    <?php $tz = $dashboard['timeZone'] ?? null; ?>
+    <?php if (is_array($tz)): ?>
+    <section class="ek-card" aria-labelledby="sys-tz">
+        <div class="ek-card-head"><div>
+            <h2 id="sys-tz">Time zone</h2>
+            <p>Every date and time in the portal is the church's local time, for
+               everyone who views it. The server's own time zone is not used.</p>
+        </div></div>
+        <?php if (!$tz['configured']): ?>
+        <div class="ek-alert" role="note">No time zone is set for the church, so the default
+            (<?= $e($tz['zone']) ?>) is used. Set the church's time zone in
+            <a href="<?= $e($basePath) ?>/admin/church-info">Church information</a>.</div>
+        <?php endif; ?>
+        <div class="ek-table-wrap">
+                <table class="ek-table">
+                    <caption class="sr-only">Time zone settings</caption>
+                    <thead><tr><th scope="col">Setting</th><th scope="col">Value</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row" class="dash-rowhead">Church time zone</th><td><code class="code"><?= $e($tz['zone']) ?></code> · <?= $e($tz['label']) ?><?= $tz['configured'] ? '' : ' (default)' ?></td></tr>
+                        <tr><th scope="row" class="dash-rowhead">Time at the church now</th><td><?= $e($tz['now']) ?></td></tr>
+                        <tr><th scope="row" class="dash-rowhead">Server's own PHP time zone</th><td><code class="code"><?= $e($tz['server']) ?></code> — replaced by the church's for every request</td></tr>
+                        <tr><th scope="row" class="dash-rowhead">Database connection</th><td><code class="code"><?= $e($tz['database'] ?? 'not opened by this page') ?></code></td></tr>
+                    </tbody>
+                </table>
+        </div>
+    </section>
+    <?php endif; ?>
+
     <section class="ek-card">
         <div class="ek-card-head"><div>
             <h2>Configuration files</h2>
